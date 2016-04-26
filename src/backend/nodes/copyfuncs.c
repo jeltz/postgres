@@ -4018,6 +4018,7 @@ _copyReindexStmt(const ReindexStmt *from)
 	COPY_NODE_FIELD(relation);
 	COPY_STRING_FIELD(name);
 	COPY_SCALAR_FIELD(options);
+	COPY_SCALAR_FIELD(concurrent);
 
 	return newnode;
 }
