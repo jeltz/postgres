@@ -1899,8 +1899,10 @@ command_no_begin(const char *query)
 		if (wordlen == 10 && pg_strncasecmp(query, "tablespace", 10) == 0)
 			return true;
 
-		/* DROP INDEX CONCURRENTLY isn't allowed in xacts */
-		if (wordlen == 5 && pg_strncasecmp(query, "index", 5) == 0)
+		/* DROP INDEX CONCURRENTLY and REINDEX [ TABLE | INDEX ] CONCURRENTLY
+		   are not allowed in xacts */
+		if (wordlen == 5 && (pg_strncasecmp(query, "index", 5) == 0 ||
+							 pg_strncasecmp(query, "table", 5) == 0))
 		{
 			query += wordlen;
 

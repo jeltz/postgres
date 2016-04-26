@@ -54,6 +54,7 @@ extern Oid index_create(Relation heapRelation,
 			 Oid *classObjectId,
 			 int16 *coloptions,
 			 Datum reloptions,
+			 TupleDesc tupdesc,
 			 bool isprimary,
 			 bool isconstraint,
 			 bool deferrable,
@@ -62,7 +63,26 @@ extern Oid index_create(Relation heapRelation,
 			 bool skip_build,
 			 bool concurrent,
 			 bool is_internal,
-			 bool if_not_exists);
+			 bool if_not_exists,
+			 bool is_reindex);
+
+extern Oid index_concurrent_create(Relation heapRelation,
+								   Oid indOid,
+								   char *concurrentName);
+
+extern void index_concurrent_build(Oid heapOid,
+								   Oid indexOid,
+								   bool isprimary);
+
+extern void index_concurrent_swap(Oid newIndexOid,
+								  Oid oldIndexOid,
+								  LOCKTAG locktag);
+
+extern void index_concurrent_set_dead(Oid heapOid,
+									  Oid indexOid,
+									  LOCKTAG locktag);
+
+extern void index_concurrent_drop(Oid indexOid);
 
 extern ObjectAddress index_constraint_create(Relation heapRelation,
 						Oid indexRelationId,
