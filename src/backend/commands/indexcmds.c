@@ -1324,6 +1324,11 @@ ReindexRelationConcurrently(Oid relationOid)
 		 */
 		WaitForOlderSnapshots(limitXmin);
 
+		/*
+		 * Index can now be marked valid -- update its pg_index entry
+		 */
+		index_set_state_flags(indOid, INDEX_CREATE_SET_VALID);
+
 		/* Commit this transaction to make the concurrent index valid */
 		CommitTransactionCommand();
 	}
@@ -1394,7 +1399,7 @@ ReindexRelationConcurrently(Oid relationOid)
 	 * that may occur on them. One transaction is used for each single index
 	 * entry.
 	 */
-	foreach(lc, concurrentIndexIds)
+	foreach(lc, indexIds)
 	{
 		Oid			indOid = lfirst_oid(lc);
 		Oid			relOid;
@@ -1433,12 +1438,12 @@ ReindexRelationConcurrently(Oid relationOid)
 	/*
 	 * Phase 6 of REINDEX CONCURRENTLY
 	 *
-	 * Drop the concurrent indexes, with actually the same code path as
+	 * Drop the original indexes, with actually the same code path as
 	 * DROP INDEX CONCURRENTLY. This is safe as all the concurrent entries are
 	 * already considered as invalid and not ready, so they will not be used
 	 * by other backends for any read or write operations.
 	 */
-	foreach(lc, concurrentIndexIds)
+	foreach(lc, indexIds)
 	{
 		Oid indexOid = lfirst_oid(lc);
 

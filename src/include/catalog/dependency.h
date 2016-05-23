@@ -232,6 +232,9 @@ extern long changeDependencyFor(Oid classId, Oid objectId,
 					Oid refClassId, Oid oldRefObjectId,
 					Oid newRefObjectId);
 
+extern long changeDependencyForAll(Oid refClassId, Oid oldRefObjectId,
+					Oid newRefObjectId);
+
 extern Oid	getExtensionOfObject(Oid classId, Oid objectId);
 
 extern bool sequenceIsOwned(Oid seqId, Oid *tableId, int32 *colId);
