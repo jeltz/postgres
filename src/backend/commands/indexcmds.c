@@ -1082,20 +1082,21 @@ ReindexRelationConcurrently(Oid relationOid)
 
 	Assert(parentRelationIds != NIL);
 
-	/*
-	 * Phase 1 of REINDEX CONCURRENTLY
-	 *
-	 * Here begins the process for concurrently rebuilding the index entries.
-	 * We need first to create an index which is based on the same data
-	 * as the former index except that it will be only registered in catalogs
-	 * and will be built later. It is possible to perform all the operations
-	 * on all the indexes at the same time for a parent relation including
-	 * indexes for its toast relation.
-	 */
-
-	/* Do the concurrent index creation for each index */
 	foreach(lc, indexIds)
 	{
+		/*
+		 * Phase 1 of REINDEX CONCURRENTLY
+		 *
+		 * Here begins the process for concurrently rebuilding the index entries.
+		 * We need first to create an index which is based on the same data
+		 * as the former index except that it will be only registered in catalogs
+		 * and will be built later. It is possible to perform all the operations
+		 * on all the indexes at the same time for a parent relation including
+		 * indexes for its toast relation.
+		 */
+
+		/* Do the concurrent index creation for each index */
+
 		char	   *concurrentName;
 		Oid			indOid = lfirst_oid(lc);
 		Oid			concurrentOid = InvalidOid;

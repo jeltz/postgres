@@ -1347,6 +1347,8 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, LOCKTAG locktag)
 		deleteDependencyRecordsForClass(RelationRelationId, oldIndexOid,
 										ConstraintRelationId, DEPENDENCY_INTERNAL);
 
+		// TODO: pg_depend for old index?
+
 		myself.classId = RelationRelationId;
 		myself.objectId = newIndexOid;
 		myself.objectSubId = 0;
