@@ -1123,6 +1123,98 @@ index_create(Relation heapRelation,
 }
 
 /*
+ * index_concurrent_build
+ *
+ * Build index for a concurrent operation. Low-level locks are taken when this
+ * operation is performed to prevent only schema changes but they need to be
+ * kept until the end of the transaction performing this operation.
+ */
+void
+index_concurrent_build(Oid heapOid,
+					   Oid indexOid,
+					   bool isprimary)
+{
+	Relation	heapRel, indexRelation;
+	IndexInfo  *indexInfo;
+
+	/* Open and lock the parent heap relation */
+	heapRel = heap_open(heapOid, ShareUpdateExclusiveLock);
+
+	/* And the target index relation */
+	indexRelation = index_open(indexOid, RowExclusiveLock);
+
+	/*
+	 * We have to re-build the IndexInfo struct, since it was lost in
+	 * commit of transaction where this concurrent index was created
+	 * at the catalog level.
+	 */
+	indexInfo = BuildIndexInfo(indexRelation);
+	Assert(!indexInfo->ii_ReadyForInserts);
+	indexInfo->ii_Concurrent = true;
+	indexInfo->ii_BrokenHotChain = false;
+
+	/* Now build the index */
+	index_build(heapRel, indexRelation, indexInfo, isprimary, false);
+
+	/* Close both relations, and keep the locks */
+	heap_close(heapRel, NoLock);
+	index_close(indexRelation, NoLock);
+
+	/*
+	 * Update the pg_index row to mark the index as ready for inserts. Once we
+	 * commit this transaction, any new transactions that open the table must
+	 * insert new entries into the index for insertions and non-HOT updates.
+	 */
+	index_set_state_flags(indexOid, INDEX_CREATE_SET_READY);
+}
+
+/*
+ * index_concurrent_set_dead
+ *
+ * Perform the last invalidation stage of DROP INDEX CONCURRENTLY or REINDEX
+ * CONCURRENTLY before actually dropping the index. After calling this
+ * function the index is seen by all the backends as dead. Low-level locks
+ * taken here are kept until the end of the transaction doing calling this
+ * function.
+ */
+void
+index_concurrent_set_dead(Oid heapOid, Oid indexOid)
+{
+	Relation	heapRelation, indexRelation;
+
+	/*
+	 * No more predicate locks will be acquired on this index, and we're
+	 * about to stop doing inserts into the index which could show
+	 * conflicts with existing predicate locks, so now is the time to move
+	 * them to the heap relation.
+	 */
+	heapRelation = heap_open(heapOid, ShareUpdateExclusiveLock);
+	indexRelation = index_open(indexOid, ShareUpdateExclusiveLock);
+	TransferPredicateLocksToHeapRelation(indexRelation);
+
+	/*
+	 * Now we are sure that nobody uses the index for queries; they just
+	 * might have it open for updating it.  So now we can unset indisready
+	 * and indislive, then wait till nobody could be using it at all
+	 * anymore.
+	 */
+	index_set_state_flags(indexOid, INDEX_DROP_SET_DEAD);
+
+	/*
+	 * Invalidate the relcache for the table, so that after this commit
+	 * all sessions will refresh the table's index list.  Forgetting just
+	 * the index's relcache entry is not enough.
+	 */
+	CacheInvalidateRelcache(heapRelation);
+
+	/*
+	 * Close the relations again, though still holding session lock.
+	 */
+	heap_close(heapRelation, NoLock);
+	index_close(indexRelation, NoLock);
+}
+
+/*
  * index_constraint_create
  *
  * Set up a constraint associated with an index.  Return the new constraint's
@@ -1483,41 +1575,13 @@ index_drop(Oid indexId, bool concurrent)
 		 * Note: the reason we use actual lock acquisition here, rather than
 		 * just checking the ProcArray and sleeping, is that deadlock is
 		 * possible if one of the transactions in question is blocked trying
-		 * to acquire an exclusive lock on our table.  The lock code will
+		 * to acquire an exclusive lock on our table. The lock code will
 		 * detect deadlock and error out properly.
 		 */
 		WaitForLockers(heaplocktag, AccessExclusiveLock);
 
-		/*
-		 * No more predicate locks will be acquired on this index, and we're
-		 * about to stop doing inserts into the index which could show
-		 * conflicts with existing predicate locks, so now is the time to move
-		 * them to the heap relation.
-		 */
-		userHeapRelation = heap_open(heapId, ShareUpdateExclusiveLock);
-		userIndexRelation = index_open(indexId, ShareUpdateExclusiveLock);
-		TransferPredicateLocksToHeapRelation(userIndexRelation);
-
-		/*
-		 * Now we are sure that nobody uses the index for queries; they just
-		 * might have it open for updating it.  So now we can unset indisready
-		 * and indislive, then wait till nobody could be using it at all
-		 * anymore.
-		 */
-		index_set_state_flags(indexId, INDEX_DROP_SET_DEAD);
-
-		/*
-		 * Invalidate the relcache for the table, so that after this commit
-		 * all sessions will refresh the table's index list.  Forgetting just
-		 * the index's relcache entry is not enough.
-		 */
-		CacheInvalidateRelcache(userHeapRelation);
-
-		/*
-		 * Close the relations again, though still holding session lock.
-		 */
-		heap_close(userHeapRelation, NoLock);
-		index_close(userIndexRelation, NoLock);
+		/* Finish invalidation of index and mark it as dead */
+		index_concurrent_set_dead(heapId, indexId);
 
 		/*
 		 * Again, commit the transaction to make the pg_index update visible

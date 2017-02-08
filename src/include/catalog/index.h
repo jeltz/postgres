@@ -64,6 +64,13 @@ extern Oid index_create(Relation heapRelation,
 			 bool is_internal,
 			 bool if_not_exists);
 
+extern void index_concurrent_build(Oid heapOid,
+								   Oid indexOid,
+								   bool isprimary);
+
+extern void index_concurrent_set_dead(Oid heapOid,
+									  Oid indexOid);
+
 extern ObjectAddress index_constraint_create(Relation heapRelation,
 						Oid indexRelationId,
 						IndexInfo *indexInfo,
