@@ -72,11 +72,13 @@ static void ComputeIndexAttrs(IndexInfo *indexInfo,
 				  bool isconstraint);
 static char *ChooseIndexName(const char *tabname, Oid namespaceId,
 				List *colnames, List *exclusionOpNames,
-				bool primary, bool isconstraint);
+				bool primary, bool isconstraint,
+				bool concurrent, bool concurrentold);
 static char *ChooseIndexNameAddition(List *colnames);
 static List *ChooseIndexColumnNames(List *indexElems);
 static void RangeVarCallbackForReindexIndex(const RangeVar *relation,
 								Oid relId, Oid oldRelId, void *arg);
+static bool ReindexRelationConcurrently(Oid relationOid, int options);
 
 /*
  * CheckIndexCompatible
@@ -553,7 +555,9 @@ DefineIndex(Oid relationId,
 											indexColNames,
 											stmt->excludeOpNames,
 											stmt->primary,
-											stmt->isconstraint);
+											stmt->isconstraint,
+											false,
+											false);
 
 	/*
 	 * look up the access method, verify it can handle the requested features
@@ -740,12 +744,12 @@ DefineIndex(Oid relationId,
 					 indexInfo, indexColNames,
 					 accessMethodId, tablespaceId,
 					 collationObjectId, classObjectId,
-					 coloptions, reloptions, stmt->primary,
+					 coloptions, reloptions, NULL, stmt->primary,
 					 stmt->isconstraint, stmt->deferrable, stmt->initdeferred,
 					 allowSystemTableMods,
 					 skip_build || stmt->concurrent,
 					 stmt->concurrent, !check_rights,
-					 stmt->if_not_exists);
+					 stmt->if_not_exists, false);
 
 	ObjectAddressSet(address, RelationRelationId, indexRelationId);
 
@@ -1595,7 +1599,8 @@ ChooseRelationName(const char *name1, const char *name2,
 static char *
 ChooseIndexName(const char *tabname, Oid namespaceId,
 				List *colnames, List *exclusionOpNames,
-				bool primary, bool isconstraint)
+				bool primary, bool isconstraint,
+				bool concurrent, bool concurrentold)
 {
 	char	   *indexname;
 
@@ -1619,6 +1624,20 @@ ChooseIndexName(const char *tabname, Oid namespaceId,
 		indexname = ChooseRelationName(tabname,
 									   ChooseIndexNameAddition(colnames),
 									   "key",
+									   namespaceId);
+	}
+	else if (concurrent)
+	{
+		indexname = ChooseRelationName(tabname,
+									   NULL,
+									   "cct",
+									   namespaceId);
+	}
+	else if (concurrentold)
+	{
+		indexname = ChooseRelationName(tabname,
+									   NULL,
+									   "ccto",
 									   namespaceId);
 	}
 	else
@@ -1733,7 +1752,7 @@ ChooseIndexColumnNames(List *indexElems)
  *		Recreate a specific index.
  */
 Oid
-ReindexIndex(RangeVar *indexRelation, int options)
+ReindexIndex(RangeVar *indexRelation, int options, bool concurrent)
 {
 	Oid			indOid;
 	Oid			heapOid = InvalidOid;
@@ -1745,8 +1764,9 @@ ReindexIndex(RangeVar *indexRelation, int options)
 	 * obtain lock on table first, to avoid deadlock hazard.  The lock level
 	 * used here must match the index lock obtained in reindex_index().
 	 */
-	indOid = RangeVarGetRelidExtended(indexRelation, AccessExclusiveLock,
-									  false, false,
+	indOid = RangeVarGetRelidExtended(indexRelation,
+									  concurrent ? ShareUpdateExclusiveLock : AccessExclusiveLock,
+									  concurrent, concurrent,
 									  RangeVarCallbackForReindexIndex,
 									  (void *) &heapOid);
 
@@ -1758,7 +1778,10 @@ ReindexIndex(RangeVar *indexRelation, int options)
 	persistence = irel->rd_rel->relpersistence;
 	index_close(irel, NoLock);
 
-	reindex_index(indOid, false, persistence, options);
+	if (concurrent)
+		ReindexRelationConcurrently(indOid, options);
+	else
+		reindex_index(indOid, false, persistence, options);
 
 	return indOid;
 }
@@ -1827,18 +1850,26 @@ RangeVarCallbackForReindexIndex(const RangeVar *relation,
  *		Recreate all indexes of a table (and of its toast table, if any)
  */
 Oid
-ReindexTable(RangeVar *relation, int options)
+ReindexTable(RangeVar *relation, int options, bool concurrent)
 {
 	Oid			heapOid;
+	bool		result;
 
 	/* The lock level used here should match reindex_relation(). */
-	heapOid = RangeVarGetRelidExtended(relation, ShareLock, false, false,
+	heapOid = RangeVarGetRelidExtended(relation,
+									   concurrent ? ShareUpdateExclusiveLock : ShareLock,
+									   concurrent, concurrent,
 									   RangeVarCallbackOwnsTable, NULL);
 
-	if (!reindex_relation(heapOid,
-						  REINDEX_REL_PROCESS_TOAST |
-						  REINDEX_REL_CHECK_CONSTRAINTS,
-						  options))
+	if (concurrent)
+		result = ReindexRelationConcurrently(heapOid, options);
+	else
+		result = reindex_relation(heapOid,
+								  REINDEX_REL_PROCESS_TOAST |
+								  REINDEX_REL_CHECK_CONSTRAINTS,
+								  options);
+
+	if (!result)
 		ereport(NOTICE,
 				(errmsg("table \"%s\" has no indexes",
 						relation->relname)));
@@ -1856,7 +1887,7 @@ ReindexTable(RangeVar *relation, int options)
  */
 void
 ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
-					  int options)
+					  int options, bool concurrent)
 {
 	Oid			objectOid;
 	Relation	relationRelation;
@@ -1984,19 +2015,24 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 	foreach(l, relids)
 	{
 		Oid			relid = lfirst_oid(l);
+		bool		result;
 
 		StartTransactionCommand();
 		/* functions in indexes may want a snapshot set */
 		PushActiveSnapshot(GetTransactionSnapshot());
-		if (reindex_relation(relid,
-							 REINDEX_REL_PROCESS_TOAST |
-							 REINDEX_REL_CHECK_CONSTRAINTS,
-							 options))
 
-			if (options & REINDEXOPT_VERBOSE)
-				ereport(INFO,
-						(errmsg("table \"%s.%s\" was reindexed",
-								get_namespace_name(get_rel_namespace(relid)),
+		if (concurrent)
+			result = ReindexRelationConcurrently(relid, options);
+		else
+			result = reindex_relation(relid,
+									  REINDEX_REL_PROCESS_TOAST |
+									  REINDEX_REL_CHECK_CONSTRAINTS,
+									  options);
+
+		if (result && (options & REINDEXOPT_VERBOSE))
+			ereport(INFO,
+					(errmsg("table \"%s.%s\" was reindexed",
+							get_namespace_name(get_rel_namespace(relid)),
 								get_rel_name(relid))));
 		PopActiveSnapshot();
 		CommitTransactionCommand();
@@ -2004,4 +2040,578 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 	StartTransactionCommand();
 
 	MemoryContextDelete(private_context);
+}
+
+
+/*
+ * ReindexRelationConcurrently
+ *
+ * Process REINDEX CONCURRENTLY for given relation Oid. The relation can be
+ * either an index or a table. If a table is specified, each phase is processed
+ * one by done for each table's indexes as well as its dependent toast indexes
+ * if this table has a toast relation defined.
+ */
+static bool
+ReindexRelationConcurrently(Oid relationOid, int options)
+{
+	List	   *parentRelationIds = NIL;
+	List	   *indexIds = NIL;
+	List	   *concurrentIndexIds = NIL;
+	List	   *relationLocks = NIL;
+	List	   *lockTags = NIL;
+	ListCell   *lc, *lc2;
+
+	/*
+	 * Extract the list of indexes that are going to be rebuilt based on the
+	 * list of relation Oids given by caller. For each element in given list,
+	 * If the relkind of given relation Oid is a table, all its valid indexes
+	 * will be rebuilt, including its associated toast table indexes. If
+	 * relkind is an index, this index itself will be rebuilt. The locks taken
+	 * on parent relations and involved indexes are kept until this transaction
+	 * is committed to protect against schema changes that might occur until
+	 * the session lock is taken on each relation, session lock used to
+	 * similarly protect from any schema change that could happen within the
+	 * multiple transactions that are used during this process.
+	 */
+	switch (get_rel_relkind(relationOid))
+	{
+		case RELKIND_RELATION:
+		case RELKIND_MATVIEW:
+		case RELKIND_TOASTVALUE:
+			{
+				/*
+				 * In the case of a relation, find all its indexes
+				 * including toast indexes.
+				 */
+				Relation	heapRelation;
+
+				/* Track this relation for session locks */
+				parentRelationIds = lappend_oid(parentRelationIds, relationOid);
+
+				/* A shared relation cannot be reindexed concurrently */
+				if (IsSharedRelation(relationOid))
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("concurrent reindex is not supported for shared relations")));
+
+				/* A system catalog cannot be reindexed concurrently */
+				if (IsSystemNamespace(get_rel_namespace(relationOid)))
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("concurrent reindex is not supported for catalog relations")));
+
+				/* Open relation to get its indexes */
+				heapRelation = heap_open(relationOid, ShareUpdateExclusiveLock);
+
+				/* Add all the valid indexes of relation to list */
+				foreach(lc, RelationGetIndexList(heapRelation))
+				{
+					Oid			cellOid = lfirst_oid(lc);
+					Relation	indexRelation = index_open(cellOid,
+													ShareUpdateExclusiveLock);
+
+					if (!indexRelation->rd_index->indisvalid)
+						ereport(WARNING,
+								(errcode(ERRCODE_INDEX_CORRUPTED),
+								 errmsg("cannot reindex concurrently invalid index \"%s.%s\", skipping",
+										get_namespace_name(get_rel_namespace(cellOid)),
+										get_rel_name(cellOid))));
+					else
+						indexIds = lappend_oid(indexIds, cellOid);
+
+					index_close(indexRelation, NoLock);
+				}
+
+				/* Also add the toast indexes */
+				if (OidIsValid(heapRelation->rd_rel->reltoastrelid))
+				{
+					Oid			toastOid = heapRelation->rd_rel->reltoastrelid;
+					Relation	toastRelation = heap_open(toastOid,
+												ShareUpdateExclusiveLock);
+
+					/* Track this relation for session locks */
+					parentRelationIds = lappend_oid(parentRelationIds, toastOid);
+
+					foreach(lc2, RelationGetIndexList(toastRelation))
+					{
+						Oid			cellOid = lfirst_oid(lc2);
+						Relation	indexRelation = index_open(cellOid,
+													ShareUpdateExclusiveLock);
+
+						if (!indexRelation->rd_index->indisvalid)
+							ereport(WARNING,
+									(errcode(ERRCODE_INDEX_CORRUPTED),
+									 errmsg("cannot reindex concurrently invalid index \"%s.%s\", skipping",
+											get_namespace_name(get_rel_namespace(cellOid)),
+											get_rel_name(cellOid))));
+						else
+							indexIds = lappend_oid(indexIds, cellOid);
+
+						index_close(indexRelation, NoLock);
+					}
+
+					heap_close(toastRelation, NoLock);
+				}
+
+				heap_close(heapRelation, NoLock);
+				break;
+			}
+		case RELKIND_INDEX:
+			{
+				/*
+				 * For an index simply add its Oid to list. Invalid indexes
+				 * cannot be included in list.
+				 */
+				Relation	indexRelation = index_open(relationOid, ShareUpdateExclusiveLock);
+				Oid			parentOid = IndexGetRelation(relationOid, false);
+
+				/* A shared relation cannot be reindexed concurrently */
+				if (IsSharedRelation(parentOid))
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("concurrent reindex is not supported for shared relations")));
+
+				/* A system catalog cannot be reindexed concurrently */
+				if (IsSystemNamespace(get_rel_namespace(parentOid)))
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("concurrent reindex is not supported for catalog relations")));
+
+				/* Track the parent relation of this index for session locks */
+				parentRelationIds = list_make1_oid(parentOid);
+
+				if (!indexRelation->rd_index->indisvalid)
+					ereport(WARNING,
+							(errcode(ERRCODE_INDEX_CORRUPTED),
+							 errmsg("cannot reindex concurrently invalid index \"%s.%s\", skipping",
+									get_namespace_name(get_rel_namespace(relationOid)),
+									get_rel_name(relationOid))));
+				else
+					indexIds = list_make1_oid(relationOid);
+
+				index_close(indexRelation, NoLock);
+				break;
+			}
+		default:
+			/* Return error if type of relation is not supported */
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("cannot reindex concurrently this type of relation")));
+			break;
+	}
+
+	/* Definetely no indexes, so leave */
+	if (indexIds == NIL)
+		return false;
+
+	Assert(parentRelationIds != NIL);
+
+	/*
+	 * Phase 1 of REINDEX CONCURRENTLY
+	 *
+	 * Here begins the process for concurrently rebuilding the index entries.
+	 * We need first to create an index which is based on the same data
+	 * as the former index except that it will be only registered in catalogs
+	 * and will be built later. It is possible to perform all the operations
+	 * on all the indexes at the same time for a parent relation including
+	 * indexes for its toast relation.
+	 */
+
+	/* Do the concurrent index creation for each index */
+	foreach(lc, indexIds)
+	{
+		char	   *concurrentName;
+		Oid			indOid = lfirst_oid(lc);
+		Oid			concurrentOid = InvalidOid;
+		Relation	indexRel,
+					indexParentRel,
+					indexConcurrentRel;
+		LockRelId	lockrelid;
+
+		indexRel = index_open(indOid, ShareUpdateExclusiveLock);
+		/* Open the index parent relation, might be a toast or parent relation */
+		indexParentRel = heap_open(indexRel->rd_index->indrelid,
+								   ShareUpdateExclusiveLock);
+
+		/* Choose a relation name for concurrent index */
+		concurrentName = ChooseIndexName(get_rel_name(indOid),
+										 get_rel_namespace(indexRel->rd_index->indrelid),
+										 NULL,
+										 NULL,
+										 false,
+										 false,
+										 true,
+										 false);
+
+		/* Create concurrent index based on given index */
+		concurrentOid = index_concurrent_create_copy(indexParentRel,
+													 indOid,
+													 concurrentName);
+
+		/*
+		 * Now open the relation of concurrent index, a lock is also needed on
+		 * it
+		 */
+		indexConcurrentRel = index_open(concurrentOid, ShareUpdateExclusiveLock);
+
+		/* Save the concurrent index Oid */
+		concurrentIndexIds = lappend_oid(concurrentIndexIds, concurrentOid);
+
+		/*
+		 * Save lockrelid to protect each concurrent relation from drop then
+		 * close relations. The lockrelid on parent relation is not taken here
+		 * to avoid multiple locks taken on the same relation, instead we rely
+		 * on parentRelationIds built earlier.
+		 */
+		lockrelid = indexRel->rd_lockInfo.lockRelId;
+		relationLocks = lappend(relationLocks, &lockrelid);
+		lockrelid = indexConcurrentRel->rd_lockInfo.lockRelId;
+		relationLocks = lappend(relationLocks, &lockrelid);
+
+		index_close(indexRel, NoLock);
+		index_close(indexConcurrentRel, NoLock);
+		heap_close(indexParentRel, NoLock);
+	}
+
+	/*
+	 * Save the heap lock for following visibility checks with other backends
+	 * might conflict with this session.
+	 */
+	foreach(lc, parentRelationIds)
+	{
+		Relation	heapRelation = heap_open(lfirst_oid(lc), ShareUpdateExclusiveLock);
+		LockRelId	lockrelid = heapRelation->rd_lockInfo.lockRelId;
+		LOCKTAG		*heaplocktag = (LOCKTAG *) palloc(sizeof(LOCKTAG));
+
+		/* Add lockrelid of parent relation to the list of locked relations */
+		relationLocks = lappend(relationLocks, &lockrelid);
+
+		/* Save the LOCKTAG for this parent relation for the wait phase */
+		SET_LOCKTAG_RELATION(*heaplocktag, lockrelid.dbId, lockrelid.relId);
+		lockTags = lappend(lockTags, heaplocktag);
+
+		/* Close heap relation */
+		heap_close(heapRelation, NoLock);
+	}
+
+	/*
+	 * For a concurrent build, it is necessary to make the catalog entries
+	 * visible to the other transactions before actually building the index.
+	 * This will prevent them from making incompatible HOT updates. The index
+	 * is marked as not ready and invalid so as no other transactions will try
+	 * to use it for INSERT or SELECT.
+	 *
+	 * Before committing, get a session level lock on the relation, the
+	 * concurrent index and its copy to insure that none of them are dropped
+	 * until the operation is done.
+	 */
+	foreach(lc, relationLocks)
+	{
+		LockRelId lockRel = *((LockRelId *) lfirst(lc));
+		LockRelationIdForSession(&lockRel, ShareUpdateExclusiveLock);
+	}
+
+	PopActiveSnapshot();
+	CommitTransactionCommand();
+
+	/*
+	 * Phase 2 of REINDEX CONCURRENTLY
+	 *
+	 * Build concurrent indexes in a separate transaction for each index to
+	 * avoid having open transactions for an unnecessary long time. A
+	 * concurrent build is done for each concurrent index that will replace
+	 * the old indexes. Before doing that, we need to wait on the parent
+	 * relations until no running transactions could have the parent table
+	 * of index open.
+	 */
+
+	/* Perform a wait on all the session locks */
+	StartTransactionCommand();
+	WaitForLockersMultiple(lockTags, ShareLock);
+	CommitTransactionCommand();
+
+	forboth(lc, indexIds, lc2, concurrentIndexIds)
+	{
+		Relation	indexRel;
+		Oid			indOid = lfirst_oid(lc);
+		Oid			concurrentOid = lfirst_oid(lc2);
+		bool		primary;
+
+		CHECK_FOR_INTERRUPTS();
+
+		/* Start new transaction for this index concurrent build */
+		StartTransactionCommand();
+
+		/* Set ActiveSnapshot since functions in the indexes may need it */
+		PushActiveSnapshot(GetTransactionSnapshot());
+
+		/*
+		 * Index relation has been closed by previous commit, so reopen it
+		 * to determine if it is used as a primary key.
+		 */
+		indexRel = index_open(indOid, ShareUpdateExclusiveLock);
+		primary = indexRel->rd_index->indisprimary;
+		index_close(indexRel, NoLock);
+
+		/* Perform concurrent build of new index */
+		index_concurrent_build(indexRel->rd_index->indrelid,
+							   concurrentOid,
+							   primary);
+
+		/* we can do away with our snapshot */
+		PopActiveSnapshot();
+
+		/*
+		 * Commit this transaction to make the indisready update visible for
+		 * concurrent index.
+		 */
+		CommitTransactionCommand();
+	}
+
+	/*
+	 * Phase 3 of REINDEX CONCURRENTLY
+	 *
+	 * During this phase the concurrent indexes catch up with any new tuples
+	 * that were created during the previous phase.
+	 *
+	 * We once again wait until no transaction can have the table open with
+	 * the index marked as read-only for updates. Each index validation is
+	 * done in a separate transaction to minimize how long we hold an open
+	 * transaction.
+	 */
+
+	/* Perform a wait on all the session locks */
+	StartTransactionCommand();
+	WaitForLockersMultiple(lockTags, ShareLock);
+	CommitTransactionCommand();
+
+	/*
+	 * Perform a scan of each concurrent index with the heap, then insert
+	 * any missing index entries.
+	 */
+	foreach(lc, concurrentIndexIds)
+	{
+		Oid				indOid = lfirst_oid(lc);
+		Oid				relOid;
+		TransactionId	limitXmin;
+		Snapshot		snapshot;
+
+		CHECK_FOR_INTERRUPTS();
+
+		/* Open separate transaction to validate index */
+		StartTransactionCommand();
+
+		/* Get the parent relation Oid */
+		relOid = IndexGetRelation(indOid, false);
+
+		/*
+		 * Take the reference snapshot that will be used for the concurrent indexes
+		 * validation.
+		 */
+		snapshot = RegisterSnapshot(GetTransactionSnapshot());
+		PushActiveSnapshot(snapshot);
+
+		/* Validate index, which might be a toast */
+		validate_index(relOid, indOid, snapshot);
+
+		/*
+		 * Invalidate the relcache for the table, so that after this commit
+		 * all sessions will refresh any cached plans that might reference the
+		 * index.
+		 */
+		CacheInvalidateRelcacheByRelid(relOid);
+
+		/*
+		 * We can now do away with our active snapshot, we still need to save the xmin
+		 * limit to wait for older snapshots.
+		 */
+		limitXmin = snapshot->xmin;
+		PopActiveSnapshot();
+
+		/* And we can remove the validating snapshot too */
+		UnregisterSnapshot(snapshot);
+
+		/*
+		 * This concurrent index is now valid as they contain all the tuples
+		 * necessary. However, it might not have taken into account deleted tuples
+		 * before the reference snapshot was taken, so we need to wait for the
+		 * transactions that might have older snapshots than ours.
+		 */
+		WaitForOlderSnapshots(limitXmin);
+
+		/* Commit this transaction now that the concurrent index is valid */
+		CommitTransactionCommand();
+	}
+
+	/*
+	 * Phase 4 of REINDEX CONCURRENTLY
+	 *
+	 * Now that the concurrent indexes have been validated, it is necessary
+	 * to swap each concurrent index with its corresponding old index.
+	 *
+	 * We mark the new indexes as valid and the old indexes dead at the same
+	 * time to make sure we get only get constraint violations from the
+	 * indexes with the correct names.
+	 */
+	forboth(lc, indexIds, lc2, concurrentIndexIds)
+	{
+		char	   *oldName;
+		Oid			indOid = lfirst_oid(lc);
+		Oid			concurrentOid = lfirst_oid(lc2);
+		Oid			relOid;
+
+		CHECK_FOR_INTERRUPTS();
+
+		/*
+		 * Each index needs to be swapped in a separate transaction, so start
+		 * a new one.
+		 */
+		StartTransactionCommand();
+		relOid = IndexGetRelation(indOid, false);
+
+		/* Choose a relation name for old index */
+		oldName = ChooseIndexName(get_rel_name(indOid),
+								  get_rel_namespace(relOid),
+								  NULL,
+								  NULL,
+								  false,
+								  false,
+								  false,
+								  true);
+
+		/* Swap old index and its concurrent entry */
+		index_concurrent_swap(concurrentOid, indOid, oldName);
+
+		/* Swap which index is valid */
+		index_set_state_flags(indOid, INDEX_DROP_CLEAR_VALID);
+		index_set_state_flags(concurrentOid, INDEX_CREATE_SET_VALID);
+
+		/*
+		 * Invalidate the relcache for the table, so that after this commit
+		 * all sessions will refresh any cached plans that might reference the
+		 * index.
+		 */
+		CacheInvalidateRelcacheByRelid(relOid);
+
+		/* Commit this transaction and make old index invalidation visible */
+		CommitTransactionCommand();
+	}
+
+	/*
+	 * Phase 5 of REINDEX CONCURRENTLY
+	 *
+	 * The indexes hold now a fresh relfilenode of their respective concurrent
+	 * entries indexes. It is time to mark the now-useless concurrent entries
+	 * as not ready so as they can be safely discarded from write operations
+	 * that may occur on them. One transaction is used for each single index
+	 * entry.
+	 */
+	foreach(lc, indexIds)
+	{
+		Oid			indOid = lfirst_oid(lc);
+		Oid			relOid;
+		LOCKTAG	   *heapLockTag = NULL;
+		ListCell   *cell;
+
+		CHECK_FOR_INTERRUPTS();
+
+		StartTransactionCommand();
+		relOid = IndexGetRelation(indOid, false);
+
+		/*
+		 * Find the locktag of parent table for this index, we need to wait for
+		 * locks on it.
+		 */
+		foreach(cell, lockTags)
+		{
+			LOCKTAG *localTag = (LOCKTAG *) lfirst(cell);
+			if (relOid == localTag->locktag_field2)
+				heapLockTag = localTag;
+		}
+		Assert(heapLockTag && heapLockTag->locktag_field2 != InvalidOid);
+
+		/*
+		 * Finish the index invalidation and set it as dead. Note that it is
+		 * necessary to wait for for virtual locks on the parent relation
+		 * before setting the index as dead.
+		 */
+		WaitForLockers(*heapLockTag, AccessExclusiveLock);
+		index_concurrent_set_dead(relOid, indOid);
+
+		/* Commit this transaction to make the update visible. */
+		CommitTransactionCommand();
+	}
+
+	/*
+	 * Phase 6 of REINDEX CONCURRENTLY
+	 *
+	 * Drop the concurrent indexes, with actually the same code path as
+	 * DROP INDEX CONCURRENTLY. This is safe as all the old entries are already
+	 * considered as invalid and not ready, so they will not be used by other
+	 * backends for any read or write operations.
+	 */
+	foreach(lc, indexIds)
+	{
+		Oid 		indOid = lfirst_oid(lc);
+		Oid			relOid;
+		LOCKTAG	   *heapLockTag = NULL;
+		ListCell   *cell;
+
+		CHECK_FOR_INTERRUPTS();
+
+		/* Start transaction to drop this index */
+		StartTransactionCommand();
+		relOid = IndexGetRelation(indOid, false);
+
+		/* Get fresh snapshot for next step */
+		PushActiveSnapshot(GetTransactionSnapshot());
+
+		/*
+		 * Find the locktag of parent table for this index, we need to wait for
+		 * locks on it.
+		 */
+		foreach(cell, lockTags)
+		{
+			LOCKTAG *localTag = (LOCKTAG *) lfirst(cell);
+			if (relOid == localTag->locktag_field2)
+				heapLockTag = localTag;
+		}
+		Assert(heapLockTag && heapLockTag->locktag_field2 != InvalidOid);
+
+		/*
+		 * Wait till every transaction that saw the old index state has
+		 * finished.
+		 */
+		WaitForLockers(*heapLockTag, AccessExclusiveLock);
+
+		/*
+		 * Open transaction if necessary, for the first index treated its
+		 * transaction has been already opened previously.
+		 */
+		index_concurrent_drop(indOid);
+
+		/* We can do away with our snapshot */
+		PopActiveSnapshot();
+
+		/* Commit this transaction to make the update visible. */
+		CommitTransactionCommand();
+	}
+
+	/*
+	 * Last thing to do is to release the session-level lock on the parent table
+	 * and the indexes of table.
+	 */
+	foreach(lc, relationLocks)
+	{
+		LockRelId lockRel = *((LockRelId *) lfirst(lc));
+		UnlockRelationIdForSession(&lockRel, ShareUpdateExclusiveLock);
+	}
+
+	/* Start a new transaction to finish process properly */
+	StartTransactionCommand();
+
+	/* Get fresh snapshot for the end of process */
+	PushActiveSnapshot(GetTransactionSnapshot());
+
+	return true;
 }
