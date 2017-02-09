@@ -773,10 +773,13 @@ index_create(Relation heapRelation,
 				 errmsg("concurrent index creation on system catalog tables is not supported")));
 
 	/*
-	 * This case is currently not supported, but there's no way to ask for it
-	 * in the grammar anyway, so it can't happen.
+	 * This case is currently only supported during a concurrent index
+	 * rebuild, but there is no way to ask for it in the grammar otherwise
+	 * anyway. If support for exclusion constraints is added in the future,
+	 * the check similar to this one in check_exclusion_constraint should as
+	 * well be changed accordingly.
 	 */
-	if (concurrent && is_exclusion)
+	if (concurrent && is_exclusion && !is_reindex)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg_internal("concurrent index creation for exclusion constraints is not supported")));

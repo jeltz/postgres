@@ -51,6 +51,7 @@
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
+#include "utils/pg_rusage.h"
 #include "utils/regproc.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
@@ -2066,6 +2067,8 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	ListCell   *lc, *lc2;
 	MemoryContext private_context;
 	MemoryContext old;
+	char	   *relationName = NULL;
+	PGRUsage	ru0;
 
 	/*
 	 * Create a memory context that will survive forced transaction commits we
@@ -2076,6 +2079,18 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	private_context = AllocSetContextCreate(PortalContext,
 											"ReindexConcurrent",
 											ALLOCSET_SMALL_SIZES);
+
+	if (options & REINDEXOPT_VERBOSE)
+	{
+		/* Save data needed by REINDEX VERBOSE in private context */
+		old = MemoryContextSwitchTo(private_context);
+
+		relationName = get_rel_name(relationOid);
+
+		pg_rusage_init(&ru0);
+
+		MemoryContextSwitchTo(old);
+	}
 
 	/*
 	 * Extract the list of indexes that are going to be rebuilt based on the
@@ -2621,6 +2636,14 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		LockRelId lockRel = *((LockRelId *) lfirst(lc));
 		UnlockRelationIdForSession(&lockRel, ShareUpdateExclusiveLock);
 	}
+
+	/* Log what we did */
+	if (options & REINDEXOPT_VERBOSE)
+		ereport(INFO,
+				(errmsg("relation \"%s\" was reindexed",
+						relationName),
+				 errdetail("%s.",
+						   pg_rusage_show(&ru0))));
 
 	/* Start a new transaction to finish process properly */
 	StartTransactionCommand();
