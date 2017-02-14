@@ -2022,7 +2022,11 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 		PushActiveSnapshot(GetTransactionSnapshot());
 
 		if (concurrent)
+		{
 			result = ReindexRelationConcurrently(relid, options);
+
+			PushActiveSnapshot(GetTransactionSnapshot());
+		}
 		else
 			result = reindex_relation(relid,
 									  REINDEX_REL_PROCESS_TOAST |
@@ -2669,9 +2673,6 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 
 	/* Start a new transaction to finish process properly */
 	StartTransactionCommand();
-
-	/* Get fresh snapshot for the end of process */
-	PushActiveSnapshot(GetTransactionSnapshot());
 
 	MemoryContextDelete(private_context);
 
