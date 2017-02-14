@@ -2060,6 +2060,18 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	List	   *relationLocks = NIL;
 	List	   *lockTags = NIL;
 	ListCell   *lc, *lc2;
+	MemoryContext private_context;
+	MemoryContext old;
+
+	/*
+	 * Create a memory context that will survive forced transaction commits we
+	 * do below.  Since it is a child of PortalContext, it will go away
+	 * eventually even if we suffer an error; there's no need for special
+	 * abort cleanup logic.
+	 */
+	private_context = AllocSetContextCreate(PortalContext,
+											"ReindexConcurrent",
+											ALLOCSET_SMALL_SIZES);
 
 	/*
 	 * Extract the list of indexes that are going to be rebuilt based on the
@@ -2085,8 +2097,13 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 				 */
 				Relation	heapRelation;
 
+				/* Save the list of relation OIDs in private context */
+				old = MemoryContextSwitchTo(private_context);
+
 				/* Track this relation for session locks */
 				parentRelationIds = lappend_oid(parentRelationIds, relationOid);
+
+				MemoryContextSwitchTo(old);
 
 				/* A shared relation cannot be reindexed concurrently */
 				if (IsSharedRelation(relationOid))
@@ -2117,7 +2134,14 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 										get_namespace_name(get_rel_namespace(cellOid)),
 										get_rel_name(cellOid))));
 					else
+					{
+						/* Save the list of relation OIDs in private context */
+						old = MemoryContextSwitchTo(private_context);
+
 						indexIds = lappend_oid(indexIds, cellOid);
+
+						MemoryContextSwitchTo(old);
+					}
 
 					index_close(indexRelation, NoLock);
 				}
@@ -2129,8 +2153,13 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 					Relation	toastRelation = heap_open(toastOid,
 												ShareUpdateExclusiveLock);
 
+					/* Save the list of relation OIDs in private context */
+					old = MemoryContextSwitchTo(private_context);
+
 					/* Track this relation for session locks */
 					parentRelationIds = lappend_oid(parentRelationIds, toastOid);
+
+					MemoryContextSwitchTo(old);
 
 					foreach(lc2, RelationGetIndexList(toastRelation))
 					{
@@ -2145,7 +2174,14 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 											get_namespace_name(get_rel_namespace(cellOid)),
 											get_rel_name(cellOid))));
 						else
+						{
+							/* Save the list of relation OIDs in private context */
+							old = MemoryContextSwitchTo(private_context);
+
 							indexIds = lappend_oid(indexIds, cellOid);
+
+							MemoryContextSwitchTo(old);
+						}
 
 						index_close(indexRelation, NoLock);
 					}
@@ -2177,8 +2213,13 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("concurrent reindex is not supported for catalog relations")));
 
+				/* Save the list of relation OIDs in private context */
+				old = MemoryContextSwitchTo(private_context);
+
 				/* Track the parent relation of this index for session locks */
 				parentRelationIds = list_make1_oid(parentOid);
+
+				MemoryContextSwitchTo(old);
 
 				if (!indexRelation->rd_index->indisvalid)
 					ereport(WARNING,
@@ -2187,7 +2228,14 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 									get_namespace_name(get_rel_namespace(relationOid)),
 									get_rel_name(relationOid))));
 				else
-					indexIds = list_make1_oid(relationOid);
+				{
+					/* Save the list of relation OIDs in private context */
+					old = MemoryContextSwitchTo(private_context);
+
+					indexIds = lappend_oid(indexIds, relationOid);
+
+					MemoryContextSwitchTo(old);
+				}
 
 				index_close(indexRelation, NoLock);
 				break;
@@ -2254,6 +2302,9 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		 */
 		indexConcurrentRel = index_open(concurrentOid, ShareUpdateExclusiveLock);
 
+		/* Save the list of oids and locks in private context */
+		old = MemoryContextSwitchTo(private_context);
+
 		/* Save the concurrent index Oid */
 		concurrentIndexIds = lappend_oid(concurrentIndexIds, concurrentOid);
 
@@ -2268,6 +2319,8 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		lockrelid = indexConcurrentRel->rd_lockInfo.lockRelId;
 		relationLocks = lappend(relationLocks, &lockrelid);
 
+		MemoryContextSwitchTo(old);
+
 		index_close(indexRel, NoLock);
 		index_close(indexConcurrentRel, NoLock);
 		heap_close(indexParentRel, NoLock);
@@ -2281,14 +2334,21 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	{
 		Relation	heapRelation = heap_open(lfirst_oid(lc), ShareUpdateExclusiveLock);
 		LockRelId	lockrelid = heapRelation->rd_lockInfo.lockRelId;
-		LOCKTAG		*heaplocktag = (LOCKTAG *) palloc(sizeof(LOCKTAG));
+		LOCKTAG		*heaplocktag;
+
+		/* Save the list of locks in private context */
+		old = MemoryContextSwitchTo(private_context);
 
 		/* Add lockrelid of parent relation to the list of locked relations */
 		relationLocks = lappend(relationLocks, &lockrelid);
 
+		heaplocktag = (LOCKTAG *) palloc(sizeof(LOCKTAG));
+
 		/* Save the LOCKTAG for this parent relation for the wait phase */
 		SET_LOCKTAG_RELATION(*heaplocktag, lockrelid.dbId, lockrelid.relId);
 		lockTags = lappend(lockTags, heaplocktag);
+
+		MemoryContextSwitchTo(old);
 
 		/* Close heap relation */
 		heap_close(heapRelation, NoLock);
@@ -2612,6 +2672,8 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 
 	/* Get fresh snapshot for the end of process */
 	PushActiveSnapshot(GetTransactionSnapshot());
+
+	MemoryContextDelete(private_context);
 
 	return true;
 }
