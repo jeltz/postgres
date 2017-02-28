@@ -2510,6 +2510,9 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	 * time to make sure we get only get constraint violations from the
 	 * indexes with the correct names.
 	 */
+
+	StartTransactionCommand();
+
 	forboth(lc, indexIds, lc2, concurrentIndexIds)
 	{
 		char	   *oldName;
@@ -2519,11 +2522,6 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 
 		CHECK_FOR_INTERRUPTS();
 
-		/*
-		 * Each index needs to be swapped in a separate transaction, so start
-		 * a new one.
-		 */
-		StartTransactionCommand();
 		relOid = IndexGetRelation(indOid, false);
 
 		/* Choose a relation name for old index */
@@ -2549,10 +2547,10 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		 * index.
 		 */
 		CacheInvalidateRelcacheByRelid(relOid);
-
-		/* Commit this transaction and make old index invalidation visible */
-		CommitTransactionCommand();
 	}
+
+	/* Commit this transaction and make index swaps visible */
+	CommitTransactionCommand();
 
 	/*
 	 * Phase 5 of REINDEX CONCURRENTLY
@@ -2560,44 +2558,31 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	 * The indexes hold now a fresh relfilenode of their respective concurrent
 	 * entries indexes. It is time to mark the now-useless concurrent entries
 	 * as not ready so as they can be safely discarded from write operations
-	 * that may occur on them. One transaction is used for each single index
-	 * entry.
+	 * that may occur on them.
+	 *
+	 * Note that it is necessary to wait for for virtual locks on the parent
+	 * relation before setting the index as dead.
 	 */
+
+	/* Perform a wait on all the session locks */
+	StartTransactionCommand();
+	WaitForLockersMultiple(lockTags, ShareLock);
+
 	foreach(lc, indexIds)
 	{
 		Oid			indOid = lfirst_oid(lc);
 		Oid			relOid;
-		LOCKTAG	   *heapLockTag = NULL;
-		ListCell   *cell;
 
 		CHECK_FOR_INTERRUPTS();
 
-		StartTransactionCommand();
 		relOid = IndexGetRelation(indOid, false);
 
-		/*
-		 * Find the locktag of parent table for this index, we need to wait for
-		 * locks on it.
-		 */
-		foreach(cell, lockTags)
-		{
-			LOCKTAG *localTag = (LOCKTAG *) lfirst(cell);
-			if (relOid == localTag->locktag_field2)
-				heapLockTag = localTag;
-		}
-		Assert(heapLockTag && heapLockTag->locktag_field2 != InvalidOid);
-
-		/*
-		 * Finish the index invalidation and set it as dead. Note that it is
-		 * necessary to wait for for virtual locks on the parent relation
-		 * before setting the index as dead.
-		 */
-		WaitForLockers(*heapLockTag, AccessExclusiveLock);
+		/* Finish the index invalidation and set it as dead. */
 		index_concurrent_set_dead(relOid, indOid);
-
-		/* Commit this transaction to make the update visible. */
-		CommitTransactionCommand();
 	}
+
+	/* Commit this transaction to make the updates visible. */
+	CommitTransactionCommand();
 
 	/*
 	 * Phase 6 of REINDEX CONCURRENTLY
@@ -2607,52 +2592,25 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 	 * considered as invalid and not ready, so they will not be used by other
 	 * backends for any read or write operations.
 	 */
+
+	/* Perform a wait on all the session locks */
+	StartTransactionCommand();
+	WaitForLockersMultiple(lockTags, ShareLock);
+
+	/* Get fresh snapshot for next step */
+	PushActiveSnapshot(GetTransactionSnapshot());
+
 	foreach(lc, indexIds)
 	{
 		Oid 		indOid = lfirst_oid(lc);
-		Oid			relOid;
-		LOCKTAG	   *heapLockTag = NULL;
-		ListCell   *cell;
 
 		CHECK_FOR_INTERRUPTS();
 
-		/* Start transaction to drop this index */
-		StartTransactionCommand();
-		relOid = IndexGetRelation(indOid, false);
-
-		/* Get fresh snapshot for next step */
-		PushActiveSnapshot(GetTransactionSnapshot());
-
-		/*
-		 * Find the locktag of parent table for this index, we need to wait for
-		 * locks on it.
-		 */
-		foreach(cell, lockTags)
-		{
-			LOCKTAG *localTag = (LOCKTAG *) lfirst(cell);
-			if (relOid == localTag->locktag_field2)
-				heapLockTag = localTag;
-		}
-		Assert(heapLockTag && heapLockTag->locktag_field2 != InvalidOid);
-
-		/*
-		 * Wait till every transaction that saw the old index state has
-		 * finished.
-		 */
-		WaitForLockers(*heapLockTag, AccessExclusiveLock);
-
-		/*
-		 * Open transaction if necessary, for the first index treated its
-		 * transaction has been already opened previously.
-		 */
 		index_concurrent_drop(indOid);
-
-		/* We can do away with our snapshot */
-		PopActiveSnapshot();
-
-		/* Commit this transaction to make the update visible. */
-		CommitTransactionCommand();
 	}
+
+	PopActiveSnapshot();
+	CommitTransactionCommand();
 
 	/*
 	 * Last thing to do is to release the session-level lock on the parent table
