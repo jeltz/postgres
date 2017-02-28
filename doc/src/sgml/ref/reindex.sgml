@@ -382,9 +382,9 @@ Indexes:
     The recommended recovery method in such cases is to drop the invalid
     index and try again to perform <command>REINDEX CONCURRENTLY</>.
     The concurrent index created during the processing has a name ending in
-    the suffix cct, or ccto if it is an old index definiton which we failed to
-    drop. Invalid indexes can be dropped using <literal>DROP INDEX</> including
-    invalid toast indexes.
+    the suffix ccnew, or ccold if it is an old index definiton which we failed
+    to drop. Invalid indexes can be dropped using <literal>DROP INDEX</>
+    including invalid toast indexes.
    </para>
 
    <para>

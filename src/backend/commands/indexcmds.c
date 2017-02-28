@@ -73,8 +73,7 @@ static void ComputeIndexAttrs(IndexInfo *indexInfo,
 				  bool isconstraint);
 static char *ChooseIndexName(const char *tabname, Oid namespaceId,
 				List *colnames, List *exclusionOpNames,
-				bool primary, bool isconstraint,
-				bool concurrent, bool concurrentold);
+				bool primary, bool isconstraint);
 static char *ChooseIndexNameAddition(List *colnames);
 static List *ChooseIndexColumnNames(List *indexElems);
 static void RangeVarCallbackForReindexIndex(const RangeVar *relation,
@@ -556,9 +555,7 @@ DefineIndex(Oid relationId,
 											indexColNames,
 											stmt->excludeOpNames,
 											stmt->primary,
-											stmt->isconstraint,
-											false,
-											false);
+											stmt->isconstraint);
 
 	/*
 	 * look up the access method, verify it can handle the requested features
@@ -1600,8 +1597,7 @@ ChooseRelationName(const char *name1, const char *name2,
 static char *
 ChooseIndexName(const char *tabname, Oid namespaceId,
 				List *colnames, List *exclusionOpNames,
-				bool primary, bool isconstraint,
-				bool concurrent, bool concurrentold)
+				bool primary, bool isconstraint)
 {
 	char	   *indexname;
 
@@ -1625,20 +1621,6 @@ ChooseIndexName(const char *tabname, Oid namespaceId,
 		indexname = ChooseRelationName(tabname,
 									   ChooseIndexNameAddition(colnames),
 									   "key",
-									   namespaceId);
-	}
-	else if (concurrent)
-	{
-		indexname = ChooseRelationName(tabname,
-									   NULL,
-									   "cct",
-									   namespaceId);
-	}
-	else if (concurrentold)
-	{
-		indexname = ChooseRelationName(tabname,
-									   NULL,
-									   "ccto",
 									   namespaceId);
 	}
 	else
@@ -2313,14 +2295,10 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 								   ShareUpdateExclusiveLock);
 
 		/* Choose a relation name for concurrent index */
-		concurrentName = ChooseIndexName(get_rel_name(indOid),
-										 get_rel_namespace(indexRel->rd_index->indrelid),
-										 NULL,
-										 NULL,
-										 false,
-										 false,
-										 true,
-										 false);
+		concurrentName = ChooseRelationName(get_rel_name(indOid),
+											NULL,
+											"ccold",
+											get_rel_namespace(indexRel->rd_index->indrelid));
 
 		/* Create concurrent index based on given index */
 		concurrentOid = index_concurrent_create_copy(indexParentRel,
@@ -2552,14 +2530,10 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		relOid = IndexGetRelation(indOid, false);
 
 		/* Choose a relation name for old index */
-		oldName = ChooseIndexName(get_rel_name(indOid),
-								  get_rel_namespace(relOid),
-								  NULL,
-								  NULL,
-								  false,
-								  false,
-								  false,
-								  true);
+		oldName = ChooseRelationName(get_rel_name(indOid),
+									 NULL,
+									 "ccold",
+									 get_rel_namespace(relOid));
 
 		/* Swap old index and its concurrent entry */
 		index_concurrent_swap(concurrentOid, indOid, oldName);
