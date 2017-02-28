@@ -1124,6 +1124,8 @@ COMMIT;
 REINDEX TABLE CONCURRENTLY pg_database; -- no shared relation
 REINDEX TABLE CONCURRENTLY pg_class; -- no catalog relations
 REINDEX SYSTEM CONCURRENTLY postgres; -- not allowed for SYSTEM
+-- Warns about catalog relations
+REINDEX SCHEMA CONCURRENTLY pg_catalog;
 
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab

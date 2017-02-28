@@ -1900,6 +1900,7 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 	List	   *relids = NIL;
 	ListCell   *l;
 	int			num_keys;
+	bool		concurrent_warning = false;
 
 	AssertArg(objectName);
 	Assert(objectKind == REINDEX_OBJECT_SCHEMA ||
@@ -1991,10 +1992,15 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 			continue;
 
 		/* A system catalog cannot be reindexed concurrently */
-		if (concurrent && IsSystemNamespace(get_rel_namespace(relationOid)))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("concurrent reindex is not supported for catalog relations")));
+		if (concurrent && IsSystemNamespace(get_rel_namespace(relid)))
+		{
+			if (!concurrent_warning)
+				ereport(WARNING,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("concurrent reindex is not supported for catalog relations, skipping all")));
+			concurrent_warning = true;
+			continue;
+		}
 
 		/* Save the list of relation OIDs in private context */
 		old = MemoryContextSwitchTo(private_context);

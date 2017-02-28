@@ -3113,6 +3113,9 @@ REINDEX TABLE CONCURRENTLY pg_class; -- no catalog relations
 ERROR:  concurrent reindex is not supported for catalog relations
 REINDEX SYSTEM CONCURRENTLY postgres; -- not allowed for SYSTEM
 ERROR:  can only reindex the currently open database
+-- Warns about catalog relations
+REINDEX SCHEMA CONCURRENTLY pg_catalog;
+WARNING:  concurrent reindex is not supported for catalog relations, skipping all
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab
          Table "public.concur_reindex_tab"
