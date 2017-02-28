@@ -1110,6 +1110,11 @@ ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
+-- Reindex of exclusion constraint
+ALTER TABLE concur_reindex_tab ADD COLUMN c3 int4range, ADD EXCLUDE USING gist (c3 WITH &&);
+INSERT INTO concur_reindex_tab VALUES  (3, 'a', '[1,2]');
+REINDEX TABLE concur_reindex_tab;
+INSERT INTO concur_reindex_tab VALUES  (4, 'a', '[2,4]');
 -- Check materialized views
 CREATE MATERIALIZED VIEW concur_reindex_matview AS SELECT * FROM concur_reindex_tab;
 REINDEX INDEX CONCURRENTLY concur_reindex_ind1;

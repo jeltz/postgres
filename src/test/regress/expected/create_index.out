@@ -3096,6 +3096,12 @@ ALTER TABLE concur_reindex_tab ADD PRIMARY KEY USING INDEX concur_reindex_ind1;
 CREATE TABLE concur_reindex_tab2 (c1 int REFERENCES concur_reindex_tab);
 INSERT INTO concur_reindex_tab VALUES  (1, 'a');
 INSERT INTO concur_reindex_tab VALUES  (2, 'a');
+-- Reindex of exclusion constraint
+ALTER TABLE concur_reindex_tab ADD COLUMN c3 int4range, ADD EXCLUDE USING gist (c3 WITH &&);
+INSERT INTO concur_reindex_tab VALUES  (3, 'a', '[1,2]');
+REINDEX TABLE concur_reindex_tab;
+INSERT INTO concur_reindex_tab VALUES  (4, 'a', '[2,4]');
+ERROR:  conflicting key value violates exclusion constraint "concur_reindex_tab_c3_excl"
 -- Check materialized views
 CREATE MATERIALIZED VIEW concur_reindex_matview AS SELECT * FROM concur_reindex_tab;
 REINDEX INDEX CONCURRENTLY concur_reindex_ind1;
@@ -3118,16 +3124,18 @@ REINDEX SCHEMA CONCURRENTLY pg_catalog;
 WARNING:  concurrent reindex is not supported for catalog relations, skipping all
 -- Check the relation status, there should not be invalid indexes
 \d concur_reindex_tab
-         Table "public.concur_reindex_tab"
- Column |  Type   | Collation | Nullable | Default 
---------+---------+-----------+----------+---------
- c1     | integer |           | not null | 
- c2     | text    |           |          | 
+          Table "public.concur_reindex_tab"
+ Column |   Type    | Collation | Nullable | Default 
+--------+-----------+-----------+----------+---------
+ c1     | integer   |           | not null | 
+ c2     | text      |           |          | 
+ c3     | int4range |           |          | 
 Indexes:
     "concur_reindex_ind1" PRIMARY KEY, btree (c1)
     "concur_reindex_ind3" UNIQUE, btree (abs(c1))
     "concur_reindex_ind2" btree (c2)
     "concur_reindex_ind4" btree (c1, c1, c2)
+    "concur_reindex_tab_c3_excl" EXCLUDE USING gist (c3 WITH &&)
 Referenced by:
     TABLE "concur_reindex_tab2" CONSTRAINT "concur_reindex_tab2_c1_fkey" FOREIGN KEY (c1) REFERENCES concur_reindex_tab(c1)
 

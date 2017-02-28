@@ -2538,10 +2538,6 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		/* Swap old index and its concurrent entry */
 		index_concurrent_swap(concurrentOid, indOid, oldName);
 
-		/* Swap which index is valid */
-		index_set_state_flags(indOid, INDEX_DROP_CLEAR_VALID);
-		index_set_state_flags(concurrentOid, INDEX_CREATE_SET_VALID);
-
 		/*
 		 * Invalidate the relcache for the table, so that after this commit
 		 * all sessions will refresh any cached plans that might reference the

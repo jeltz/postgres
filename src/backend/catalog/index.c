@@ -1168,6 +1168,11 @@ index_concurrent_create_copy(Relation heapRelation, Oid indOid, const char *newN
 	/* Concurrent index uses the same index information as former index */
 	indexInfo = BuildIndexInfo(indexRelation);
 
+	/* Do not copy exclusion constraint */
+	indexInfo->ii_ExclusionOps = NULL;
+	indexInfo->ii_ExclusionProcs = NULL;
+	indexInfo->ii_ExclusionStrats = NULL;
+
 	/*
 	 * Determine if index is initdeferred, this depends on its dependent
 	 * constraint.
@@ -1231,7 +1236,7 @@ index_concurrent_create_copy(Relation heapRelation, Oid indOid, const char *newN
 								 indcoloptions->values,
 								 optionDatum,
 								 indexTupDesc,
-								 indexRelation->rd_index->indisprimary,
+								 false, /* do not copy primary flag */
 								 false,	/* is constraint? */
 								 !indexRelation->rd_index->indimmediate,	/* is deferrable? */
 								 initdeferred,	/* is initially deferred? */
@@ -1305,38 +1310,72 @@ index_concurrent_build(Oid heapOid,
 void
 index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 {
-	Relation		oldIndexRel, newIndexRel, pg_class;
+	Relation		pg_class, pg_index, oldClassRel, newClassRel;
+	HeapTuple		oldClassTuple, newClassTuple;
+	Form_pg_class	oldClassForm, newClassForm;
 	HeapTuple		oldIndexTuple, newIndexTuple;
-	Form_pg_class	oldIndexForm, newIndexForm;
+	Form_pg_index	oldIndexForm, newIndexForm;
 	Oid				constraintOid = get_index_constraint(oldIndexOid);
 
 	/*
 	 * Take a necessary lock on the old and new index before swapping them.
 	 */
-	oldIndexRel = relation_open(oldIndexOid, ShareUpdateExclusiveLock);
-	newIndexRel = relation_open(newIndexOid, ShareUpdateExclusiveLock);
+	oldClassRel = relation_open(oldIndexOid, ShareUpdateExclusiveLock);
+	newClassRel = relation_open(newIndexOid, ShareUpdateExclusiveLock);
 
 	/* Now swap names and dependencies of those indexes */
 	pg_class = heap_open(RelationRelationId, RowExclusiveLock);
 
-	oldIndexTuple = SearchSysCacheCopy1(RELOID,
+	oldClassTuple = SearchSysCacheCopy1(RELOID,
+										ObjectIdGetDatum(oldIndexOid));
+	if (!HeapTupleIsValid(oldClassTuple))
+		elog(ERROR, "could not find tuple for relation %u", oldIndexOid);
+	newClassTuple = SearchSysCacheCopy1(RELOID,
+										ObjectIdGetDatum(newIndexOid));
+	if (!HeapTupleIsValid(newClassTuple))
+		elog(ERROR, "could not find tuple for relation %u", newIndexOid);
+
+	oldClassForm = (Form_pg_class) GETSTRUCT(oldClassTuple);
+	newClassForm = (Form_pg_class) GETSTRUCT(newClassTuple);
+
+	/* Swap the names */
+	namestrcpy(&newClassForm->relname, NameStr(oldClassForm->relname));
+	namestrcpy(&oldClassForm->relname, oldName);
+
+	CatalogTupleUpdate(pg_class, &oldClassTuple->t_self, oldClassTuple);
+	CatalogTupleUpdate(pg_class, &newClassTuple->t_self, newClassTuple);
+
+	/* Now swap index info */
+	pg_index = heap_open(IndexRelationId, RowExclusiveLock);
+
+	oldIndexTuple = SearchSysCacheCopy1(INDEXRELID,
 										ObjectIdGetDatum(oldIndexOid));
 	if (!HeapTupleIsValid(oldIndexTuple))
 		elog(ERROR, "could not find tuple for relation %u", oldIndexOid);
-	newIndexTuple = SearchSysCacheCopy1(RELOID,
+	newIndexTuple = SearchSysCacheCopy1(INDEXRELID,
 										ObjectIdGetDatum(newIndexOid));
 	if (!HeapTupleIsValid(newIndexTuple))
 		elog(ERROR, "could not find tuple for relation %u", newIndexOid);
 
-	oldIndexForm = (Form_pg_class) GETSTRUCT(oldIndexTuple);
-	newIndexForm = (Form_pg_class) GETSTRUCT(newIndexTuple);
+	oldIndexForm = (Form_pg_index) GETSTRUCT(oldIndexTuple);
+	newIndexForm = (Form_pg_index) GETSTRUCT(newIndexTuple);
 
-	/* Swap the names */
-	namestrcpy(&newIndexForm->relname, NameStr(oldIndexForm->relname));
-	namestrcpy(&oldIndexForm->relname, oldName);
+	/*
+	 * Copy contraint flags for old index. This is safe because the old index
+	 * guaranteed uniquness.
+	 */
+	newIndexForm->indisprimary = oldIndexForm->indisprimary;
+	oldIndexForm->indisprimary = false;
+	newIndexForm->indisexclusion = oldIndexForm->indisexclusion;
+	oldIndexForm->indisexclusion = false;
 
-	CatalogTupleUpdate(pg_class, &oldIndexTuple->t_self, oldIndexTuple);
-	CatalogTupleUpdate(pg_class, &newIndexTuple->t_self, newIndexTuple);
+	/* Mark old index as valid and new is invalid as index_set_state_flags */
+	newIndexForm->indisvalid = true;
+	oldIndexForm->indisvalid = false;
+	oldIndexForm->indisclustered = false;
+
+	CatalogTupleUpdate(pg_index, &oldIndexTuple->t_self, oldIndexTuple);
+	CatalogTupleUpdate(pg_index, &newIndexTuple->t_self, newIndexTuple);
 
 	if (OidIsValid(constraintOid)) {
 		ObjectAddress	myself, referenced;
@@ -1378,13 +1417,16 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 	changeDependencyForAll(RelationRelationId, oldIndexOid, newIndexOid);
 
 	/* Close relations and clean up */
+	heap_freetuple(oldClassTuple);
+	heap_freetuple(newClassTuple);
 	heap_freetuple(oldIndexTuple);
 	heap_freetuple(newIndexTuple);
 	heap_close(pg_class, RowExclusiveLock);
+	heap_close(pg_index, RowExclusiveLock);
 
 	/* The lock taken previously is not released until the end of transaction */
-	relation_close(oldIndexRel, NoLock);
-	relation_close(newIndexRel, NoLock);
+	relation_close(oldClassRel, NoLock);
+	relation_close(newClassRel, NoLock);
 }
 
 /*
