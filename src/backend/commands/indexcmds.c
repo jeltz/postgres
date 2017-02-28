@@ -2567,7 +2567,7 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 
 	/* Perform a wait on all the session locks */
 	StartTransactionCommand();
-	WaitForLockersMultiple(lockTags, ShareLock);
+	WaitForLockersMultiple(lockTags, AccessExclusiveLock);
 
 	foreach(lc, indexIds)
 	{
@@ -2596,7 +2596,7 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 
 	/* Perform a wait on all the session locks */
 	StartTransactionCommand();
-	WaitForLockersMultiple(lockTags, ShareLock);
+	WaitForLockersMultiple(lockTags, AccessExclusiveLock);
 
 	/* Get fresh snapshot for next step */
 	PushActiveSnapshot(GetTransactionSnapshot());
