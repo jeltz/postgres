@@ -2479,13 +2479,6 @@ ReindexRelationConcurrently(Oid relationOid, int options)
 		validate_index(relOid, indOid, snapshot);
 
 		/*
-		 * Invalidate the relcache for the table, so that after this commit
-		 * all sessions will refresh any cached plans that might reference the
-		 * index.
-		 */
-		CacheInvalidateRelcacheByRelid(relOid);
-
-		/*
 		 * We can now do away with our active snapshot, we still need to save the xmin
 		 * limit to wait for older snapshots.
 		 */
