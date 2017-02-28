@@ -1990,6 +1990,12 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 			!IsSystemClass(relid, classtuple))
 			continue;
 
+		/* A system catalog cannot be reindexed concurrently */
+		if (concurrent && IsSystemNamespace(get_rel_namespace(relationOid)))
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("concurrent reindex is not supported for catalog relations")));
+
 		/* Save the list of relation OIDs in private context */
 		old = MemoryContextSwitchTo(private_context);
 
