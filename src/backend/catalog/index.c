@@ -1396,8 +1396,6 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 		heap_freetuple(constraintTuple);
 		heap_close(pg_constraint, RowExclusiveLock);
 
-		deleteDependencyRecordsForClass(RelationRelationId, newIndexOid,
-										RelationRelationId, DEPENDENCY_AUTO);
 		deleteDependencyRecordsForClass(RelationRelationId, oldIndexOid,
 										ConstraintRelationId, DEPENDENCY_INTERNAL);
 
