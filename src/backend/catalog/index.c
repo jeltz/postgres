@@ -1305,7 +1305,7 @@ index_concurrent_build(Oid heapOid,
  * index_concurrent_swap
  *
  * Swap name, dependencies and constraints of the old index over to the new
- * index.
+ * index, while marking the old index as invalid and the new as valid.
  */
 void
 index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
@@ -1345,6 +1345,9 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 	CatalogTupleUpdate(pg_class, &oldClassTuple->t_self, oldClassTuple);
 	CatalogTupleUpdate(pg_class, &newClassTuple->t_self, newClassTuple);
 
+	heap_freetuple(oldClassTuple);
+	heap_freetuple(newClassTuple);
+
 	/* Now swap index info */
 	pg_index = heap_open(IndexRelationId, RowExclusiveLock);
 
@@ -1377,11 +1380,15 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 	CatalogTupleUpdate(pg_index, &oldIndexTuple->t_self, oldIndexTuple);
 	CatalogTupleUpdate(pg_index, &newIndexTuple->t_self, newIndexTuple);
 
+	heap_freetuple(oldIndexTuple);
+	heap_freetuple(newIndexTuple);
+
 	if (OidIsValid(constraintOid)) {
 		ObjectAddress	myself, referenced;
 		Relation		pg_constraint;
 		HeapTuple		constraintTuple;
 
+		/* Move the constraint from the old to the new index */
 		pg_constraint = heap_open(ConstraintRelationId, RowExclusiveLock);
 
 		constraintTuple = SearchSysCacheCopy1(CONSTROID,
@@ -1396,10 +1403,9 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 		heap_freetuple(constraintTuple);
 		heap_close(pg_constraint, RowExclusiveLock);
 
+		/* Change to having the new index depend on the constraint */
 		deleteDependencyRecordsForClass(RelationRelationId, oldIndexOid,
 										ConstraintRelationId, DEPENDENCY_INTERNAL);
-
-		// TODO: pg_depend for old index?
 
 		myself.classId = RelationRelationId;
 		myself.objectId = newIndexOid;
@@ -1412,13 +1418,10 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_INTERNAL);
 	}
 
+	/* Move all dependencies on the old index to the new */
 	changeDependencyForAll(RelationRelationId, oldIndexOid, newIndexOid);
 
-	/* Close relations and clean up */
-	heap_freetuple(oldClassTuple);
-	heap_freetuple(newClassTuple);
-	heap_freetuple(oldIndexTuple);
-	heap_freetuple(newIndexTuple);
+	/* Close relations */
 	heap_close(pg_class, RowExclusiveLock);
 	heap_close(pg_index, RowExclusiveLock);
 
