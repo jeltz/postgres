@@ -1160,8 +1160,6 @@ index_concurrent_create_copy(Relation heapRelation, Oid indOid, const char *newN
 	oidvector  *indclass;
 	int2vector *indcoloptions;
 	bool		isnull;
-	bool		initdeferred = false;
-	Oid			constraintOid = get_index_constraint(indOid);
 
 	indexRelation = index_open(indOid, RowExclusiveLock);
 
@@ -1172,27 +1170,6 @@ index_concurrent_create_copy(Relation heapRelation, Oid indOid, const char *newN
 	indexInfo->ii_ExclusionOps = NULL;
 	indexInfo->ii_ExclusionProcs = NULL;
 	indexInfo->ii_ExclusionStrats = NULL;
-
-	/*
-	 * Determine if index is initdeferred, this depends on its dependent
-	 * constraint.
-	 */
-	if (OidIsValid(constraintOid))
-	{
-		/* Look for the correct value */
-		HeapTuple			constraintTuple;
-		Form_pg_constraint	constraintForm;
-
-		constraintTuple = SearchSysCache1(CONSTROID,
-									 ObjectIdGetDatum(constraintOid));
-		if (!HeapTupleIsValid(constraintTuple))
-			elog(ERROR, "cache lookup failed for constraint %u",
-				 constraintOid);
-		constraintForm = (Form_pg_constraint) GETSTRUCT(constraintTuple);
-		initdeferred = constraintForm->condeferred;
-
-		ReleaseSysCache(constraintTuple);
-	}
 
 	/*
 	 * Create a copy of the tuple descriptor to be used for the concurrent
@@ -1238,8 +1215,8 @@ index_concurrent_create_copy(Relation heapRelation, Oid indOid, const char *newN
 								 indexTupDesc,
 								 false, /* do not copy primary flag */
 								 false,	/* is constraint? */
-								 !indexRelation->rd_index->indimmediate,	/* is deferrable? */
-								 initdeferred,	/* is initially deferred? */
+								 false,	/* is deferrable? */
+								 false,	/* is initially deferred? */
 								 true,	/* allow table to be a system catalog? */
 								 true,	/* skip build? */
 								 true,	/* concurrent? */
@@ -1371,6 +1348,8 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 	oldIndexForm->indisprimary = false;
 	newIndexForm->indisexclusion = oldIndexForm->indisexclusion;
 	oldIndexForm->indisexclusion = false;
+	newIndexForm->indimmediate = oldIndexForm->indimmediate;
+	oldIndexForm->indimmediate = true;
 
 	/* Mark old index as valid and new is invalid as index_set_state_flags */
 	newIndexForm->indisvalid = true;
@@ -1385,8 +1364,10 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 
 	if (OidIsValid(constraintOid)) {
 		ObjectAddress	myself, referenced;
-		Relation		pg_constraint;
-		HeapTuple		constraintTuple;
+		Relation		pg_constraint, pg_trigger;
+		HeapTuple		constraintTuple, triggerTuple;
+		ScanKeyData 	key[1];
+		SysScanDesc 	scan;
 
 		/* Move the constraint from the old to the new index */
 		pg_constraint = heap_open(ConstraintRelationId, RowExclusiveLock);
@@ -1416,6 +1397,39 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 		referenced.objectSubId = 0;
 
 		recordDependencyOn(&myself, &referenced, DEPENDENCY_INTERNAL);
+
+		pg_trigger = heap_open(TriggerRelationId, RowExclusiveLock);
+
+		/* Search for trigger records */
+		ScanKeyInit(&key[0],
+					Anum_pg_trigger_tgconstraint,
+					BTEqualStrategyNumber, F_OIDEQ,
+					ObjectIdGetDatum(constraintOid));
+
+		scan = systable_beginscan(pg_trigger, TriggerConstraintIndexId, true,
+								  NULL, 1, key);
+
+		while (HeapTupleIsValid((triggerTuple = systable_getnext(scan))))
+		{
+			Form_pg_trigger tgform = (Form_pg_trigger) GETSTRUCT(triggerTuple);
+
+			if (tgform->tgconstrindid != oldIndexOid)
+				continue;
+
+			/* make a modifiable copy */
+			triggerTuple = heap_copytuple(triggerTuple);
+			tgform = (Form_pg_trigger) GETSTRUCT(triggerTuple);
+
+			tgform->tgconstrindid = newIndexOid;
+
+			CatalogTupleUpdate(pg_trigger, &triggerTuple->t_self, triggerTuple);
+
+			heap_freetuple(triggerTuple);
+		}
+
+		systable_endscan(scan);
+
+		heap_close(pg_trigger, RowExclusiveLock);
 	}
 
 	/* Move all dependencies on the old index to the new */
