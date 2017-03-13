@@ -810,3 +810,58 @@ get_index_constraint(Oid indexId)
 
 	return constraintId;
 }
+
+/*
+ * get_index_ref_constraints
+ *		Given the OID of an index, return the OID of all foreign key
+ *		constraints which reference the index.
+ */
+List *
+get_index_ref_constraints(Oid indexId)
+{
+	List	   *result = NIL;
+	Relation	depRel;
+	ScanKeyData key[3];
+	SysScanDesc scan;
+	HeapTuple	tup;
+
+	/* Search the dependency table for the index */
+	depRel = heap_open(DependRelationId, AccessShareLock);
+
+	ScanKeyInit(&key[0],
+				Anum_pg_depend_refclassid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(RelationRelationId));
+	ScanKeyInit(&key[1],
+				Anum_pg_depend_refobjid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(indexId));
+	ScanKeyInit(&key[2],
+				Anum_pg_depend_refobjsubid,
+				BTEqualStrategyNumber, F_INT4EQ,
+				Int32GetDatum(0));
+
+	scan = systable_beginscan(depRel, DependReferenceIndexId, true,
+							  NULL, 3, key);
+
+	while (HeapTupleIsValid(tup = systable_getnext(scan)))
+	{
+		Form_pg_depend deprec = (Form_pg_depend) GETSTRUCT(tup);
+
+		/*
+		 * We assume any normal dependency from a constraint must be what we
+		 * are looking for.
+		 */
+		if (deprec->classid == ConstraintRelationId &&
+			deprec->objsubid == 0 &&
+			deprec->deptype == DEPENDENCY_NORMAL)
+		{
+			result = lappend_oid(result, deprec->objid);
+		}
+	}
+
+	systable_endscan(scan);
+	heap_close(depRel, AccessShareLock);
+
+	return result;
+}

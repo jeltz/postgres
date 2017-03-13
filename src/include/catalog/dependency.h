@@ -250,6 +250,8 @@ extern Oid	get_constraint_index(Oid constraintId);
 
 extern Oid	get_index_constraint(Oid indexId);
 
+extern List *get_index_ref_constraints(Oid indexId);
+
 /* in pg_shdepend.c */
 
 extern void recordSharedDependencyOn(ObjectAddress *depender,

@@ -1287,12 +1287,15 @@ index_concurrent_build(Oid heapOid,
 void
 index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 {
-	Relation		pg_class, pg_index, oldClassRel, newClassRel;
+	Relation		pg_class, pg_index, pg_constraint, pg_trigger;
+	Relation		oldClassRel, newClassRel;
 	HeapTuple		oldClassTuple, newClassTuple;
 	Form_pg_class	oldClassForm, newClassForm;
 	HeapTuple		oldIndexTuple, newIndexTuple;
 	Form_pg_index	oldIndexForm, newIndexForm;
-	Oid				constraintOid = get_index_constraint(oldIndexOid);
+	Oid				indexConstraintOid;
+	List		   *constraintOids = NIL;
+	ListCell	   *lc;
 
 	/*
 	 * Take a necessary lock on the old and new index before swapping them.
@@ -1362,43 +1365,44 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 	heap_freetuple(oldIndexTuple);
 	heap_freetuple(newIndexTuple);
 
-	if (OidIsValid(constraintOid)) {
-		ObjectAddress	myself, referenced;
-		Relation		pg_constraint, pg_trigger;
-		HeapTuple		constraintTuple, triggerTuple;
-		ScanKeyData 	key[1];
-		SysScanDesc 	scan;
+	/*
+	 * Move contstraints and triggers over to the new index
+	 */
+
+	constraintOids = get_index_ref_constraints(oldIndexOid);
+
+	indexConstraintOid = get_index_constraint(oldIndexOid);
+
+	if (OidIsValid(indexConstraintOid))
+		constraintOids = lappend_oid(constraintOids, indexConstraintOid);
+
+	pg_constraint = heap_open(ConstraintRelationId, RowExclusiveLock);
+	pg_trigger = heap_open(TriggerRelationId, RowExclusiveLock);
+
+	foreach(lc, constraintOids)
+	{
+		HeapTuple			constraintTuple, triggerTuple;
+		Form_pg_constraint	conForm;
+		ScanKeyData 		key[1];
+		SysScanDesc 		scan;
+		Oid					constraintOid = lfirst_oid(lc);
 
 		/* Move the constraint from the old to the new index */
-		pg_constraint = heap_open(ConstraintRelationId, RowExclusiveLock);
-
 		constraintTuple = SearchSysCacheCopy1(CONSTROID,
 											  ObjectIdGetDatum(constraintOid));
 		if (!HeapTupleIsValid(constraintTuple))
 			elog(ERROR, "could not find tuple for constraint %u", constraintOid);
 
-		((Form_pg_constraint) GETSTRUCT(constraintTuple))->conindid = newIndexOid;
+		conForm = ((Form_pg_constraint) GETSTRUCT(constraintTuple));
 
-		CatalogTupleUpdate(pg_constraint, &constraintTuple->t_self, constraintTuple);
+		if (conForm->conindid == oldIndexOid)
+		{
+			conForm->conindid = newIndexOid;
+
+			CatalogTupleUpdate(pg_constraint, &constraintTuple->t_self, constraintTuple);
+		}
 
 		heap_freetuple(constraintTuple);
-		heap_close(pg_constraint, RowExclusiveLock);
-
-		/* Change to having the new index depend on the constraint */
-		deleteDependencyRecordsForClass(RelationRelationId, oldIndexOid,
-										ConstraintRelationId, DEPENDENCY_INTERNAL);
-
-		myself.classId = RelationRelationId;
-		myself.objectId = newIndexOid;
-		myself.objectSubId = 0;
-
-		referenced.classId = ConstraintRelationId;
-		referenced.objectId = constraintOid;
-		referenced.objectSubId = 0;
-
-		recordDependencyOn(&myself, &referenced, DEPENDENCY_INTERNAL);
-
-		pg_trigger = heap_open(TriggerRelationId, RowExclusiveLock);
 
 		/* Search for trigger records */
 		ScanKeyInit(&key[0],
@@ -1411,16 +1415,16 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 
 		while (HeapTupleIsValid((triggerTuple = systable_getnext(scan))))
 		{
-			Form_pg_trigger tgform = (Form_pg_trigger) GETSTRUCT(triggerTuple);
+			Form_pg_trigger tgForm = (Form_pg_trigger) GETSTRUCT(triggerTuple);
 
-			if (tgform->tgconstrindid != oldIndexOid)
+			if (tgForm->tgconstrindid != oldIndexOid)
 				continue;
 
 			/* make a modifiable copy */
 			triggerTuple = heap_copytuple(triggerTuple);
-			tgform = (Form_pg_trigger) GETSTRUCT(triggerTuple);
+			tgForm = (Form_pg_trigger) GETSTRUCT(triggerTuple);
 
-			tgform->tgconstrindid = newIndexOid;
+			tgForm->tgconstrindid = newIndexOid;
 
 			CatalogTupleUpdate(pg_trigger, &triggerTuple->t_self, triggerTuple);
 
@@ -1428,16 +1432,38 @@ index_concurrent_swap(Oid newIndexOid, Oid oldIndexOid, const char *oldName)
 		}
 
 		systable_endscan(scan);
-
-		heap_close(pg_trigger, RowExclusiveLock);
 	}
 
-	/* Move all dependencies on the old index to the new */
+	/*
+	 * Move all dependencies on the old index to the new
+	 */
+
+	if (OidIsValid(indexConstraintOid))
+	{
+		ObjectAddress	myself, referenced;
+
+		/* Change to having the new index depend on the constraint */
+		deleteDependencyRecordsForClass(RelationRelationId, oldIndexOid,
+										ConstraintRelationId, DEPENDENCY_INTERNAL);
+
+		myself.classId = RelationRelationId;
+		myself.objectId = newIndexOid;
+		myself.objectSubId = 0;
+
+		referenced.classId = ConstraintRelationId;
+		referenced.objectId = indexConstraintOid;
+		referenced.objectSubId = 0;
+
+		recordDependencyOn(&myself, &referenced, DEPENDENCY_INTERNAL);
+	}
+
 	changeDependencyForAll(RelationRelationId, oldIndexOid, newIndexOid);
 
 	/* Close relations */
 	heap_close(pg_class, RowExclusiveLock);
 	heap_close(pg_index, RowExclusiveLock);
+	heap_close(pg_constraint, RowExclusiveLock);
+	heap_close(pg_trigger, RowExclusiveLock);
 
 	/* The lock taken previously is not released until the end of transaction */
 	relation_close(oldClassRel, NoLock);
