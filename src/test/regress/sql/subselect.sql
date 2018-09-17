@@ -625,3 +625,42 @@ move forward all in c1;
 fetch backward all in c1;
 
 commit;
+
+-- Ensure that we inline the currect CTE when there multiple CTEs with the same name
+
+explain (verbose, costs off)
+with x as (select 1 as y)
+select * from (with x as (select 2 as y) select * from x) ss;
+
+-- Ensure that we do not inline when there are side effects
+
+-- Basic subquery which can be inlined
+explain (verbose, costs off)
+with x as (select * from (select f1 from subselect_tbl) ss)
+select * from x where f1 = 1;
+
+-- Stable functions are safe to inline
+explain (verbose, costs off)
+with x as (select * from (select f1, now() from subselect_tbl) ss)
+select * from x where f1 = 1;
+
+-- Volatile functions prevent inlining
+explain (verbose, costs off)
+with x as (select * from (select f1, random() from subselect_tbl) ss)
+select * from x where f1 = 1;
+
+-- Row marks prevent inlining
+explain (verbose, costs off)
+with x as (select * from (select f1 from subselect_tbl for update) ss)
+select * from x where f1 = 1;
+
+-- Explicitly request materialization
+explain (verbose, costs off)
+with x as materialized (select * from (select f1 from subselect_tbl) ss)
+select * from x where f1 = 1;
+
+-- Row marks are not pushed into CTEs
+
+explain (verbose, costs off)
+with x as (select * from subselect_tbl)
+select * from x for update;

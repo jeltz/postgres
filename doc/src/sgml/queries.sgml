@@ -2199,6 +2199,8 @@ SELECT n FROM t LIMIT 100;
   </para>
 
   <para>
+   TODO: Update this for inlining and <literal>MATERIALIZED</literal>.
+
    A useful property of <literal>WITH</literal> queries is that they are evaluated
    only once per execution of the parent query, even if they are referred to
    more than once by the parent query or sibling <literal>WITH</literal> queries.

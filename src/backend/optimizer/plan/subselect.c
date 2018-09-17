@@ -57,6 +57,14 @@ typedef struct finalize_primnode_context
 	Bitmapset  *paramids;		/* Non-local PARAM_EXEC paramids found */
 } finalize_primnode_context;
 
+typedef struct inline_cte_walker_context
+{
+	const char *ctename;
+	int levelsup;
+	int refcount;
+	Query *ctequery;
+	CommonTableExpr *cte;
+} inline_cte_walker_context;
 
 static Node *build_subplan(PlannerInfo *root, Plan *plan, PlannerInfo *subroot,
 			  List *plan_params,
@@ -800,14 +808,129 @@ hash_ok_operator(OpExpr *expr)
 	}
 }
 
+/*
+ * inline_cte_walker: recursively walk the query and inline CTE
+ *
+ * While walking the expression tree with take care to examine the RTEs and
+ * potentially replace a CTE RTE with a subquery RTE after recursing into the
+ * RTE to avoid recursing into the newly inlined CTE.
+ */
+static bool
+inline_cte_walker(Node *node, inline_cte_walker_context *context)
+{
+	if (!node)
+		return false;
+
+	if (IsA(node, Query))
+	{
+		Query *query = castNode(Query, node);
+
+		context->levelsup++;
+
+		/*
+		 * Visit the actual RTE nodes after their contents so we can modify
+		 * the RTE node without having to visit the newly inlined contents.
+		 */
+		query_tree_walker(query, inline_cte_walker, context,
+						  QTW_EXAMINE_RTES_AFTER);
+
+		context->levelsup--;
+
+		return false;
+	}
+	else if (IsA(node, RangeTblEntry))
+	{
+		RangeTblEntry *rte = castNode(RangeTblEntry, node);
+
+		if (rte->rtekind == RTE_CTE &&
+			strcmp(rte->ctename, context->ctename) == 0 &&
+			rte->ctelevelsup == context->levelsup)
+		{
+			Query *newquery = copyObject(context->ctequery);
+
+			/* Preserve outer references, for example to other CTEs */
+			if (context->levelsup > 0)
+				IncrementVarSublevelsUp((Node *) newquery, context->levelsup, 1);
+
+			/*
+			 * Replace the CTE reference in the range table with a subquery
+			 *
+			 * A FOR UPDATE clause is treated as extending into views and
+			 * subqueries, but not into CTEs. We preserve this distinction
+			 * by not trying to push rowmarks into the new subquery.
+			 */
+			rte->rtekind = RTE_SUBQUERY;
+			rte->subquery = newquery;
+			rte->security_barrier = false;
+
+			/* Zero out CTE specific fields */
+			rte->ctename = NULL;
+			rte->ctelevelsup = 0;
+			rte->self_reference = false;
+			rte->coltypes = NIL;
+			rte->coltypmods = NIL;
+			rte->colcollations = NIL;
+
+			context->refcount--;
+		}
+
+		return false;
+	}
+
+	return expression_tree_walker(node, inline_cte_walker, context);
+}
+
+/*
+ * inline_cte: replace all refernces to CTE with subqueries
+ */
+static void
+inline_cte(PlannerInfo *root, CommonTableExpr *cte)
+{
+	struct inline_cte_walker_context context;
+	context.ctequery = castNode(Query, cte->ctequery);
+	context.ctename = cte->ctename;
+	context.refcount = cte->cterefcount;
+	context.levelsup = -1;
+	context.cte = cte;
+	inline_cte_walker((Node *) root->parse, &context);
+	/* we must replace all references */
+	Assert(context.refcount == 0);
+}
+
+static bool
+contain_row_marks_walker(Node *node, void *context)
+{
+	if (!node)
+		return false;
+
+	if (IsA(node, Query))
+	{
+		Query *query = castNode(Query, node);
+
+		if (query->rowMarks != NIL)
+			return true;
+
+		return query_tree_walker(query, contain_row_marks_walker, context, 0);
+	}
+	return expression_tree_walker(node, contain_row_marks_walker, context);
+}
+
+/*
+ * contain_row_marks: check the query or any subquery contains row marks
+ */
+static bool
+contain_row_marks(Node *node)
+{
+	return contain_row_marks_walker(node, NULL);
+}
 
 /*
  * SS_process_ctes: process a query's WITH list
  *
- * We plan each interesting WITH item and convert it to an initplan.
- * A side effect is to fill in root->cte_plan_ids with a list that
- * parallels root->parse->cteList and provides the subplan ID for
- * each CTE's initplan.
+ * We plan each interesting WITH item and either convert it to an initplan, or
+ * if allowed inline it as a subquery. A side effect is to fill in
+ * root->cte_plan_ids with a list that parallels root->parse->cteList and
+ * provides the subplan ID for each CTE's initplan, or a dummy ID when inlined.
  */
 void
 SS_process_ctes(PlannerInfo *root)
@@ -833,6 +956,27 @@ SS_process_ctes(PlannerInfo *root)
 		 */
 		if (cte->cterefcount == 0 && cmdType == CMD_SELECT)
 		{
+			/* Make a dummy entry in cte_plan_ids */
+			root->cte_plan_ids = lappend_int(root->cte_plan_ids, -1);
+			continue;
+		}
+
+		/*
+		 * We always inline the CTE as a subquery as long as it has no side
+		 * effects, whch in this context means that it is a SELECT which does
+		 * not call any volatile functions and does not have any rowmarks.
+		 *
+		 * The user may also have requested to not inline the CTE with the
+		 * MATERIALIZED keyword.
+		 */
+		if (!cte->ctematerialized &&
+			cmdType == CMD_SELECT &&
+			!cte->cterecursive &&
+			!contain_volatile_functions(cte->ctequery) &&
+			!contain_row_marks(cte->ctequery))
+		{
+			inline_cte(root, cte);
+
 			/* Make a dummy entry in cte_plan_ids */
 			root->cte_plan_ids = lappend_int(root->cte_plan_ids, -1);
 			continue;
