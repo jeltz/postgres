@@ -67,8 +67,10 @@ extern Oid index_create(Relation heapRelation,
 			 Datum reloptions,
 			 bits16 flags,
 			 bits16 constr_flags,
+			 TupleDesc tupdesc,
 			 bool allow_system_table_mods,
 			 bool is_internal,
+			 bool is_reindex,
 			 Oid *constraintId);
 
 #define	INDEX_CONSTR_CREATE_MARK_AS_PRIMARY	(1 << 0)
@@ -76,6 +78,23 @@ extern Oid index_create(Relation heapRelation,
 #define	INDEX_CONSTR_CREATE_INIT_DEFERRED	(1 << 2)
 #define	INDEX_CONSTR_CREATE_UPDATE_INDEX	(1 << 3)
 #define	INDEX_CONSTR_CREATE_REMOVE_OLD_DEPS	(1 << 4)
+
+extern Oid index_concurrent_create_copy(Relation heapRelation,
+										Oid indOid,
+										const char *newName);
+
+extern void index_concurrent_build(Oid heapOid,
+								   Oid indexOid,
+								   bool isprimary);
+
+extern void index_concurrent_swap(Oid newIndexOid,
+								  Oid oldIndexOid,
+								  const char *oldName);
+
+extern void index_concurrent_set_dead(Oid heapOid,
+									  Oid indexOid);
+
+extern void index_concurrent_drop(Oid indexOid);
 
 extern ObjectAddress index_constraint_create(Relation heapRelation,
 						Oid indexRelationId,
