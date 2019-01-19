@@ -495,11 +495,14 @@ ExplainOnePlan(PlannedStmt *plannedstmt, IntoClause *into, ExplainState *es,
 	UpdateActiveSnapshotCommandId();
 
 	/*
-	 * Normally we discard the query's output, but if explaining CREATE TABLE
+	 * Normally we discard the query's output, but if executing CREATE TABLE
 	 * AS, we'd better use the appropriate tuple receiver.
 	 */
-	if (into)
-		dest = CreateIntoRelDestReceiver(into);
+	if (into && es->analyze)
+	{
+		dest = CreateIntoRelDestReceiver();
+		DefineIntoRelForDestReceiver(dest, plannedstmt->planTree->targetlist, into);
+	}
 	else
 		dest = None_Receiver;
 
