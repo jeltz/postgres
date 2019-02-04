@@ -2434,7 +2434,7 @@ psql_completion(const char *text, int start, int end)
 /* CREATE TABLE --- is allowed inside CREATE SCHEMA, so use TailMatches */
 	/* Complete "CREATE TEMP/TEMPORARY" with the possible temp objects */
 	else if (TailMatches("CREATE", "TEMP|TEMPORARY"))
-		COMPLETE_WITH("SEQUENCE", "TABLE", "VIEW");
+		COMPLETE_WITH("SEQUENCE", "TABLE", "VIEW", "MATERIALIZED VIEW");
 	/* Complete "CREATE UNLOGGED" with TABLE or MATVIEW */
 	else if (TailMatches("CREATE", "UNLOGGED"))
 		COMPLETE_WITH("TABLE", "MATERIALIZED VIEW");
@@ -2642,13 +2642,16 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH("SELECT");
 
 /* CREATE MATERIALIZED VIEW */
-	else if (Matches("CREATE", "MATERIALIZED"))
+	else if (Matches("CREATE", "MATERIALIZED") ||
+			 Matches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "MATERIALIZED"))
 		COMPLETE_WITH("VIEW");
 	/* Complete CREATE MATERIALIZED VIEW <name> with AS */
-	else if (Matches("CREATE", "MATERIALIZED", "VIEW", MatchAny))
+	else if (Matches("CREATE", "MATERIALIZED", "VIEW", MatchAny) ||
+			 Matches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "MATERIALIZED", "VIEW", MatchAny))
 		COMPLETE_WITH("AS");
 	/* Complete "CREATE MATERIALIZED VIEW <sth> AS with "SELECT" */
-	else if (Matches("CREATE", "MATERIALIZED", "VIEW", MatchAny, "AS"))
+	else if (Matches("CREATE", "MATERIALIZED", "VIEW", MatchAny, "AS") ||
+			 Matches("CREATE", "TEMP|TEMPORARY|UNLOGGED", "MATERIALIZED", "VIEW", MatchAny, "AS"))
 		COMPLETE_WITH("SELECT");
 
 /* CREATE EVENT TRIGGER */

@@ -41,6 +41,7 @@
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_clause.h"
+#include "parser/parse_relation.h"
 #include "rewrite/rewriteHandler.h"
 #include "storage/smgr.h"
 #include "tcop/tcopprot.h"
@@ -87,6 +88,7 @@ create_ctas_nodata(List *tlist, IntoClause *into)
 			   *lc;
 	CreateStmt *create;
 	bool		is_matview;
+	RangeVar   *relation;
 	char		relkind;
 	Datum		toast_options;
 	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
@@ -95,6 +97,22 @@ create_ctas_nodata(List *tlist, IntoClause *into)
 	/* This code supports both CREATE TABLE AS and CREATE MATERIALIZED VIEW */
 	is_matview = (into->viewQuery != NULL);
 	relkind = is_matview ? RELKIND_MATVIEW : RELKIND_RELATION;
+
+	/*
+	 * If the user didn't explicitly ask for a temporary MV, check whether
+	 * we need one implicitly.  We allow TEMP to be inserted automatically as
+	 * long as the CREATE command is consistent with that --- no explicit
+	 * schema name.
+	 */
+	relation = copyObject(into->rel);	/* don't corrupt original command */
+	if (is_matview && relation->relpersistence == RELPERSISTENCE_PERMANENT
+		&& isQueryUsingTempRelation((Query *) into->viewQuery))
+	{
+		relation->relpersistence = RELPERSISTENCE_TEMP;
+		ereport(NOTICE,
+				(errmsg("materialized view \"%s\" will be a temporary materialized view",
+						relation->relname)));
+	}
 
 	/*
 	 * Build list of ColumnDefs from non-junk elements of the tlist.  If a
@@ -154,7 +172,7 @@ create_ctas_nodata(List *tlist, IntoClause *into)
 	 * passing it to DefineRelation.
 	 */
 	create = makeNode(CreateStmt);
-	create->relation = into->rel;
+	create->relation = relation;
 	create->tableElts = attrList;
 	create->inhRelations = NIL;
 	create->ofTypename = NULL;

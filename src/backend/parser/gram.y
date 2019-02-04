@@ -420,7 +420,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 %type <boolean>  opt_trusted opt_restart_seqs
 %type <ival>	 OptTemp
-%type <ival>	 OptNoLog
 %type <oncommit> OnCommitOption
 
 %type <ival>	for_locking_strength
@@ -4008,7 +4007,7 @@ opt_with_data:
  *****************************************************************************/
 
 CreateMatViewStmt:
-		CREATE OptNoLog MATERIALIZED VIEW create_mv_target AS SelectStmt opt_with_data
+		CREATE OptTemp MATERIALIZED VIEW create_mv_target AS SelectStmt opt_with_data
 				{
 					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
 					ctas->query = $7;
@@ -4021,7 +4020,7 @@ CreateMatViewStmt:
 					$5->skipData = !($8);
 					$$ = (Node *) ctas;
 				}
-		| CREATE OptNoLog MATERIALIZED VIEW IF_P NOT EXISTS create_mv_target AS SelectStmt opt_with_data
+		| CREATE OptTemp MATERIALIZED VIEW IF_P NOT EXISTS create_mv_target AS SelectStmt opt_with_data
 				{
 					CreateTableAsStmt *ctas = makeNode(CreateTableAsStmt);
 					ctas->query = $10;
@@ -4048,10 +4047,6 @@ create_mv_target:
 					$$->viewQuery = NULL;		/* filled at analysis time */
 					$$->skipData = false;		/* might get changed later */
 				}
-		;
-
-OptNoLog:	UNLOGGED					{ $$ = RELPERSISTENCE_UNLOGGED; }
-			| /*EMPTY*/					{ $$ = RELPERSISTENCE_PERMANENT; }
 		;
 
 

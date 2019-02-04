@@ -2559,16 +2559,6 @@ transformCreateTableAsStmt(ParseState *pstate, CreateTableAsStmt *stmt)
 					 errmsg("materialized views must not use data-modifying statements in WITH")));
 
 		/*
-		 * Check whether any temporary database objects are used in the
-		 * creation query. It would be hard to refresh data or incrementally
-		 * maintain it if a source disappeared.
-		 */
-		if (isQueryUsingTempRelation(query))
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("materialized views must not use temporary tables or views")));
-
-		/*
 		 * A materialized view would either need to save parameters for use in
 		 * maintaining/loading the data or prohibit them entirely.  The latter
 		 * seems safer and more sane.

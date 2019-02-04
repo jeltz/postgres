@@ -236,3 +236,52 @@ SELECT mvtest_func();
 SELECT * FROM mvtest1;
 SELECT * FROM mvtest2;
 ROLLBACK;
+
+-- create temporary materialized view
+EXPLAIN (costs off)
+  CREATE TEMPORARY MATERIALIZED VIEW mvtest_t_temp_view AS SELECT * FROM mvtest_t ORDER BY id;
+CREATE TEMPORARY MATERIALIZED VIEW mvtest_t_temp_view AS SELECT * FROM mvtest_t ORDER BY id;
+CREATE UNIQUE INDEX mvtest_t_temp_view_id ON mvtest_t_temp_view (id);
+SELECT * FROM mvtest_t_temp_view ORDER BY id;
+
+-- check the description, it should be temporary
+SELECT relpersistence, relkind FROM pg_class WHERE relname='mvtest_t_temp_view';
+
+-- we should be able to refresh it
+REFRESH MATERIALIZED VIEW mvtest_t_temp_view;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_t_temp_view;
+
+-- we make it so that view is refreshed for every change of used table
+CREATE OR REPLACE FUNCTION refresh_view() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+  DECLARE
+    view_name TEXT := TG_ARGV[0];
+  BEGIN
+    EXECUTE 'REFRESH MATERIALIZED VIEW CONCURRENTLY "' || view_name || '"';
+    RETURN NULL;
+  END
+$$;
+
+CREATE TRIGGER refresh_view_mvtest_t_insert AFTER INSERT ON mvtest_t REFERENCING NEW TABLE AS new_table FOR EACH STATEMENT EXECUTE FUNCTION refresh_view('mvtest_t_temp_view');
+
+INSERT INTO mvtest_t VALUES(7, 'z', 10);
+
+-- both should be updated, refresh inside a trigger should work
+SELECT * FROM mvtest_t ORDER BY id;
+SELECT * FROM mvtest_t_temp_view ORDER BY id;
+
+-- create a temporary table
+CREATE TEMPORARY TABLE mvtest_t_temp (id int NOT NULL PRIMARY KEY, type text NOT NULL, amt numeric NOT NULL);
+INSERT INTO mvtest_t_temp VALUES
+  (1, 'x', 2),
+  (2, 'x', 3),
+  (3, 'y', 5),
+  (4, 'y', 7),
+  (5, 'z', 11);
+
+-- this one should be temporary as well
+CREATE MATERIALIZED VIEW mvtest_t_temp_temp_view AS SELECT * FROM mvtest_t_temp ORDER BY id;
+
+-- check the description, it should be temporary
+SELECT relpersistence, relkind FROM pg_class WHERE relname='mvtest_t_temp_temp_view';
+
+DROP TABLE mvtest_t_temp CASCADE;
