@@ -8497,7 +8497,7 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	int			numfks,
 				numpks;
 	Oid			indexOid;
-	bool		has_array;
+	bool		has_each_element;
 	bool		old_check_ok;
 	ObjectAddress address;
 	ListCell   *old_pfeqop_item = list_head(fkconstraint->old_conpfeqop);
@@ -8603,7 +8603,7 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	 * format to pass to CreateConstraintEntry.
 	 */
 	Assert(list_length(fkconstraint->fk_reftypes) == numfks);
-	has_array = false;
+	has_each_element = false;
 	i = 0;
 	foreach(lc, fkconstraint->fk_reftypes)
 	{
@@ -8616,12 +8616,12 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 				break;
 			case FKCONSTR_REF_EACH_ELEMENT:
 				/* At most one FK column can be an array reference */
-				if (has_array)
+				if (has_each_element)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_FOREIGN_KEY),
 							 errmsg("foreign keys support only one array column")));
 
-				has_array = true;
+				has_each_element = true;
 				break;
 			default:
 				elog(ERROR, "invalid fk_reftype: %d", (int) reftype);
@@ -8635,7 +8635,7 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	* Array foreign keys support only UPDATE/DELETE NO ACTION, UPDATE/DELETE
 	* RESTRICT
 	*/
-	if (has_array)
+	if (has_each_element)
 	{
 		if ((fkconstraint->fk_upd_action != FKCONSTR_ACTION_NOACTION &&
 			 fkconstraint->fk_upd_action != FKCONSTR_ACTION_RESTRICT) ||
@@ -8862,6 +8862,9 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			pfeqop_right = InvalidOid;
 			ffeqop = InvalidOid;
 		}
+
+		if (fkreftypes[i] == FKCONSTR_REF_EACH_ELEMENT)
+			ffeqop = 1070; // ARRAY_EQ_OP;
 
 		if (!(OidIsValid(pfeqop) && OidIsValid(ffeqop)))
 		{
