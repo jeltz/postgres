@@ -8864,7 +8864,7 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		}
 
 		if (fkreftypes[i] == FKCONSTR_REF_EACH_ELEMENT)
-			ffeqop = 1070; // ARRAY_EQ_OP;
+			ffeqop = 1070; // XXX: ARRAY_EQ_OP;
 
 		if (!(OidIsValid(pfeqop) && OidIsValid(ffeqop)))
 		{

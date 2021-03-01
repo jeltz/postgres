@@ -1161,7 +1161,7 @@ ri_set(TriggerData *trigdata, bool is_set_null)
 			sprintf(paramname, "$%d", i + 1);
 			ri_GenerateQual(&qualbuf, qualsep,
 							paramname, pk_type,
-							riinfo->pf_eq_oprs[i], // XXX
+							riinfo->pf_eq_oprs[i], // XXX: Replace opr
 							attname, fk_type);
 			if (pk_coll != fk_coll && !get_collation_isdeterministic(pk_coll))
 				ri_GenerateQualCollation(&querybuf, pk_coll);
@@ -1749,7 +1749,7 @@ RI_PartitionRemove_Check(Trigger *trigger, Relation fk_rel, Relation pk_rel)
 					 RIAttName(fk_rel, riinfo->fk_attnums[i]));
 		ri_GenerateQual(&querybuf, sep,
 						pkattname, pk_type,
-						riinfo->pf_eq_oprs[i], // XXX
+						riinfo->pf_eq_oprs[i], // XXX: Replace opr
 						fkattname, fk_type);
 		if (pk_coll != fk_coll)
 			ri_GenerateQualCollation(&querybuf, pk_coll);
