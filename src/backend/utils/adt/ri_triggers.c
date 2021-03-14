@@ -756,7 +756,7 @@ ri_restrict(TriggerData *trigdata, bool is_no_action)
 			sprintf(paramname, "$%d", i + 1);
 			ri_GenerateQual(&querybuf, querysep,
 							paramname, pk_type,
-							riinfo->pf_eq_oprs[i], // XXX: Replace opr
+							riinfo->fk_reftypes[i] == FKCONSTR_REF_EACH_ELEMENT ? OID_ARRAY_ELEMCONTAINED_OP : riinfo->pf_eq_oprs[i], // XXX
 							attname, fk_type);
 			if (pk_coll != fk_coll && !get_collation_isdeterministic(pk_coll))
 				ri_GenerateQualCollation(&querybuf, pk_coll);
@@ -862,7 +862,7 @@ RI_FKey_cascade_del(PG_FUNCTION_ARGS)
 			sprintf(paramname, "$%d", i + 1);
 			ri_GenerateQual(&querybuf, querysep,
 							paramname, pk_type,
-							riinfo->pf_eq_oprs[i], // XXX: Replace opr
+							riinfo->fk_reftypes[i] == FKCONSTR_REF_EACH_ELEMENT ? OID_ARRAY_ELEMCONTAINED_OP : riinfo->pf_eq_oprs[i], // XXX
 							attname, fk_type);
 			if (pk_coll != fk_coll && !get_collation_isdeterministic(pk_coll))
 				ri_GenerateQualCollation(&querybuf, pk_coll);
@@ -981,7 +981,7 @@ RI_FKey_cascade_upd(PG_FUNCTION_ARGS)
 			sprintf(paramname, "$%d", j + 1);
 			ri_GenerateQual(&qualbuf, qualsep,
 							paramname, pk_type,
-							riinfo->pf_eq_oprs[i], // XXX: Replace opr
+							riinfo->fk_reftypes[i] == FKCONSTR_REF_EACH_ELEMENT ? OID_ARRAY_ELEMCONTAINED_OP : riinfo->pf_eq_oprs[i], // XXX
 							attname, fk_type);
 			if (pk_coll != fk_coll && !get_collation_isdeterministic(pk_coll))
 				ri_GenerateQualCollation(&querybuf, pk_coll);
@@ -1161,7 +1161,7 @@ ri_set(TriggerData *trigdata, bool is_set_null)
 			sprintf(paramname, "$%d", i + 1);
 			ri_GenerateQual(&qualbuf, qualsep,
 							paramname, pk_type,
-							riinfo->pf_eq_oprs[i], // XXX: Replace opr
+							riinfo->fk_reftypes[i] == FKCONSTR_REF_EACH_ELEMENT ? OID_ARRAY_ELEMCONTAINED_OP : riinfo->pf_eq_oprs[i], // XXX
 							attname, fk_type);
 			if (pk_coll != fk_coll && !get_collation_isdeterministic(pk_coll))
 				ri_GenerateQualCollation(&querybuf, pk_coll);
@@ -1749,7 +1749,7 @@ RI_PartitionRemove_Check(Trigger *trigger, Relation fk_rel, Relation pk_rel)
 					 RIAttName(fk_rel, riinfo->fk_attnums[i]));
 		ri_GenerateQual(&querybuf, sep,
 						pkattname, pk_type,
-						riinfo->pf_eq_oprs[i], // XXX: Replace opr
+						riinfo->fk_reftypes[i] == FKCONSTR_REF_EACH_ELEMENT ? OID_ARRAY_ELEMCONTAINED_OP : riinfo->pf_eq_oprs[i], // XXX
 						fkattname, fk_type);
 		if (pk_coll != fk_coll)
 			ri_GenerateQualCollation(&querybuf, pk_coll);
