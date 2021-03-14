@@ -8766,8 +8766,6 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 		 */
 		if (fkreftypes[i] == FKCONSTR_REF_EACH_ELEMENT)
 		{
-			Oid			elemopclass;
-
 			/* We check if the array element type exists and is of valid Oid */
 			fktype = get_base_element_type(fktype);
 			if (!OidIsValid(fktype))
@@ -8791,45 +8789,6 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 					errdetail("Unssupported relation between %s and %s.",
 							format_type_be(fktypoid[i]),
 							format_type_be(pktype))));
-
-			/*
-			 * For the moment, we must also insist that the array's element
-			 * type have a default btree opclass that is in the index's
-			 * opfamily.  This is necessary because ri_triggers.c relies on
-			 * COUNT(DISTINCT x) on the element type, as well as on array_eq()
-			 * on the array type, and we need those operations to have the
-			 * same notion of equality that we're using otherwise.
-			 *
-			 * XXX this restriction is pretty annoying, considering the effort
-			 * that's been put into the rest of the RI mechanisms to make them
-			 * work with nondefault equality operators.  In particular, it
-			 * means that the cast-to-PK-datatype code path isn't useful for
-			 * array-to-scalar references.
-			 */
-			elemopclass = GetDefaultOpClass(fktype, BTREE_AM_OID);
-			if (!OidIsValid(elemopclass) ||
-				get_opclass_family(elemopclass) != opfamily)
-			{
-				/* Get the index opclass's name for the error message. */
-				char	   *opcname;
-
-				cla_ht = SearchSysCache1(CLAOID,
-										 ObjectIdGetDatum(opclasses[i]));
-				if (!HeapTupleIsValid(cla_ht))
-					elog(ERROR, "cache lookup failed for opclass %u",
-						 opclasses[i]);
-				cla_tup = (Form_pg_opclass) GETSTRUCT(cla_ht);
-				opcname = pstrdup(NameStr(cla_tup->opcname));
-				ReleaseSysCache(cla_ht);
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("foreign key constraint \"%s\" cannot be implemented",
-								fkconstraint->conname),
-						 errdetail("Key column \"%s\" has element type %s which does not have a default btree operator class that's compatible with class \"%s\".",
-								   strVal(list_nth(fkconstraint->fk_attrs, i)),
-								   format_type_be(fktype),
-								   opcname)));
-			}
 		}
 
 		/*
