@@ -39,6 +39,7 @@
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_opclass.h"
+#include "catalog/pg_operator.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_trigger.h"
 #include "catalog/pg_type.h"
@@ -8863,8 +8864,9 @@ ATAddForeignKeyConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			ffeqop = InvalidOid;
 		}
 
+		// XXX: Fix logic for selecting operators
 		if (fkreftypes[i] == FKCONSTR_REF_EACH_ELEMENT)
-			ffeqop = 1070; // XXX: ARRAY_EQ_OP;
+			ffeqop = ARRAY_EQ_OP;
 
 		if (!(OidIsValid(pfeqop) && OidIsValid(ffeqop)))
 		{
