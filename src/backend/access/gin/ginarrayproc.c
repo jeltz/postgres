@@ -140,11 +140,6 @@ ginqueryarrayextract(PG_FUNCTION_ARGS)
 				*searchMode = GIN_SEARCH_MODE_INCLUDE_EMPTY;
 			break;
 		case GinContainsElemStrategy:
-			/*
-			 * only items that match the queried element
-			 * are considered candidate
-			 */
-
 			*searchMode = GIN_SEARCH_MODE_DEFAULT;
 			break;
 		default:
