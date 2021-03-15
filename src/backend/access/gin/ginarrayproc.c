@@ -188,6 +188,7 @@ ginarrayconsistent(PG_FUNCTION_ARGS)
 			}
 			break;
 		case GinContainsStrategy:
+		case GinContainsElemStrategy:
 			/* result is not lossy */
 			*recheck = false;
 			/* must have all elements in check[] true, and no nulls */
@@ -201,7 +202,6 @@ ginarrayconsistent(PG_FUNCTION_ARGS)
 				}
 			}
 			break;
-		case GinContainsElemStrategy:
 		case GinContainedStrategy:
 			/* we will need recheck */
 			*recheck = true;
@@ -276,6 +276,7 @@ ginarraytriconsistent(PG_FUNCTION_ARGS)
 			}
 			break;
 		case GinContainsStrategy:
+		case GinContainsElemStrategy:
 			/* must have all elements in check[] true, and no nulls */
 			res = GIN_TRUE;
 			for (i = 0; i < nkeys; i++)
@@ -291,7 +292,6 @@ ginarraytriconsistent(PG_FUNCTION_ARGS)
 				}
 			}
 			break;
-		case GinContainsElemStrategy:
 		case GinContainedStrategy:
 			/* can't do anything else useful here */
 			res = GIN_MAYBE;
