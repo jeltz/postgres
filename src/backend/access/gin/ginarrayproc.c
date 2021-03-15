@@ -93,8 +93,10 @@ ginqueryarrayextract(PG_FUNCTION_ARGS)
 	if (strategy == GinContainsElemStrategy)
 	{
 		/* single element is passed, set elems to its pointer */
-		elems = &PG_GETARG_DATUM(0);
-		nulls = &PG_ARGISNULL(0);
+		elems = palloc(sizeof(Datum));
+		elems[0] = PG_GETARG_DATUM(0); // XXX: Investigate if we need to copy complex datums
+		nulls = palloc(sizeof(bool));
+		nulls[0] = PG_ARGISNULL(0);
 		nelems = 1;
 	}
 	else
