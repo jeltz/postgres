@@ -1,627 +1,538 @@
--- EACH-ELEMENT FK CONSTRAINTS
-CREATE TABLE PKTABLEFORARRAY ( ptest1 int PRIMARY KEY, ptest2 text );
--- Insert test data into PKTABLEFORARRAY
-INSERT INTO PKTABLEFORARRAY VALUES (1, 'Test1');
-INSERT INTO PKTABLEFORARRAY VALUES (2, 'Test2');
-INSERT INTO PKTABLEFORARRAY VALUES (3, 'Test3');
-INSERT INTO PKTABLEFORARRAY VALUES (4, 'Test4');
-INSERT INTO PKTABLEFORARRAY VALUES (5, 'Test5');
--- Check alter table
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], ftest2 int );
-ALTER TABLE FKTABLEFORARRAY ADD CONSTRAINT FKARRAY FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY;
-DROP TABLE FKTABLEFORARRAY;
--- Check alter table with rows
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], ftest2 int );
-INSERT INTO FKTABLEFORARRAY VALUES ('{1}', 1);
-ALTER TABLE FKTABLEFORARRAY ADD CONSTRAINT FKARRAY FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY;
-DROP TABLE FKTABLEFORARRAY;
--- Check alter table with failing rows
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], ftest2 int );
-INSERT INTO FKTABLEFORARRAY VALUES ('{10,1}', 2);
-ALTER TABLE FKTABLEFORARRAY ADD CONSTRAINT FKARRAY FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY;
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fkarray"
-DETAIL:  Key (ftest1)=({10,1}) is not present in table "pktableforarray".
-DROP TABLE FKTABLEFORARRAY;
--- Check create table
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY, ftest2 int );
-CREATE TABLE FKTABLEFORARRAYMDIM ( ftest1 int[][], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY, ftest2 int );
-CREATE TABLE FKTABLEFORARRAYNOTNULL ( ftest1 int[] NOT NULL, FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY, ftest2 int );
--- Insert successful rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY VALUES ('{1}', 3);
-INSERT INTO FKTABLEFORARRAY VALUES ('{2}', 4);
-INSERT INTO FKTABLEFORARRAY VALUES ('{1}', 5);
-INSERT INTO FKTABLEFORARRAY VALUES ('{3}', 6);
-INSERT INTO FKTABLEFORARRAY VALUES ('{1}', 7);
-INSERT INTO FKTABLEFORARRAY VALUES ('{4,5}', 8);
-INSERT INTO FKTABLEFORARRAY VALUES ('{4,4}', 9);
-INSERT INTO FKTABLEFORARRAY VALUES (NULL, 10);
-INSERT INTO FKTABLEFORARRAY VALUES ('{}', 11);
-INSERT INTO FKTABLEFORARRAY VALUES ('{1,NULL}', 12);
-INSERT INTO FKTABLEFORARRAY VALUES ('{NULL}', 13);
-INSERT INTO FKTABLEFORARRAYMDIM VALUES ('{{4,5},{1,2},{1,3}}', 14);
-INSERT INTO FKTABLEFORARRAYMDIM VALUES ('{{4,5},{NULL,2},{NULL,3}}', 15);
--- Insert failed rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY VALUES ('{6}', 16);
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey"
-DETAIL:  Key (ftest1)=({6}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY VALUES ('{4,6}', 17);
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey"
-DETAIL:  Key (ftest1)=({4,6}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY VALUES ('{6,NULL}', 18);
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey"
-DETAIL:  Key (ftest1)=({6,NULL}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY VALUES ('{6,NULL,4,NULL}', 19);
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey"
-DETAIL:  Key (ftest1)=({6,NULL,4,NULL}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAYMDIM VALUES ('{{1,2},{6,NULL}}', 20);
-ERROR:  insert or update on table "fktableforarraymdim" violates foreign key constraint "fktableforarraymdim_ftest1_fkey"
-DETAIL:  Key (ftest1)=({{1,2},{6,NULL}}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAYNOTNULL VALUES (NULL, 21);
-ERROR:  null value in column "ftest1" of relation "fktableforarraynotnull" violates not-null constraint
+--
+-- EACH ELEMENT FOREIGN KEY CONSTRAINTS
+--
+CREATE TABLE pk_table (
+  a int PRIMARY KEY
+);
+CREATE TABLE fk_table (
+  a int[]
+);
+INSERT INTO pk_table VALUES (1);
+INSERT INTO pk_table VALUES (2);
+INSERT INTO pk_table VALUES (3);
+INSERT INTO pk_table VALUES (4);
+INSERT INTO pk_table VALUES (5);
+-- ok - check alter table no rows
+ALTER TABLE fk_table ADD CONSTRAINT fk_name FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table;
+ALTER TABLE fk_table DROP CONSTRAINT fk_name;
+-- ok - check alter table with rows
+INSERT INTO fk_table VALUES ('{1}');
+INSERT INTO fk_table VALUES ('{2,3,4,5}');
+ALTER TABLE fk_table ADD CONSTRAINT fk_name FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table;
+ALTER TABLE fk_table DROP CONSTRAINT fk_name;
+-- fail - check alter table with failing rows
+INSERT INTO fk_table VALUES ('{6}');
+ALTER TABLE fk_table ADD CONSTRAINT fk_name FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table;
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_name"
+DETAIL:  Key (a)=({6}) is not present in table "pk_table".
+DROP TABLE fk_table;
+-- ok - check create table
+CREATE TABLE fk_table (
+  a int[],
+  b int,
+  FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table
+);
+-- ok - check create table with multi dimensional column
+CREATE TABLE fk_table_multi_dim (
+  a int[][],
+  b int,
+  FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table
+);
+-- ok - check create table with not null
+CREATE TABLE fk_table_not_null (
+  a int[] NOT NULL,
+  b int,
+  FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table
+);
+-- ok
+INSERT INTO fk_table VALUES ('{1}', 3);
+INSERT INTO fk_table VALUES ('{2}', 4);
+INSERT INTO fk_table VALUES ('{1}', 5);
+INSERT INTO fk_table VALUES ('{3}', 6);
+INSERT INTO fk_table VALUES ('{1}', 7);
+INSERT INTO fk_table VALUES ('{4,5}', 8);
+INSERT INTO fk_table VALUES ('{4,4}', 9);
+INSERT INTO fk_table VALUES (NULL, 10);
+INSERT INTO fk_table VALUES ('{}', 11);
+INSERT INTO fk_table VALUES ('{1,NULL}', 12);
+INSERT INTO fk_table VALUES ('{NULL}', 13);
+INSERT INTO fk_table_multi_dim VALUES ('{{4,5},{1,2},{1,3}}', 14);
+INSERT INTO fk_table_multi_dim VALUES ('{{4,5},{NULL,2},{NULL,3}}', 15);
+-- fail
+INSERT INTO fk_table VALUES ('{6}', 16);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_fkey"
+DETAIL:  Key (a)=({6}) is not present in table "pk_table".
+INSERT INTO fk_table VALUES ('{4,6}', 17);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_fkey"
+DETAIL:  Key (a)=({4,6}) is not present in table "pk_table".
+INSERT INTO fk_table VALUES ('{6,NULL}', 18);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_fkey"
+DETAIL:  Key (a)=({6,NULL}) is not present in table "pk_table".
+INSERT INTO fk_table VALUES ('{6,NULL,4,NULL}', 19);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_fkey"
+DETAIL:  Key (a)=({6,NULL,4,NULL}) is not present in table "pk_table".
+INSERT INTO fk_table_multi_dim VALUES ('{{1,2},{6,NULL}}', 20);
+ERROR:  insert or update on table "fk_table_multi_dim" violates foreign key constraint "fk_table_multi_dim_a_fkey"
+DETAIL:  Key (a)=({{1,2},{6,NULL}}) is not present in table "pk_table".
+INSERT INTO fk_table_not_null VALUES (NULL, 21);
+ERROR:  null value in column "a" of relation "fk_table_not_null" violates not-null constraint
 DETAIL:  Failing row contains (null, 21).
--- Check FKTABLE
-SELECT * FROM FKTABLEFORARRAY;
-  ftest1  | ftest2 
-----------+--------
- {1}      |      3
- {2}      |      4
- {1}      |      5
- {3}      |      6
- {1}      |      7
- {4,5}    |      8
- {4,4}    |      9
-          |     10
- {}       |     11
- {1,NULL} |     12
- {NULL}   |     13
+SELECT * FROM fk_table ORDER BY a,b;
+    a     | b  
+----------+----
+ {}       | 11
+ {1}      |  3
+ {1}      |  5
+ {1}      |  7
+ {1,NULL} | 12
+ {2}      |  4
+ {3}      |  6
+ {4,4}    |  9
+ {4,5}    |  8
+ {NULL}   | 13
+          | 10
 (11 rows)
 
--- Delete a row from PK TABLE (must fail due to ON DELETE NO ACTION)
-DELETE FROM PKTABLEFORARRAY WHERE ptest1=1;
-ERROR:  update or delete on table "pktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey" on table "fktableforarray"
-DETAIL:  Key (ptest1)=(1) is still referenced from table "fktableforarray".
--- Check FKTABLE for removal of matched row
-SELECT * FROM FKTABLEFORARRAY;
-  ftest1  | ftest2 
-----------+--------
- {1}      |      3
- {2}      |      4
- {1}      |      5
- {3}      |      6
- {1}      |      7
- {4,5}    |      8
- {4,4}    |      9
-          |     10
- {}       |     11
- {1,NULL} |     12
- {NULL}   |     13
+-- fail
+DELETE FROM pk_table WHERE a=1;
+ERROR:  update or delete on table "pk_table" violates foreign key constraint "fk_table_a_fkey" on table "fk_table"
+DETAIL:  Key (a)=(1) is still referenced from table "fk_table".
+-- fail
+UPDATE pk_table SET a=7 WHERE a=1;
+ERROR:  update or delete on table "pk_table" violates foreign key constraint "fk_table_a_fkey" on table "fk_table"
+DETAIL:  Key (a)=(1) is still referenced from table "fk_table".
+-- ok
+UPDATE fk_table SET a='{1}' WHERE b=4;
+SELECT * FROM fk_table ORDER BY a,b;
+    a     | b  
+----------+----
+ {}       | 11
+ {1}      |  3
+ {1}      |  4
+ {1}      |  5
+ {1}      |  7
+ {1,NULL} | 12
+ {3}      |  6
+ {4,4}    |  9
+ {4,5}    |  8
+ {NULL}   | 13
+          | 10
 (11 rows)
 
--- Update a row from PK TABLE (must fail due to ON UPDATE NO ACTION)
-UPDATE PKTABLEFORARRAY SET ptest1=7 WHERE ptest1=1;
-ERROR:  update or delete on table "pktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey" on table "fktableforarray"
-DETAIL:  Key (ptest1)=(1) is still referenced from table "fktableforarray".
--- Check FKTABLE for update of matched row
-SELECT * FROM FKTABLEFORARRAY;
-  ftest1  | ftest2 
-----------+--------
- {1}      |      3
- {2}      |      4
- {1}      |      5
- {3}      |      6
- {1}      |      7
- {4,5}    |      8
- {4,4}    |      9
-          |     10
- {}       |     11
- {1,NULL} |     12
- {NULL}   |     13
-(11 rows)
-
--- Check UPDATE on FKTABLE
-UPDATE FKTABLEFORARRAY SET ftest1=ARRAY[1] WHERE ftest2=4;
--- Check FKTABLE for update of matched row
-SELECT * FROM FKTABLEFORARRAY;
-  ftest1  | ftest2 
-----------+--------
- {1}      |      3
- {1}      |      5
- {3}      |      6
- {1}      |      7
- {4,5}    |      8
- {4,4}    |      9
-          |     10
- {}       |     11
- {1,NULL} |     12
- {NULL}   |     13
- {1}      |      4
-(11 rows)
-
-DROP TABLE FKTABLEFORARRAY;
-DROP TABLE FKTABLEFORARRAYNOTNULL;
-DROP TABLE FKTABLEFORARRAYMDIM;
--- Allowed references with actions (NO ACTION, RESTRICT)
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE NO ACTION ON UPDATE NO ACTION, ftest2 int );
-DROP TABLE FKTABLEFORARRAY;
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE NO ACTION ON UPDATE RESTRICT, ftest2 int );
-DROP TABLE FKTABLEFORARRAY;
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE RESTRICT ON UPDATE NO ACTION, ftest2 int );
-DROP TABLE FKTABLEFORARRAY;
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE RESTRICT ON UPDATE RESTRICT, ftest2 int );
-DROP TABLE FKTABLEFORARRAY;
--- Not allowed references (SET NULL, SET DEFAULT, CASCADE)
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE NO ACTION ON UPDATE SET DEFAULT, ftest2 int );
+DROP TABLE fk_table;
+DROP TABLE fk_table_not_null;
+DROP TABLE fk_table_multi_dim;
+-- allowed references with actions (NO ACTION, RESTRICT)
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE NO ACTION ON UPDATE NO ACTION, b int);
+DROP TABLE fk_table;
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE NO ACTION ON UPDATE RESTRICT, b int);
+DROP TABLE fk_table;
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE RESTRICT ON UPDATE NO ACTION, b int);
+DROP TABLE fk_table;
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE RESTRICT ON UPDATE RESTRICT, b int);
+DROP TABLE fk_table;
+-- fail - not allowed references (SET NULL, SET DEFAULT, CASCADE)
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE NO ACTION ON UPDATE SET NULL, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE NO ACTION ON UPDATE SET NULL, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE NO ACTION ON UPDATE SET DEFAULT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE RESTRICT ON UPDATE SET DEFAULT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE NO ACTION ON UPDATE CASCADE, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE RESTRICT ON UPDATE SET NULL, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE RESTRICT ON UPDATE SET NULL, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE CASCADE ON UPDATE NO ACTION, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE RESTRICT ON UPDATE SET DEFAULT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE FKTABLEFORARRAY;
-ERROR:  table "fktableforarray" does not exist
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE CASCADE ON UPDATE RESTRICT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE RESTRICT ON UPDATE CASCADE, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE FKTABLEFORARRAY;
-ERROR:  table "fktableforarray" does not exist
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE CASCADE ON UPDATE SET DEFAULT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET NULL ON UPDATE NO ACTION, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE CASCADE ON UPDATE SET NULL, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET NULL ON UPDATE RESTRICT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET DEFAULT ON UPDATE NO ACTION, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET NULL ON UPDATE SET NULL, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET DEFAULT ON UPDATE RESTRICT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET NULL ON UPDATE SET DEFAULT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET DEFAULT ON UPDATE SET DEFAULT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET NULL ON UPDATE CASCADE, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET DEFAULT ON UPDATE SET NULL, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE CASCADE ON UPDATE NO ACTION, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET NULL ON UPDATE NO ACTION, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE CASCADE ON UPDATE RESTRICT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET NULL ON UPDATE RESTRICT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE CASCADE ON UPDATE SET NULL, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET NULL ON UPDATE SET DEFAULT, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE CASCADE ON UPDATE SET DEFAULT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET NULL ON UPDATE SET NULL, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE CASCADE ON UPDATE CASCADE, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE NO ACTION ON UPDATE CASCADE, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET DEFAULT ON UPDATE NO ACTION, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE RESTRICT ON UPDATE CASCADE, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET DEFAULT ON UPDATE RESTRICT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE CASCADE ON UPDATE CASCADE, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET DEFAULT ON UPDATE SET NULL, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET DEFAULT ON UPDATE CASCADE, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET DEFAULT ON UPDATE SET DEFAULT, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
-CREATE TABLE FKTABLEFORARRAY ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON DELETE SET NULL ON UPDATE CASCADE, ftest2 int );
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+CREATE TABLE fk_table (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table ON DELETE SET DEFAULT ON UPDATE CASCADE, b int);
 ERROR:  Array Element Foreign Keys support only NO ACTION and RESTRICT actions
-DROP TABLE IF EXISTS FKTABLEFORARRAY;
-NOTICE:  table "fktableforarray" does not exist, skipping
--- Cleanup
-DROP TABLE PKTABLEFORARRAY;
--- Check reference on empty table
-CREATE TABLE PKTABLEFORARRAY (ptest1 int PRIMARY KEY);
-CREATE TABLE FKTABLEFORARRAY  (ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY);
-INSERT INTO FKTABLEFORARRAY VALUES ('{}');
-DROP TABLE FKTABLEFORARRAY;
-DROP TABLE PKTABLEFORARRAY;
--- Repeat a similar test using CHAR(1) keys rather than INTEGER
-CREATE TABLE PKTABLEFORARRAY ( ptest1 CHAR(1) PRIMARY KEY, ptest2 text );
--- Populate the primary table
-INSERT INTO PKTABLEFORARRAY VALUES ('A', 'Test A');
-INSERT INTO PKTABLEFORARRAY VALUES ('B', 'Test B');
-INSERT INTO PKTABLEFORARRAY VALUES ('C', 'Test C');
--- Create the referencing table
-CREATE TABLE FKTABLEFORARRAY ( ftest1 char(1)[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAY ON UPDATE RESTRICT ON DELETE RESTRICT, ftest2 int );
--- Insert valid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY VALUES ('{"A"}', 1);
-INSERT INTO FKTABLEFORARRAY VALUES ('{"B"}', 2);
-INSERT INTO FKTABLEFORARRAY VALUES ('{"C"}', 3);
-INSERT INTO FKTABLEFORARRAY VALUES ('{"A","B","C"}', 4);
--- Insert invalid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY VALUES ('{"D"}', 5);
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey"
-DETAIL:  Key (ftest1)=({D}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY VALUES ('{"A","B","D"}', 6);
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey"
-DETAIL:  Key (ftest1)=({A,B,D}) is not present in table "pktableforarray".
--- Check FKTABLE
-SELECT * FROM FKTABLEFORARRAY;
- ftest1  | ftest2 
----------+--------
- {A}     |      1
- {B}     |      2
- {C}     |      3
- {A,B,C} |      4
-(4 rows)
-
--- Delete a row from PK TABLE (must fail due to ON DELETE RESTRICT)
-DELETE FROM PKTABLEFORARRAY WHERE ptest1='A';
-ERROR:  update or delete on table "pktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey" on table "fktableforarray"
-DETAIL:  Key (ptest1)=(A) is still referenced from table "fktableforarray".
--- Check FKTABLE for removal of matched row
-SELECT * FROM FKTABLEFORARRAY;
- ftest1  | ftest2 
----------+--------
- {A}     |      1
- {B}     |      2
- {C}     |      3
- {A,B,C} |      4
-(4 rows)
-
--- Update a row from PK TABLE (must fail due to ON UPDATE RESTRICT)
-UPDATE PKTABLEFORARRAY SET ptest1='D' WHERE ptest1='B';
-ERROR:  update or delete on table "pktableforarray" violates foreign key constraint "fktableforarray_ftest1_fkey" on table "fktableforarray"
-DETAIL:  Key (ptest1)=(B) is still referenced from table "fktableforarray".
--- Check FKTABLE for update of matched row
-SELECT * FROM FKTABLEFORARRAY;
- ftest1  | ftest2 
----------+--------
- {A}     |      1
- {B}     |      2
- {C}     |      3
- {A,B,C} |      4
-(4 rows)
-
--- Cleanup
-DROP TABLE FKTABLEFORARRAY;
-DROP TABLE PKTABLEFORARRAY;
--- Composite primary keys
-CREATE TABLE PKTABLEFORARRAY ( id1 CHAR(1), id2 CHAR(1), ptest2 text, PRIMARY KEY (id1, id2) );
--- Populate the primary table
-INSERT INTO PKTABLEFORARRAY VALUES ('A', 'A', 'Test A');
-INSERT INTO PKTABLEFORARRAY VALUES ('A', 'B', 'Test B');
-INSERT INTO PKTABLEFORARRAY VALUES ('B', 'C', 'Test B');
--- Create the referencing table
-CREATE TABLE FKTABLEFORARRAY ( fid1 CHAR(1), fid2 CHAR(1)[], ftest2 text, FOREIGN KEY (fid1, EACH ELEMENT OF fid2) REFERENCES PKTABLEFORARRAY);
--- Insert valid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY VALUES ('A', ARRAY['A','B'], '1');
-INSERT INTO FKTABLEFORARRAY VALUES ('B', ARRAY['C'], '2');
--- Insert invalid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY VALUES ('A', ARRAY['A','B', 'C'], '3');
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_fid1_fid2_fkey"
-DETAIL:  Key (fid1, fid2)=(A, {A,B,C}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY VALUES ('B', ARRAY['A'], '4');
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_fid1_fid2_fkey"
-DETAIL:  Key (fid1, fid2)=(B, {A}) is not present in table "pktableforarray".
--- Cleanup
-DROP TABLE FKTABLEFORARRAY;
-DROP TABLE PKTABLEFORARRAY;
--- Test Array Element Foreign Keys with composite type
-CREATE TYPE INVOICEID AS (year_part INTEGER, progressive_part INTEGER);
-CREATE TABLE PKTABLEFORARRAY ( id INVOICEID PRIMARY KEY,  ptest2 text);
--- Populate the primary table
-INSERT INTO PKTABLEFORARRAY VALUES (ROW(2010, 99), 'Last invoice for 2010');
-INSERT INTO PKTABLEFORARRAY VALUES (ROW(2011, 1), 'First invoice for 2011');
-INSERT INTO PKTABLEFORARRAY VALUES (ROW(2011, 2), 'Second invoice for 2011');
--- Create the referencing table
-CREATE TABLE FKTABLEFORARRAY ( id SERIAL PRIMARY KEY, invoice_ids INVOICEID[], FOREIGN KEY (EACH ELEMENT OF invoice_ids) REFERENCES PKTABLEFORARRAY, ftest2 TEXT );
--- Insert valid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY(invoice_ids, ftest2) VALUES (ARRAY['(2010,99)']::INVOICEID[], 'Product A');
-INSERT INTO FKTABLEFORARRAY(invoice_ids, ftest2) VALUES (ARRAY['(2011,1)','(2011,2)']::INVOICEID[], 'Product B');
-INSERT INTO FKTABLEFORARRAY(invoice_ids, ftest2) VALUES (ARRAY['(2011,2)']::INVOICEID[], 'Product C');
--- Insert invalid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY(invoice_ids, ftest2) VALUES (ARRAY['(2011,99)']::INVOICEID[], 'Product A');
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_invoice_ids_fkey"
-DETAIL:  Key (invoice_ids)=({"(2011,99)"}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY(invoice_ids, ftest2) VALUES (ARRAY['(2011,1)','(2010,1)']::INVOICEID[], 'Product B');
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_invoice_ids_fkey"
-DETAIL:  Key (invoice_ids)=({"(2011,1)","(2010,1)"}) is not present in table "pktableforarray".
--- Check FKTABLE
-SELECT * FROM FKTABLEFORARRAY;
- id |       invoice_ids       |  ftest2   
-----+-------------------------+-----------
-  1 | {"(2010,99)"}           | Product A
-  2 | {"(2011,1)","(2011,2)"} | Product B
-  3 | {"(2011,2)"}            | Product C
-(3 rows)
-
--- Delete a row from PK TABLE
-DELETE FROM PKTABLEFORARRAY WHERE id=ROW(2010,99);
-ERROR:  update or delete on table "pktableforarray" violates foreign key constraint "fktableforarray_invoice_ids_fkey" on table "fktableforarray"
-DETAIL:  Key (id)=((2010,99)) is still referenced from table "fktableforarray".
--- Check FKTABLE for removal of matched row
-SELECT * FROM FKTABLEFORARRAY;
- id |       invoice_ids       |  ftest2   
-----+-------------------------+-----------
-  1 | {"(2010,99)"}           | Product A
-  2 | {"(2011,1)","(2011,2)"} | Product B
-  3 | {"(2011,2)"}            | Product C
-(3 rows)
-
--- Update a row from PK TABLE
-UPDATE PKTABLEFORARRAY SET id=ROW(2011,99) WHERE id=ROW(2011,1);
-ERROR:  update or delete on table "pktableforarray" violates foreign key constraint "fktableforarray_invoice_ids_fkey" on table "fktableforarray"
-DETAIL:  Key (id)=((2011,1)) is still referenced from table "fktableforarray".
--- Check FKTABLE for update of matched row
-SELECT * FROM FKTABLEFORARRAY;
- id |       invoice_ids       |  ftest2   
-----+-------------------------+-----------
-  1 | {"(2010,99)"}           | Product A
-  2 | {"(2011,1)","(2011,2)"} | Product B
-  3 | {"(2011,2)"}            | Product C
-(3 rows)
-
--- Cleanup
-DROP TABLE FKTABLEFORARRAY;
-DROP TABLE PKTABLEFORARRAY;
-DROP TYPE INVOICEID;
--- Check for an array column referencing another array column (NOT ELEMENT FOREIGN KEY)
--- Create primary table with an array primary key
-CREATE TABLE PKTABLEFORARRAY ( id INT[] PRIMARY KEY,  ptest2 text);
--- Create the referencing table
-CREATE TABLE FKTABLEFORARRAY ( id SERIAL PRIMARY KEY, fids INT[] REFERENCES PKTABLEFORARRAY, ftest2 TEXT );
--- Populate the primary table
-INSERT INTO PKTABLEFORARRAY VALUES ('{1,1}', 'A');
-INSERT INTO PKTABLEFORARRAY VALUES ('{1,2}', 'B');
--- Insert valid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY (fids, ftest2) VALUES ('{1,1}', 'Product A');
-INSERT INTO FKTABLEFORARRAY (fids, ftest2) VALUES ('{1,2}', 'Product B');
--- Insert invalid rows into FK TABLE
-INSERT INTO FKTABLEFORARRAY (fids, ftest2) VALUES ('{0,1}', 'Product C');
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_fids_fkey"
-DETAIL:  Key (fids)=({0,1}) is not present in table "pktableforarray".
-INSERT INTO FKTABLEFORARRAY (fids, ftest2) VALUES ('{2,1}', 'Product D');
-ERROR:  insert or update on table "fktableforarray" violates foreign key constraint "fktableforarray_fids_fkey"
-DETAIL:  Key (fids)=({2,1}) is not present in table "pktableforarray".
--- Cleanup
-DROP TABLE FKTABLEFORARRAY;
-DROP TABLE PKTABLEFORARRAY;
--- ---------------------------------------
--- Multi-column "ELEMENT" foreign key tests
--- ---------------------------------------
--- Create DIM1 table with two-column primary key
-CREATE TABLE DIM1 (X INTEGER NOT NULL, Y INTEGER NOT NULL, PRIMARY KEY (X, Y));
--- Populate DIM1 table pairs
-INSERT INTO DIM1 SELECT x.t, x.t * y.t
-	FROM (SELECT generate_series(1, 10) AS t) x,
-	(SELECT generate_series(0, 10) AS t) y;
--- Test with TABLE declaration of an element foreign key constraint (NO ACTION)
-CREATE TABLE F1 (
-	x INTEGER PRIMARY KEY, y INTEGER[],
-	FOREIGN KEY (x, EACH ELEMENT OF y) REFERENCES DIM1(x, y)
+DROP TABLE IF EXISTS fk_table;
+NOTICE:  table "fk_table" does not exist, skipping
+DROP TABLE pk_table;
+-- check reference on empty table
+CREATE TABLE pk_table (a int PRIMARY KEY);
+CREATE TABLE fk_table  (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table);
+INSERT INTO fk_table VALUES ('{}');
+DROP TABLE fk_table;
+DROP TABLE pk_table;
+--
+-- test multi-column primary keys
+--
+CREATE TABLE pk_table (
+  a text,
+  b text,
+  PRIMARY KEY (a, b)
 );
--- Insert facts
-INSERT INTO F1 VALUES (1, '{0,1,2,3,4,5}'); -- OK
-INSERT INTO F1 VALUES (2, '{0,2,4,6}'); -- OK
-INSERT INTO F1 VALUES (3, '{0,3,6,9,0,3,6,9,0,0,0,0,9,9}'); -- OK (multiple occurrences)
-INSERT INTO F1 VALUES (4, '{0,2,4}'); -- FAILS (2 is not present)
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_x_y_fkey"
-DETAIL:  Key (x, y)=(4, {0,2,4}) is not present in table "dim1".
-INSERT INTO F1 VALUES (4, '{0,NULL,4}'); -- OK
-INSERT INTO F1 VALUES (5, '{0,NULL,5}'); -- OK
--- Try updates
-UPDATE F1 SET y = '{0,2,4,6}' WHERE x = 2; -- OK
-UPDATE F1 SET y = '{0,2,3,4,6}' WHERE x = 2; -- FAILS
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_x_y_fkey"
-DETAIL:  Key (x, y)=(2, {0,2,3,4,6}) is not present in table "dim1".
-UPDATE F1 SET x = 20, y = '{0,2,3,4,6}' WHERE x = 2; -- FAILS (20 does not exist)
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_x_y_fkey"
-DETAIL:  Key (x, y)=(20, {0,2,3,4,6}) is not present in table "dim1".
-UPDATE F1 SET y = '{0,4,8}' WHERE x = 4; -- OK
-UPDATE F1 SET y = '{0,5,NULL,10}' WHERE x = 5; -- OK
-DROP TABLE F1;
--- Test with FOREIGN KEY after TABLE population
-CREATE TABLE F1 (
-	x INTEGER PRIMARY KEY, y INTEGER[]
+INSERT INTO pk_table (a, b) VALUES ('foo', 'foo');
+INSERT INTO pk_table (a, b) VALUES ('foo', 'bar');
+INSERT INTO pk_table (a, b) VALUES ('bar', 'baz');
+CREATE TABLE fk_table (
+  a text,
+  b text[],
+  FOREIGN KEY (a, EACH ELEMENT OF b) REFERENCES pk_table
 );
--- Insert facts
-INSERT INTO F1 VALUES (1, '{0,1,2,3,4,5}'); -- OK
-INSERT INTO F1 VALUES (2, '{0,2,4,6}'); -- OK
-INSERT INTO F1 VALUES (3, '{0,3,6,9,0,3,6,9,0,0,0,0,9,9}'); -- OK (multiple occurrences)
-INSERT INTO F1 VALUES (4, '{0,2,4}'); -- OK (2 is not present)
-INSERT INTO F1 VALUES (5, '{0,NULL,5}'); -- OK
--- Add foreign key (FAILS)
-ALTER TABLE F1 ADD FOREIGN KEY (x, EACH ELEMENT OF y) REFERENCES DIM1(x, y);
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_x_y_fkey"
-DETAIL:  Key (x, y)=(4, {0,2,4}) is not present in table "dim1".
-DROP TABLE F1;
--- Test with TABLE declaration of a two-dim ELEMENT foreign key constraint (FAILS)
-CREATE TABLE F1 (
-	x INTEGER[] PRIMARY KEY, y INTEGER[],
-	FOREIGN KEY (EACH ELEMENT OF x, EACH ELEMENT OF y) REFERENCES DIM1(x, y)
+-- ok
+INSERT INTO fk_table (a, b) VALUES ('foo', ARRAY['foo','bar']);
+INSERT INTO fk_table (a, b) VALUES ('bar', ARRAY['baz']);
+-- fail
+INSERT INTO fk_table (a, b) VALUES ('foo', ARRAY['foo','bar', 'baz']);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_b_fkey"
+DETAIL:  Key (a, b)=(foo, {foo,bar,baz}) is not present in table "pk_table".
+INSERT INTO fk_table (a, b) VALUES ('bar', ARRAY['foo']);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_b_fkey"
+DETAIL:  Key (a, b)=(bar, {foo}) is not present in table "pk_table".
+DROP TABLE fk_table;
+DROP TABLE pk_table;
+--
+-- test composite type primary key
+--
+CREATE TYPE invoiceid AS (year_part int, progressive_part int);
+CREATE TABLE pk_table (id invoiceid PRIMARY KEY, b text);
+INSERT INTO pk_table (id, b) VALUES (ROW(2010, 99), 'Last invoice for 2010');
+INSERT INTO pk_table (id, b) VALUES (ROW(2011, 1), 'First invoice for 2011');
+INSERT INTO pk_table (id, b) VALUES (ROW(2011, 2), 'Second invoice for 2011');
+CREATE TABLE fk_table (
+  id integer NOT NULL GENERATED ALWAYS AS IDENTITY,
+  invoice_ids invoiceid[],
+  b TEXT,
+  PRIMARY KEY (id),
+  FOREIGN KEY (EACH ELEMENT OF invoice_ids) REFERENCES pk_table
+);
+-- ok
+INSERT INTO fk_table (invoice_ids, b) VALUES (ARRAY['(2010,99)']::invoiceid[], 'Product A');
+INSERT INTO fk_table (invoice_ids, b) VALUES (ARRAY['(2011,1)','(2011,2)']::invoiceid[], 'Product B');
+INSERT INTO fk_table (invoice_ids, b) VALUES (ARRAY['(2011,2)']::invoiceid[], 'Product C');
+-- fail
+INSERT INTO fk_table (invoice_ids, b) VALUES (ARRAY['(2011,99)']::invoiceid[], 'Product A');
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_invoice_ids_fkey"
+DETAIL:  Key (invoice_ids)=({"(2011,99)"}) is not present in table "pk_table".
+INSERT INTO fk_table (invoice_ids, b) VALUES (ARRAY['(2011,1)','(2010,1)']::invoiceid[], 'Product B');
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_invoice_ids_fkey"
+DETAIL:  Key (invoice_ids)=({"(2011,1)","(2010,1)"}) is not present in table "pk_table".
+SELECT * FROM fk_table;
+ id |       invoice_ids       |     b     
+----+-------------------------+-----------
+  1 | {"(2010,99)"}           | Product A
+  2 | {"(2011,1)","(2011,2)"} | Product B
+  3 | {"(2011,2)"}            | Product C
+(3 rows)
+
+DELETE FROM pk_table WHERE id=ROW(2010,99);
+ERROR:  update or delete on table "pk_table" violates foreign key constraint "fk_table_invoice_ids_fkey" on table "fk_table"
+DETAIL:  Key (id)=((2010,99)) is still referenced from table "fk_table".
+SELECT * FROM fk_table;
+ id |       invoice_ids       |     b     
+----+-------------------------+-----------
+  1 | {"(2010,99)"}           | Product A
+  2 | {"(2011,1)","(2011,2)"} | Product B
+  3 | {"(2011,2)"}            | Product C
+(3 rows)
+
+UPDATE pk_table SET id=ROW(2011,99) WHERE id=ROW(2011,1);
+ERROR:  update or delete on table "pk_table" violates foreign key constraint "fk_table_invoice_ids_fkey" on table "fk_table"
+DETAIL:  Key (id)=((2011,1)) is still referenced from table "fk_table".
+SELECT * FROM fk_table;
+ id |       invoice_ids       |     b     
+----+-------------------------+-----------
+  1 | {"(2010,99)"}           | Product A
+  2 | {"(2011,1)","(2011,2)"} | Product B
+  3 | {"(2011,2)"}            | Product C
+(3 rows)
+
+DROP TABLE fk_table;
+DROP TABLE pk_table;
+DROP TYPE invoiceid;
+--
+-- test array primary key
+--
+CREATE TABLE pk_table (
+  a int[] PRIMARY KEY,
+  x text
+);
+CREATE TABLE fk_table (
+  b int NOT NULL GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  a int[] REFERENCES pk_table,
+  x text
+);
+INSERT INTO pk_table VALUES ('{1,1}', 'A');
+INSERT INTO pk_table VALUES ('{1,2}', 'B');
+-- ok
+INSERT INTO fk_table (a, x) VALUES ('{1,1}', 'Product A');
+INSERT INTO fk_table (a, x) VALUES ('{1,2}', 'Product B');
+-- fail
+INSERT INTO fk_table (a, x) VALUES ('{0,1}', 'Product C');
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_fkey"
+DETAIL:  Key (a)=({0,1}) is not present in table "pk_table".
+INSERT INTO fk_table (a, x) VALUES ('{2,1}', 'Product D');
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_fkey"
+DETAIL:  Key (a)=({2,1}) is not present in table "pk_table".
+DROP TABLE fk_table;
+DROP TABLE pk_table;
+--
+-- multi-column primary key
+--
+CREATE TABLE pk_table (
+  a int NOT NULL,
+  b int NOT NULL,
+  PRIMARY KEY (a, b)
+);
+INSERT INTO pk_table
+  SELECT
+    a.t,
+    a.t * b.t
+  FROM
+  (
+    SELECT generate_series(1, 10) AS t
+  ) a
+  CROSS JOIN
+  (
+    SELECT generate_series(0, 10) AS t
+  ) b;
+--
+-- multi-column foreign key
+-- CREATE TABLE
+--
+CREATE TABLE fk_table (
+	a int PRIMARY KEY,
+  b int[],
+	FOREIGN KEY (a, EACH ELEMENT OF b) REFERENCES pk_table(a, b)
+);
+-- ok
+INSERT INTO fk_table VALUES (1, '{0,1,2,3,4,5}');
+INSERT INTO fk_table VALUES (2, '{0,2,4,6}');
+INSERT INTO fk_table VALUES (3, '{0,3,6,9,0,3,6,9,0,0,0,0,9,9}');
+INSERT INTO fk_table VALUES (4, '{0,NULL,4}');
+INSERT INTO fk_table VALUES (5, '{0,NULL,5}');
+UPDATE fk_table SET b = '{0,2,4,6}' WHERE a = 2;
+UPDATE fk_table SET b = '{0,4,8}' WHERE a = 4;
+UPDATE fk_table SET b = '{0,5,NULL,10}' WHERE a = 5;
+-- fail
+INSERT INTO fk_table VALUES (4, '{0,2,4}');
+ERROR:  duplicate key value violates unique constraint "fk_table_pkey"
+DETAIL:  Key (a)=(4) already exists.
+UPDATE fk_table SET b = '{0,2,3,4,6}' WHERE a = 2;
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_b_fkey"
+DETAIL:  Key (a, b)=(2, {0,2,3,4,6}) is not present in table "pk_table".
+UPDATE fk_table SET a = 20, b = '{0,2,3,4,6}' WHERE a = 2;
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_b_fkey"
+DETAIL:  Key (a, b)=(20, {0,2,3,4,6}) is not present in table "pk_table".
+DROP TABLE fk_table;
+--
+-- multi-column foreign key
+-- ALTER TABLE ... ADD FOREIGN KEY
+--
+CREATE TABLE fk_table (
+	a int PRIMARY KEY,
+  b int[]
+);
+-- ok
+INSERT INTO fk_table VALUES (1, '{0,1,2,3,4,5}');
+INSERT INTO fk_table VALUES (2, '{0,2,4,6}');
+INSERT INTO fk_table VALUES (3, '{0,3,6,9,0,3,6,9,0,0,0,0,9,9}');
+INSERT INTO fk_table VALUES (5, '{0,NULL,5}');
+-- ok since no foreign key yet
+INSERT INTO fk_table VALUES (4, '{0,2,4}');
+-- fail
+ALTER TABLE fk_table ADD FOREIGN KEY (a, EACH ELEMENT OF b) REFERENCES pk_table(a, b);
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_a_b_fkey"
+DETAIL:  Key (a, b)=(4, {0,2,4}) is not present in table "pk_table".
+DROP TABLE fk_table;
+--
+-- multiple EACH ELEMENT OF unsupported
+--
+CREATE TABLE fk_table (
+	a int[],
+  b int[],
+  PRIMARY KEY (a),
+	FOREIGN KEY (EACH ELEMENT OF a, EACH ELEMENT OF b) REFERENCES pk_table(a, b)
 );
 ERROR:  foreign keys support only one array column
--- Test with two-dim ELEMENT foreign key after TABLE population
-CREATE TABLE F1 (
-	x INTEGER[] PRIMARY KEY, y INTEGER[]
+CREATE TABLE fk_table (
+	a int[],
+  b int[],
+  PRIMARY KEY (a)
 );
-INSERT INTO F1 VALUES ('{1}', '{0,1,2,3,4,5}'); -- OK
-INSERT INTO F1 VALUES ('{1,2}', '{0,2,4,6}'); -- OK
--- Add foreign key (FAILS)
-ALTER TABLE F1 ADD FOREIGN KEY (EACH ELEMENT OF x, EACH ELEMENT OF y) REFERENCES DIM1(x, y);
+INSERT INTO fk_table VALUES ('{1}', '{0,1,2,3,4,5}');
+INSERT INTO fk_table VALUES ('{1,2}', '{0,2,4,6}');
+ALTER TABLE fk_table ADD FOREIGN KEY (EACH ELEMENT OF a, EACH ELEMENT OF b) REFERENCES pk_table(a, b);
 ERROR:  foreign keys support only one array column
-DROP TABLE F1;
--- Cleanup
-DROP TABLE DIM1;
--- Check for potential name conflicts (with internal integrity checks)
-CREATE TABLE x1(x1 int, x2 int, PRIMARY KEY(x1,x2));
-INSERT INTO x1 VALUES
-       (1,4),
-       (1,5),
-       (2,4),
-       (2,5),
-       (3,6),
-       (3,7)
-;
-CREATE TABLE x2(x1 int[], x2 int, FOREIGN KEY(EACH ELEMENT OF x1, x2) REFERENCES x1);
-INSERT INTO x2 VALUES ('{1,2}',4);
-INSERT INTO x2 VALUES ('{1,3}',6); -- FAILS
-ERROR:  insert or update on table "x2" violates foreign key constraint "x2_x1_x2_fkey"
-DETAIL:  Key (x1, x2)=({1,3}, 6) is not present in table "x1".
-DROP TABLE x2;
-CREATE TABLE x2(x1 int[], x2 int);
-INSERT INTO x2 VALUES ('{1,2}',4);
-INSERT INTO x2 VALUES ('{1,3}',6);
-ALTER TABLE x2 ADD CONSTRAINT fk_const FOREIGN KEY(EACH ELEMENT OF x1, x2) REFERENCES x1;  -- FAILS
-ERROR:  insert or update on table "x2" violates foreign key constraint "fk_const"
-DETAIL:  Key (x1, x2)=({1,3}, 6) is not present in table "x1".
-DROP TABLE x2;
-DROP TABLE x1;
--- ---------------------------------------
--- Multi-dimensional "ELEMENT" foreign key tests
--- ---------------------------------------
--- Create DIM1 table with two-column primary key
-CREATE TABLE DIM1 (X INTEGER NOT NULL PRIMARY KEY,
-	CODE TEXT NOT NULL UNIQUE);
--- Populate DIM1 table pairs
-INSERT INTO DIM1 SELECT t, 'DIM1-' || lpad(t::TEXT, 2, '0')
-	FROM (SELECT generate_series(1, 10)) x(t);
--- Test with TABLE declaration of an element foreign key constraint (NO ACTION)
-CREATE TABLE F1 (
-	ID SERIAL PRIMARY KEY,
-	SLOTS INTEGER[3][3], FOREIGN KEY (EACH ELEMENT OF SLOTS) REFERENCES DIM1
+DROP TABLE fk_table;
+DROP TABLE pk_table;
+--
+-- multi-dimensional array FOREIGN KEY
+--
+CREATE TABLE pk_table (a int NOT NULL PRIMARY KEY);
+INSERT INTO pk_table (a) SELECT generate_series(1, 10);
+CREATE TABLE fk_table (
+	id int GENERATED ALWAYS AS IDENTITY,
+	slots int[3][3],
+  PRIMARY KEY (id),
+  CONSTRAINT slots_fk FOREIGN KEY (EACH ELEMENT OF slots) REFERENCES pk_table
 );
-INSERT INTO F1(SLOTS) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 3}, {NULL, NULL, 6}}'); -- OK
-INSERT INTO F1(SLOTS) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}'); -- FAILS
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_slots_fkey"
-DETAIL:  Key (slots)=({{NULL,1,NULL},{NULL,NULL,11},{NULL,NULL,6}}) is not present in table "dim1".
-INSERT INTO F1(SLOTS) VALUES ('{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}'); -- OK
-INSERT INTO F1(SLOTS) VALUES ('{1, 2, 3, 4, 5, 6, 7, 8, 9}'); -- OK
-UPDATE F1 SET SLOTS = '{{NULL, 1, NULL}, {NULL, NULL, 3}, {7, 8, 10}}' WHERE ID = 1; -- OK
-UPDATE F1 SET SLOTS = '{{100, 100, 100}, {NULL, NULL, 20}, {7, 8, 10}}' WHERE ID = 1; -- FAILS
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_slots_fkey"
-DETAIL:  Key (slots)=({{100,100,100},{NULL,NULL,20},{7,8,10}}) is not present in table "dim1".
-DROP TABLE F1;
--- Test with postponed foreign key
-CREATE TABLE F1 (
-	ID SERIAL PRIMARY KEY,
-	SLOTS INTEGER[3][3]
+-- ok
+INSERT INTO fk_table (slots) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 3}, {NULL, NULL, 6}}');
+INSERT INTO fk_table (slots) VALUES ('{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}');
+INSERT INTO fk_table (slots) VALUES ('{1, 2, 3, 4, 5, 6, 7, 8, 9}');
+UPDATE fk_table SET slots = '{{NULL, 1, NULL}, {NULL, NULL, 3}, {7, 8, 10}}' WHERE id = 1;
+-- fail
+INSERT INTO fk_table (slots) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}');
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "slots_fk"
+DETAIL:  Key (slots)=({{NULL,1,NULL},{NULL,NULL,11},{NULL,NULL,6}}) is not present in table "pk_table".
+UPDATE fk_table SET slots = '{{100, 100, 100}, {NULL, NULL, 20}, {7, 8, 10}}' WHERE id = 1;
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "slots_fk"
+DETAIL:  Key (slots)=({{100,100,100},{NULL,NULL,20},{7,8,10}}) is not present in table "pk_table".
+-- test with postponed foreign key
+ALTER TABLE fk_table DROP CONSTRAINT slots_fk;
+-- ok since no foreign key
+INSERT INTO fk_table (slots) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}');
+-- fail
+ALTER TABLE fk_table ADD FOREIGN KEY (EACH ELEMENT OF slots) REFERENCES pk_table;
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_slots_fkey"
+DETAIL:  Key (slots)=({{NULL,1,NULL},{NULL,NULL,11},{NULL,NULL,6}}) is not present in table "pk_table".
+-- remove issue
+DELETE FROM fk_table WHERE slots = '{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}';
+-- ok
+ALTER TABLE fk_table ADD FOREIGN KEY (EACH ELEMENT OF slots) REFERENCES pk_table;
+-- fail
+INSERT INTO fk_table (slots) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}');
+ERROR:  insert or update on table "fk_table" violates foreign key constraint "fk_table_slots_fkey"
+DETAIL:  Key (slots)=({{NULL,1,NULL},{NULL,NULL,11},{NULL,NULL,6}}) is not present in table "pk_table".
+DROP TABLE fk_table;
+-- leave tables in the database
+CREATE TABLE pk_table_violating (a int PRIMARY KEY, b text);
+CREATE TABLE fk_table_violating (a int[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+-- check ALTER TABLE ALTER TYPE
+ALTER TABLE fk_table_violating ALTER a TYPE int[];
+-- check GIN index
+CREATE TABLE pk_table_gin (a int PRIMARY KEY, b text);
+INSERT INTO pk_table_gin VALUES (1, 'Test1');
+INSERT INTO pk_table_gin VALUES (2, 'Test2');
+INSERT INTO pk_table_gin VALUES (3, 'Test3');
+INSERT INTO pk_table_gin VALUES (4, 'Test4');
+INSERT INTO pk_table_gin VALUES (5, 'Test5');
+INSERT INTO pk_table_gin VALUES (6, 'Test6');
+CREATE TABLE fk_table_gin (
+  a int[],
+  b int,
+  PRIMARY KEY (b),
+  FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_gin
+  ON DELETE NO ACTION ON UPDATE NO ACTION
 );
-INSERT INTO F1(SLOTS) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 3}, {NULL, NULL, 6}}'); -- OK
-INSERT INTO F1(SLOTS) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}'); -- OK
-INSERT INTO F1(SLOTS) VALUES ('{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}'); -- OK
-INSERT INTO F1(SLOTS) VALUES ('{1, 2, 3, 4, 5, 6, 7, 8, 9}'); -- OK
-ALTER TABLE F1 ADD FOREIGN KEY (EACH ELEMENT OF SLOTS) REFERENCES DIM1; -- FAILS
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_slots_fkey"
-DETAIL:  Key (slots)=({{NULL,1,NULL},{NULL,NULL,11},{NULL,NULL,6}}) is not present in table "dim1".
-DELETE FROM F1 WHERE ID = 2; -- REMOVE ISSUE
-ALTER TABLE F1 ADD FOREIGN KEY (EACH ELEMENT OF SLOTS) REFERENCES DIM1; -- NOW OK
-INSERT INTO F1(SLOTS) VALUES ('{{NULL, 1, NULL}, {NULL, NULL, 11}, {NULL, NULL, 6}}'); -- FAILS
-ERROR:  insert or update on table "f1" violates foreign key constraint "f1_slots_fkey"
-DETAIL:  Key (slots)=({{NULL,1,NULL},{NULL,NULL,11},{NULL,NULL,6}}) is not present in table "dim1".
-DROP TABLE F1;
--- Leave tables in the database
-CREATE TABLE PKTABLEFORELEMENTFK ( ptest1 int PRIMARY KEY, ptest2 text );
-CREATE TABLE FKTABLEFORELEMENTFK ( ftest1 int[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
--- Check ALTER TABLE ALTER TYPE
-ALTER TABLE FKTABLEFORELEMENTFK ALTER FTEST1 TYPE INT[];
--- Check GIN index
--- Define PKTABLEFORARRAYGIN
-CREATE TABLE PKTABLEFORARRAYGIN ( ptest1 int PRIMARY KEY, ptest2 text );
--- Insert test data into PKTABLEFORARRAYGIN
-INSERT INTO PKTABLEFORARRAYGIN VALUES (1, 'Test1');
-INSERT INTO PKTABLEFORARRAYGIN VALUES (2, 'Test2');
-INSERT INTO PKTABLEFORARRAYGIN VALUES (3, 'Test3');
-INSERT INTO PKTABLEFORARRAYGIN VALUES (4, 'Test4');
-INSERT INTO PKTABLEFORARRAYGIN VALUES (5, 'Test5');
-INSERT INTO PKTABLEFORARRAYGIN VALUES (6, 'Test6');
--- Define FKTABLEFORARRAYGIN
-CREATE TABLE FKTABLEFORARRAYGIN ( ftest1 int[],
-    ftest2 int PRIMARY KEY,
-    FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORARRAYGIN
-    ON DELETE NO ACTION ON UPDATE NO ACTION);
--- -- Create index on FKTABLEFORARRAYGIN
-CREATE INDEX ON FKTABLEFORARRAYGIN USING gin (ftest1 array_ops);
--- Populate Table
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{5}', 1);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{3,2}', 2);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{3,5,2,5}', 3);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{3,4,4}', 4);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{3,5,4,1,3}', 5);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{1}', 6);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{5,1}', 7);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{2,1,2,4,1}', 8);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{4,2}', 9);
-INSERT INTO FKTABLEFORARRAYGIN VALUES ('{3,4,5,3}', 10);
--- Try UPDATE
-UPDATE PKTABLEFORARRAYGIN SET ptest1=7 WHERE ptest1=6;
---- Try using the indexable operators
-SET enable_seqscan=off; -- to ensure GIN index is used
-EXPLAIN (COSTS OFF) SELECT ftest1 FROM FKTABLEFORARRAYGIN WHERE ftest1 @>> 5;
-                        QUERY PLAN                        
-----------------------------------------------------------
- Bitmap Heap Scan on fktableforarraygin
-   Recheck Cond: (ftest1 @>> 5)
-   ->  Bitmap Index Scan on fktableforarraygin_ftest1_idx
-         Index Cond: (ftest1 @>> 5)
-(4 rows)
-
-SELECT ftest1 FROM FKTABLEFORARRAYGIN WHERE ftest1 @>> 5;
-   ftest1    
--------------
- {5}
- {3,5,2,5}
- {3,5,4,1,3}
- {5,1}
- {3,4,5,3}
+-- create index on fk_table_gin
+CREATE INDEX ON fk_table_gin USING gin (a array_ops);
+INSERT INTO fk_table_gin VALUES ('{5}', 1);
+INSERT INTO fk_table_gin VALUES ('{3,2}', 2);
+INSERT INTO fk_table_gin VALUES ('{3,5,2,5}', 3);
+INSERT INTO fk_table_gin VALUES ('{3,4,4}', 4);
+INSERT INTO fk_table_gin VALUES ('{3,5,4,1,3}', 5);
+INSERT INTO fk_table_gin VALUES ('{1}', 6);
+INSERT INTO fk_table_gin VALUES ('{5,1}', 7);
+INSERT INTO fk_table_gin VALUES ('{2,1,2,4,1}', 8);
+INSERT INTO fk_table_gin VALUES ('{4,2}', 9);
+INSERT INTO fk_table_gin VALUES ('{3,4,5,3}', 10);
+-- try UPDATE
+UPDATE pk_table_gin SET a=7 WHERE a=6;
+-- try using the indexable operator
+SELECT * FROM fk_table_gin WHERE a @>> 5;
+      a      | b  
+-------------+----
+ {5}         |  1
+ {3,5,2,5}   |  3
+ {3,5,4,1,3} |  5
+ {5,1}       |  7
+ {3,4,5,3}   | 10
 (5 rows)
 
--- Cleanup
-DROP TABLE FKTABLEFORARRAYGIN;
-DROP TABLE PKTABLEFORARRAYGIN;
--- ---------------------------------------
--- Invalid referencing key tests
--- ---------------------------------------
-CREATE TABLE PKTABLEVIOLATING ( ptest1 int PRIMARY KEY, ptest2 text );
--- Attempt fk constraint between int <-> int
-CREATE TABLE FKTABLEVIOLATING ( ftest1 int, FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
-ERROR:  foreign key constraint "fktableviolating_ftest1_fkey" cannot be implemented
-DETAIL:  Key column "ftest1" has type integer which is not an array type.
--- Attempt fk constraint between int <-> char[]
-CREATE TABLE FKTABLEVIOLATING ( ftest1 char[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
-ERROR:  foreign key constraint "fktableviolating_ftest1_fkey" cannot be implemented
-DETAIL:  Unssupported relation between character[] and integer.
--- Attempt fk constraint between int <-> char
-CREATE TABLE FKTABLEVIOLATING ( ftest1 char, FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
-ERROR:  foreign key constraint "fktableviolating_ftest1_fkey" cannot be implemented
-DETAIL:  Key column "ftest1" has type character which is not an array type.
--- Attempt fk constraint between int <-> smallint[]
-CREATE TABLE FKTABLEVIOLATING ( ftest1 smallint[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
-ERROR:  foreign key constraint "fktableviolating_ftest1_fkey" cannot be implemented
-DETAIL:  Unssupported relation between smallint[] and integer.
--- Attempt fk constraint between int <-> bigint[]
-CREATE TABLE FKTABLEVIOLATING ( ftest1 bigint[], FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
-ERROR:  foreign key constraint "fktableviolating_ftest1_fkey" cannot be implemented
-DETAIL:  Unssupported relation between bigint[] and integer.
--- Attempt fk constraint between int <-> int2vector
-CREATE TABLE FKTABLEVIOLATING ( ftest1 int2vector, FOREIGN KEY (EACH ELEMENT OF ftest1) REFERENCES PKTABLEFORELEMENTFK, ftest2 int );
-ERROR:  foreign key constraint "fktableviolating_ftest1_fkey" cannot be implemented
-DETAIL:  Unssupported relation between int2vector and integer.
+DROP TABLE fk_table_gin;
+DROP TABLE pk_table_gin;
+--
+-- invalid refrencing key tests
+--
+CREATE TABLE pk_table_violating (a int PRIMARY KEY, b text);
+ERROR:  relation "pk_table_violating" already exists
+-- attempt fk constraint between int <-> int
+CREATE TABLE fk_table_violating (a int, FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+ERROR:  relation "fk_table_violating" already exists
+-- attempt fk constraint between int <-> char[]
+CREATE TABLE fk_table_violating (a char[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+ERROR:  relation "fk_table_violating" already exists
+-- attempt fk constraint between int <-> char
+CREATE TABLE fk_table_violating (a char, FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+ERROR:  relation "fk_table_violating" already exists
+-- attempt fk constraint between int <-> smallint[]
+CREATE TABLE fk_table_violating (a smallint[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+ERROR:  relation "fk_table_violating" already exists
+-- attempt fk constraint between int <-> bigint[]
+CREATE TABLE fk_table_violating (a bigint[], FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+ERROR:  relation "fk_table_violating" already exists
+-- attempt fk constraint between int <-> int2vector
+CREATE TABLE fk_table_violating (a int2vector, FOREIGN KEY (EACH ELEMENT OF a) REFERENCES pk_table_violating, b int);
+ERROR:  relation "fk_table_violating" already exists
