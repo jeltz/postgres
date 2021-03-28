@@ -236,6 +236,84 @@ scalararraysel_containment(PlannerInfo *root,
 }
 
 /*
+ * arrayelemcontsel -- restriction selectivity for array @>>, <<@ operators
+ */
+Datum
+arrayelemcontsel(PG_FUNCTION_ARGS)
+{
+	PlannerInfo *root = (PlannerInfo *) PG_GETARG_POINTER(0);
+	Oid			operator = PG_GETARG_OID(1);
+	List	   *args = (List *) PG_GETARG_POINTER(2);
+	int			varRelid = PG_GETARG_INT32(3);
+	VariableStatData vardata;
+	Node	   *other;
+	bool		varonleft;
+	Selectivity selec;
+	Oid			element_typeid;
+
+	/*
+	 * If expression is not (variable op something) or (something op
+	 * variable), then punt and return a default estimate.
+	 */
+	if (!get_restriction_variable(root, args, varRelid,
+								  &vardata, &other, &varonleft))
+		PG_RETURN_FLOAT8(DEFAULT_SEL(operator));
+
+	/*
+	 * Can't do anything useful if the something is not a constant, either.
+	 */
+	if (!IsA(other, Const))
+	{
+		ReleaseVariableStats(vardata);
+		PG_RETURN_FLOAT8(DEFAULT_SEL(operator));
+	}
+
+	/*
+	 * The "@>>" and "<<@" operators are strict, so we can cope with a NULL
+	 * constant right away.
+	 */
+	if (((Const *) other)->constisnull)
+	{
+		ReleaseVariableStats(vardata);
+		PG_RETURN_FLOAT8(0.0);
+	}
+
+	/*
+	 * If var is on the right, commute the operator, so that we can assume the
+	 * var is on the left in what follows.
+	 */
+	if (varonleft)
+	{
+		if (operator == OID_ARRAY_CONTAINSELEM_OP)
+			element_typeid = get_base_element_type(((Const *) other)->consttype);
+		else
+			element_typeid = get_base_element_type(vardata.vartype);
+	}
+	else
+	{
+		if (operator == OID_ARRAY_CONTAINSELEM_OP)
+		{
+			operator = OID_ARRAY_ELEMCONTAINED_OP;
+			element_typeid = get_base_element_type(vardata.vartype);
+		}
+		else
+		{
+			operator = OID_ARRAY_CONTAINSELEM_OP;
+			element_typeid = get_base_element_type(((Const *) other)->consttype);
+		}
+	}
+
+	selec = calc_arraycontsel(&vardata, ((Const *) other)->constvalue,
+							  element_typeid, operator);
+
+	ReleaseVariableStats(vardata);
+
+	CLAMP_PROBABILITY(selec);
+
+	PG_RETURN_FLOAT8((float8) selec);
+}
+
+/*
  * arraycontsel -- restriction selectivity for array @>, &&, <@ operators
  */
 Datum

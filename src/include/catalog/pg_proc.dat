@@ -1680,6 +1680,10 @@
   proname => 'arraycontjoinsel', provolatile => 's', prorettype => 'float8',
   proargtypes => 'internal oid internal int2 internal',
   prosrc => 'arraycontjoinsel' },
+{ oid => '6019',
+  descr => 'restriction selectivity for array element-containment operators',
+  proname => 'arrayelemcontsel', provolatile => 's', prorettype => 'float8',
+  proargtypes => 'internal oid internal int4', prosrc => 'arrayelemcontsel' },
 
 { oid => '764', descr => 'large object import',
   proname => 'lo_import', provolatile => 'v', proparallel => 'u',
