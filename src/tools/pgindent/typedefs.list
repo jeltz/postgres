@@ -1629,6 +1629,7 @@ ManyTestResourceKind
 Material
 MaterialPath
 MaterialState
+MdSMgrRelationData
 MdfdVec
 MdPathStr
 Memoize
