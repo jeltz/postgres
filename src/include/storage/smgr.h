@@ -15,12 +15,18 @@
 #define SMGR_H
 
 #include "lib/ilist.h"
+#include "nodes/pg_list.h"
 #include "storage/block.h"
 #include "storage/relfilelocator.h"
 
-typedef uint8 SMgrId;
+/*
+ * volatile ID of the smgr. Across various configurations IDs may vary,
+ * true identity is the name of each smgr. 
+ */
+typedef int SMgrId;
 
-#define MaxSMgrId UINT8_MAX
+#define MaxSMgrId		INT_MAX
+#define InvalidSmgrId	(-1)
 
 /*
  * smgr.c maintains a table of SMgrRelation objects, which are essentially
@@ -113,8 +119,13 @@ typedef struct f_smgr
 	void		(*smgr_truncate) (SMgrRelation reln, ForkNumber forknum,
 								  BlockNumber nblocks);
 	void		(*smgr_immedsync) (SMgrRelation reln, ForkNumber forknum);
+
+	void		(*smgr_validate_tspopts) (List *tspopts);
+	void		(*smgr_create_tsp) (Oid tspoid, List *tspopts, bool isredo);
+	void		(*smgr_drop_tsp) (Oid tspoid, bool isredo);
 } f_smgr;
 
+extern SMgrId get_smgr_id(const char *smgrname, bool missing_ok);
 extern SMgrId smgr_register(const f_smgr *smgr, Size smgrrelation_size);
 
 extern void smgrinit(void);
@@ -147,6 +158,11 @@ extern BlockNumber smgrnblocks_cached(SMgrRelation reln, ForkNumber forknum);
 extern void smgrtruncate(SMgrRelation reln, ForkNumber *forknum,
 						 int nforks, BlockNumber *nblocks);
 extern void smgrimmedsync(SMgrRelation reln, ForkNumber forknum);
+
+extern void smgrvalidatetspopts(const char *smgrname, List *opts);
+extern void smgrcreatetsp(const char *smgrname, Oid tsp, List *opts, bool isredo);
+extern void smgrdroptsp(const char *smgrname, Oid tsp, bool isredo);
+
 extern void AtEOXact_SMgr(void);
 extern bool ProcessBarrierSmgrRelease(void);
 

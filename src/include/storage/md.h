@@ -21,6 +21,8 @@
 
 /* registration function for md storage manager */
 extern void mdsmgr_register(void);
+
+#define MD_SMGR_NAME "md"
 extern SMgrId MdSMgrId;
 
 /* md storage manager functionality */
@@ -54,5 +56,13 @@ extern void DropRelationFiles(RelFileLocator *delrels, int ndelrels, bool isRedo
 extern int	mdsyncfiletag(const FileTag *ftag, char *path);
 extern int	mdunlinkfiletag(const FileTag *ftag, char *path);
 extern bool mdfiletagmatches(const FileTag *ftag, const FileTag *candidate);
+
+/* md tsp callbacks */
+extern void mdvalidatetspopts(List *opts);
+extern void mdcreatetsp(Oid tsp, List *opts, bool isredo);
+extern void mddroptsp(Oid tsp, bool isredo);
+void create_tablespace_directories(const char *location,
+								   const Oid tablespaceoid);
+
 
 #endif							/* MD_H */

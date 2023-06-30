@@ -18,6 +18,7 @@
 #include "postgres.h"
 
 #include "access/xlogutils.h"
+#include "catalog/pg_tablespace_d.h"
 #include "lib/ilist.h"
 #include "miscadmin.h"
 #include "storage/bufmgr.h"
@@ -29,7 +30,7 @@
 #include "utils/hsearch.h"
 #include "utils/inval.h"
 #include "utils/memutils.h"
-
+#include "utils/spccache.h"
 
 static f_smgr *smgrsw;
 
@@ -174,13 +175,25 @@ smgropen(RelFileLocator rlocator, BackendId backend)
 	/* Initialize it if not present before */
 	if (!found)
 	{
+		Oid		tspid = reln->smgr_rlocator.locator.spcOid;
 		/* hash_search already filled in the lookup key */
 		reln->smgr_owner = NULL;
 		reln->smgr_targblock = InvalidBlockNumber;
 		for (int i = 0; i <= MAX_FORKNUM; ++i)
 			reln->smgr_cached_nblocks[i] = InvalidBlockNumber;
 
-		reln->smgr_which = MdSMgrId;	/* we only have md.c at present */
+		/*
+		 * There is a chicken-and-egg problem for determining which storage
+		 * manager to use for the global tablespace, as that holds the
+		 * pg_tablespace table which we'd use to look up this information.
+		 *
+		 * As the global tablespace can't be replaced, the default is used
+		 * instead, which is the md.c smgr (MD_SMGR_NAME).
+		 */
+		if (tspid == GLOBALTABLESPACE_OID || tspid == DEFAULTTABLESPACE_OID)
+			reln->smgr_which = get_smgr_id(MD_SMGR_NAME, false);
+		else
+			reln->smgr_which = get_tablespace_smgrid(tspid);
 
 		/* implementation-specific initialization */
 		smgrsw[reln->smgr_which].smgr_open(reln);
@@ -720,6 +733,61 @@ void
 smgrimmedsync(SMgrRelation reln, ForkNumber forknum)
 {
 	smgrsw[reln->smgr_which].smgr_immedsync(reln, forknum);
+}
+
+static const char *recent_smgrname = NULL;
+static SMgrId recent_smgrid = -1;
+
+static SMgrId get_smgr_by_name(const char *smgrname, bool missing_ok)
+{
+	if (recent_smgrname != NULL && strcmp(smgrname, recent_smgrname) == 0)
+		return recent_smgrid;
+
+	for (SMgrId id = 0; id < NSmgr; id++)
+	{
+		f_smgr *smgr = &smgrsw[id];
+
+		if (strcmp(smgrname, smgr->name) == 0)
+		{
+			recent_smgrname = smgr->name;
+			recent_smgrid = id;
+			return id;
+		}
+	}
+
+	if (missing_ok)
+		return InvalidSmgrId;
+
+	ereport(ERROR,
+			(errcode(ERRCODE_INVALID_NAME),
+			 errmsg("invalid smgr '%s'", smgrname)));
+}
+
+
+SMgrId get_smgr_id(const char *smgrname, bool missing_ok)
+{
+	return get_smgr_by_name(smgrname, missing_ok);
+}
+
+void smgrvalidatetspopts(const char *smgrname, List *opts)
+{
+	SMgrId smgrid = get_smgr_by_name(smgrname, false);
+
+	smgrsw[smgrid].smgr_validate_tspopts(opts);
+}
+
+void smgrcreatetsp(const char *smgrname, Oid tsp, List *opts, bool isredo)
+{
+	SMgrId smgrid = get_smgr_by_name(smgrname, false);
+
+	smgrsw[smgrid].smgr_create_tsp(tsp, opts, isredo);
+}
+
+void smgrdroptsp(const char *smgrname, Oid tsp, bool isredo)
+{
+	SMgrId smgrid = get_smgr_by_name(smgrname, false);
+
+	smgrsw[smgrid].smgr_drop_tsp(tsp, isredo);
 }
 
 /*

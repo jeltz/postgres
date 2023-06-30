@@ -2613,8 +2613,9 @@ typedef struct CreateTableSpaceStmt
 {
 	NodeTag		type;
 	char	   *tablespacename;
+	char	   *smgr;
+	List	   *smgropts; /* list of DefElem nodes */
 	RoleSpec   *owner;
-	char	   *location;
 	List	   *options;
 } CreateTableSpaceStmt;
 
