@@ -130,7 +130,7 @@ mdsmgr_register(void)
 {
 	/* magnetic disk */
 	f_smgr		md_smgr = (f_smgr) {
-		.name = "md",
+		.name = MdSMgrName,
 		.smgr_init = mdinit,
 		.smgr_shutdown = NULL,
 		.smgr_open = mdopen,
