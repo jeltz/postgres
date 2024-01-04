@@ -63,8 +63,7 @@ sid		\'([^']|\'\')*\'
  * unreserved identifier.  Note that _null_ is not treated as a keyword
  * for this purpose; it's the one "reserved word" in the bootstrap syntax.
  *
- * Notice that all the keywords are case-sensitive, and for historical
- * reasons some must be upper case.
+ * Notice that all the keywords are case-sensitive.
  *
  * String tokens return a palloc'd string in boot_yylval.str.
  */
@@ -103,9 +102,9 @@ index			{ boot_yylval.kw = "index"; return INDEX; }
 on				{ boot_yylval.kw = "on"; return ON; }
 using			{ boot_yylval.kw = "using"; return USING; }
 toast			{ boot_yylval.kw = "toast"; return XTOAST; }
-FORCE			{ boot_yylval.kw = "FORCE"; return XFORCE; }
-NOT				{ boot_yylval.kw = "NOT"; return XNOT; }
-NULL			{ boot_yylval.kw = "NULL"; return XNULL; }
+force			{ boot_yylval.kw = "force"; return XFORCE; }
+not				{ boot_yylval.kw = "not"; return XNOT; }
+null			{ boot_yylval.kw = "null"; return XNULL; }
 
 {id}			{
 					boot_yylval.str = pstrdup(yytext);

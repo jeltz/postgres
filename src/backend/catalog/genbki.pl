@@ -512,11 +512,11 @@ EOM
 
 		if (defined $column->{forcenotnull})
 		{
-			print $bki " FORCE NOT NULL";
+			print $bki " force not null";
 		}
 		elsif (defined $column->{forcenull})
 		{
-			print $bki " FORCE NULL";
+			print $bki " force null";
 		}
 
 		# Emit Anum_* constants
