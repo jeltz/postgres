@@ -921,7 +921,6 @@ sub print_bki_insert
 	foreach my $column (@$schema)
 	{
 		my $attname = $column->{name};
-		my $atttype = $column->{type};
 		my $bki_value = $row->{$attname};
 
 		# Fold backslash-zero to empty string if it's the entire string,
