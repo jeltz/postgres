@@ -77,7 +77,6 @@ close			{ boot_yylval.kw = "close"; return XCLOSE; }
 
 create			{ boot_yylval.kw = "create"; return XCREATE; }
 
-OID				{ boot_yylval.kw = "OID"; return OBJ_ID; }
 bootstrap		{ boot_yylval.kw = "bootstrap"; return XBOOTSTRAP; }
 shared_relation	{ boot_yylval.kw = "shared_relation"; return XSHARED_RELATION; }
 rowtype_oid		{ boot_yylval.kw = "rowtype_oid"; return XROWTYPE_OID; }

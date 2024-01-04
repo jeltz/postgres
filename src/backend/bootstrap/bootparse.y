@@ -101,7 +101,7 @@ static int num_columns_read = 0;
 /* All the rest are unreserved, and should be handled in boot_ident! */
 %token <kw> OPEN XCLOSE XCREATE INSERT_TUPLE
 %token <kw> XDECLARE INDEX ON USING XBUILD INDICES UNIQUE XTOAST
-%token <kw> OBJ_ID XBOOTSTRAP XSHARED_RELATION XROWTYPE_OID
+%token <kw> XBOOTSTRAP XSHARED_RELATION XROWTYPE_OID
 %token <kw> XFORCE XNOT XNULL
 
 %start TopLevel
@@ -478,7 +478,6 @@ boot_ident:
 		| INDICES		{ $$ = pstrdup($1); }
 		| UNIQUE		{ $$ = pstrdup($1); }
 		| XTOAST		{ $$ = pstrdup($1); }
-		| OBJ_ID		{ $$ = pstrdup($1); }
 		| XBOOTSTRAP	{ $$ = pstrdup($1); }
 		| XSHARED_RELATION	{ $$ = pstrdup($1); }
 		| XROWTYPE_OID	{ $$ = pstrdup($1); }
