@@ -488,7 +488,7 @@ EOM
 
 	my $first = 1;
 
-	print $bki "\n (\n";
+	print $bki "\n(\n";
 	my $schema = $catalog->{columns};
 	my %attnames;
 	my $attnum = 0;
@@ -504,7 +504,7 @@ EOM
 		# Emit column definitions
 		if (!$first)
 		{
-			print $bki " ,\n";
+			print $bki ",\n";
 		}
 		$first = 0;
 
@@ -522,7 +522,7 @@ EOM
 		# Emit Anum_* constants
 		printf $def "#define Anum_%s_%s %s\n", $catname, $attname, $attnum;
 	}
-	print $bki "\n )\n";
+	print $bki "\n)\n";
 
 	# Emit Natts_* constant
 	print $def "\n#define Natts_$catname $attnum\n\n";
