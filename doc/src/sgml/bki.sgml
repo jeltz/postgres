@@ -897,7 +897,7 @@ $ perl  rewrite_dat_with_prokind.pl  pg_proc.dat
 
      <para>
       NULL values can be specified using the special key word
-      <literal>_null_</literal>.  Values that do not look like
+      <literal>_</literal>.  Values that do not look like
       identifiers or digit strings must be single-quoted.
       (To include a single quote in a value, write it twice.
       Escape-string-style backslash escapes are allowed in the string, too.)
@@ -1071,7 +1071,7 @@ $ perl  rewrite_dat_with_prokind.pl  pg_proc.dat
 create test_table 420 (oid = oid, cola = int4, colb = text)
 open test_table
 insert (421 1 'value 1')
-insert (422 2 _null_)
+insert (422 2 _)
 close test_table
 </programlisting>
   </para>

@@ -923,21 +923,29 @@ sub print_bki_insert
 		my $attname = $column->{name};
 		my $bki_value = $row->{$attname};
 
-		# Fold backslash-zero to empty string if it's the entire string,
-		# since that represents a NUL char in C code.
-		$bki_value = '' if $bki_value eq '\0';
+		if ($bki_value eq '_') {
+			$bki_value = "'_'";
+		}
+		else
+		{
+			$bki_value = '_' if $bki_value eq '_null_';
 
-		# Handle single quotes by doubling them, because that's what the
-		# bootstrap scanner requires.  We do not process backslashes
-		# specially; this allows escape-string-style backslash escapes
-		# to be used in catalog data.
-		$bki_value =~ s/'/''/g;
+			# Fold backslash-zero to empty string if it's the entire string,
+			# since that represents a NUL char in C code.
+			$bki_value = '' if $bki_value eq '\0';
 
-		# Quote value if needed.  We need not quote values that satisfy
-		# the "id" pattern in bootscanner.l, currently "[-A-Za-z0-9_]+".
-		$bki_value = sprintf("'%s'", $bki_value)
-		  if length($bki_value) == 0
-		  or $bki_value =~ /[^-A-Za-z0-9_]/;
+			# Handle single quotes by doubling them, because that's what the
+			# bootstrap scanner requires.  We do not process backslashes
+			# specially; this allows escape-string-style backslash escapes
+			# to be used in catalog data.
+			$bki_value =~ s/'/''/g;
+
+			# Quote value if needed.  We need not quote values that satisfy
+			# the "id" pattern in bootscanner.l, currently "[-A-Za-z0-9_]+".
+			$bki_value = sprintf("'%s'", $bki_value)
+			  if length($bki_value) == 0
+				or $bki_value =~ /[^-A-Za-z0-9_]/;
+		}
 
 		push @bki_values, $bki_value;
 	}

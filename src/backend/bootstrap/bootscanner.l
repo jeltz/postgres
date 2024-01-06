@@ -82,7 +82,7 @@ rowtype_oid		{ boot_yylval.kw = "rowtype_oid"; return XROWTYPE_OID; }
 
 insert			{ boot_yylval.kw = "insert"; return INSERT_TUPLE; }
 
-_null_			{ return NULLVAL; }
+_				{ return NULLVAL; }
 
 ","				{ return COMMA; }
 "="				{ return EQUALS; }
