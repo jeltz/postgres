@@ -941,7 +941,7 @@ sub print_bki_insert
 
 		push @bki_values, $bki_value;
 	}
-	printf $bki "insert ( %s )\n", join(' ', @bki_values);
+	printf $bki "insert (%s)\n", join(' ', @bki_values);
 	return;
 }
 
