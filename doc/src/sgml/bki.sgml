@@ -798,10 +798,10 @@ $ perl  rewrite_dat_with_prokind.pl  pg_proc.dat
      <optional><literal>rowtype_oid</literal> <replaceable>oid</replaceable></optional>
      (<replaceable class="parameter">name1</replaceable> =
      <replaceable class="parameter">type1</replaceable>
-     <optional><literal>FORCE NOT NULL</literal> | <literal>FORCE NULL</literal> </optional> <optional>,
+     <optional><literal>force not null</literal> | <literal>force null</literal> </optional> <optional>,
      <replaceable class="parameter">name2</replaceable> =
      <replaceable class="parameter">type2</replaceable>
-     <optional><literal>FORCE NOT NULL</literal> | <literal>FORCE NULL</literal> </optional>,
+     <optional><literal>force not null</literal> | <literal>force null</literal> </optional>,
      ...</optional>)
     </term>
 
