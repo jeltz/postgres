@@ -634,7 +634,7 @@ ok(-f "$tempdir/backuponserver/base.tar", 'backup tar was created');
 rmtree("$tempdir/backuponserver");
 
 $node->command_ok(
-	[qw(createuser --replication --role=pg_write_server_files backupuser)],
+	[qw(pg_createuser --replication --role=pg_write_server_files backupuser)],
 	'create backup user');
 $node->command_ok(
 	[

@@ -420,8 +420,8 @@ check_bin_dir(ClusterInfo *cluster, bool check_versions)
 		check_exec(cluster->bindir, "pg_dump", check_versions);
 		check_exec(cluster->bindir, "pg_dumpall", check_versions);
 		check_exec(cluster->bindir, "pg_restore", check_versions);
+		check_exec(cluster->bindir, "pg_vacuumdb", check_versions);
 		check_exec(cluster->bindir, "psql", check_versions);
-		check_exec(cluster->bindir, "vacuumdb", check_versions);
 	}
 }
 

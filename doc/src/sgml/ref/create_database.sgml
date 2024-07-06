@@ -387,7 +387,7 @@ CREATE DATABASE <replaceable class="parameter">name</replaceable>
    </para>
 
    <para>
-    The program <xref linkend="app-createdb"/> is a
+    The program <xref linkend="app-pgcreatedb"/> is a
     wrapper program around this command, provided for convenience.
    </para>
 

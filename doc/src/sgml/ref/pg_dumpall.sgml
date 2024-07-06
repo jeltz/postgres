@@ -795,7 +795,7 @@ exclude database <replaceable class="parameter">PATTERN</replaceable>
   <para>
    Once restored, it is wise to run <command>ANALYZE</command> on each
    database so the optimizer has useful statistics. You
-   can also run <command>vacuumdb -a -z</command> to analyze all
+   can also run <command>pg_vacuumdb -a -z</command> to analyze all
    databases.
   </para>
 

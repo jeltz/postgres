@@ -1,27 +1,27 @@
 <!--
-doc/src/sgml/ref/vacuumdb.sgml
+doc/src/sgml/ref/pg_vacuumdb.sgml
 PostgreSQL documentation
 -->
 
-<refentry id="app-vacuumdb">
- <indexterm zone="app-vacuumdb">
-  <primary>vacuumdb</primary>
+<refentry id="app-pgvacuumdb">
+ <indexterm zone="app-pgvacuumdb">
+  <primary>pg_vacuumdb</primary>
  </indexterm>
 
  <refmeta>
-  <refentrytitle><application>vacuumdb</application></refentrytitle>
+  <refentrytitle><application>pg_vacuumdb</application></refentrytitle>
   <manvolnum>1</manvolnum>
   <refmiscinfo>Application</refmiscinfo>
  </refmeta>
 
  <refnamediv>
-  <refname>vacuumdb</refname>
+  <refname>pg_vacuumdb</refname>
   <refpurpose>garbage-collect and analyze a <productname>PostgreSQL</productname> database</refpurpose>
  </refnamediv>
 
  <refsynopsisdiv>
   <cmdsynopsis>
-   <command>vacuumdb</command>
+   <command>pg_vacuumdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg rep="repeat"><replaceable>option</replaceable></arg>
 
@@ -46,7 +46,7 @@ PostgreSQL documentation
   </cmdsynopsis>
 
   <cmdsynopsis>
-   <command>vacuumdb</command>
+   <command>pg_vacuumdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg rep="repeat"><replaceable>option</replaceable></arg>
 
@@ -70,7 +70,7 @@ PostgreSQL documentation
   </cmdsynopsis>
 
   <cmdsynopsis>
-   <command>vacuumdb</command>
+   <command>pg_vacuumdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg rep="repeat"><replaceable>option</replaceable></arg>
 
@@ -98,14 +98,14 @@ PostgreSQL documentation
   <title>Description</title>
 
   <para>
-   <application>vacuumdb</application> is a utility for cleaning a
+   <application>pg_vacuumdb</application> is a utility for cleaning a
    <productname>PostgreSQL</productname> database.
-   <application>vacuumdb</application> will also generate internal statistics
+   <application>pg_vacuumdb</application> will also generate internal statistics
    used by the <productname>PostgreSQL</productname> query optimizer.
   </para>
 
   <para>
-   <application>vacuumdb</application> is a wrapper around the SQL
+   <application>pg_vacuumdb</application> is a wrapper around the SQL
    command <link linkend="sql-vacuum"><command>VACUUM</command></link>.
    There is no effective difference between vacuuming and analyzing
    databases via this utility and via other methods for accessing the
@@ -119,7 +119,7 @@ PostgreSQL documentation
   <title>Options</title>
 
    <para>
-    <application>vacuumdb</application> accepts the following command-line arguments:
+    <application>pg_vacuumdb</application> accepts the following command-line arguments:
     <variablelist>
      <varlistentry>
       <term><option>-a</option></term>
@@ -137,7 +137,7 @@ PostgreSQL documentation
        <para>
         Specifies the
         <glossterm linkend="glossary-buffer-access-strategy">Buffer Access Strategy</glossterm>
-        ring buffer size for a given invocation of <application>vacuumdb</application>.
+        ring buffer size for a given invocation of <application>pg_vacuumdb</application>.
         This size is used to calculate the number of shared buffers which will
         be reused as part of this strategy.  See <xref linkend="sql-vacuum"/>.
        </para>
@@ -176,7 +176,7 @@ PostgreSQL documentation
       <term><option>--echo</option></term>
       <listitem>
        <para>
-        Echo the commands that <application>vacuumdb</application> generates
+        Echo the commands that <application>pg_vacuumdb</application> generates
         and sends to the server.
        </para>
       </listitem>
@@ -222,7 +222,7 @@ PostgreSQL documentation
         but it also increases the load on the database server.
        </para>
        <para>
-        <application>vacuumdb</application> will open
+        <application>pg_vacuumdb</application> will open
         <replaceable class="parameter">njobs</replaceable> connections to the
         database, so make sure your <xref linkend="guc-max-connections"/>
         setting is high enough to accommodate all connections.
@@ -249,7 +249,7 @@ PostgreSQL documentation
         For the purposes of this option, the multixact ID age of a relation is
         the greatest of the ages of the main relation and its associated
         <acronym>TOAST</acronym> table, if one exists.  Since the commands
-        issued by <application>vacuumdb</application> will also process the
+        issued by <application>pg_vacuumdb</application> will also process the
         <acronym>TOAST</acronym> table for the relation if necessary, it does
         not need to be considered separately.
        </para>
@@ -270,7 +270,7 @@ PostgreSQL documentation
         For the purposes of this option, the transaction ID age of a relation
         is the greatest of the ages of the main relation and its associated
         <acronym>TOAST</acronym> table, if one exists.  Since the commands
-        issued by <application>vacuumdb</application> will also process the
+        issued by <application>pg_vacuumdb</application> will also process the
         <acronym>TOAST</acronym> table for the relation if necessary, it does
         not need to be considered separately.
        </para>
@@ -403,7 +403,7 @@ PostgreSQL documentation
        <term><option>--version</option></term>
        <listitem>
        <para>
-       Print the <application>vacuumdb</application> version and exit.
+       Print the <application>pg_vacuumdb</application> version and exit.
        </para>
        </listitem>
      </varlistentry>
@@ -457,7 +457,7 @@ PostgreSQL documentation
        <term><option>--help</option></term>
        <listitem>
        <para>
-       Show help about <application>vacuumdb</application> command line
+       Show help about <application>pg_vacuumdb</application> command line
        arguments, and exit.
        </para>
        </listitem>
@@ -467,7 +467,7 @@ PostgreSQL documentation
    </para>
 
    <para>
-    <application>vacuumdb</application> also accepts
+    <application>pg_vacuumdb</application> also accepts
     the following command-line arguments for connection parameters:
     <variablelist>
      <varlistentry>
@@ -524,15 +524,15 @@ PostgreSQL documentation
       <term><option>--password</option></term>
       <listitem>
        <para>
-        Force <application>vacuumdb</application> to prompt for a
+        Force <application>pg_vacuumdb</application> to prompt for a
         password before connecting to a database.
        </para>
 
        <para>
         This option is never essential, since
-        <application>vacuumdb</application> will automatically prompt
+        <application>pg_vacuumdb</application> will automatically prompt
         for a password if the server demands password authentication.
-        However, <application>vacuumdb</application> will waste a
+        However, <application>pg_vacuumdb</application> will waste a
         connection attempt finding out that the server wants a password.
         In some cases it is worth typing <option>-W</option> to avoid the extra
         connection attempt.
@@ -621,7 +621,7 @@ PostgreSQL documentation
    <para>
     To clean the database <literal>test</literal>:
 <screen>
-<prompt>$ </prompt><userinput>vacuumdb test</userinput>
+<prompt>$ </prompt><userinput>pg_vacuumdb test</userinput>
 </screen>
    </para>
 
@@ -629,7 +629,7 @@ PostgreSQL documentation
     To clean and analyze for the optimizer a database named
     <literal>bigdb</literal>:
 <screen>
-<prompt>$ </prompt><userinput>vacuumdb --analyze bigdb</userinput>
+<prompt>$ </prompt><userinput>pg_vacuumdb --analyze bigdb</userinput>
 </screen>
    </para>
 
@@ -639,14 +639,14 @@ PostgreSQL documentation
     <literal>xyzzy</literal>, and analyze a single column
     <literal>bar</literal> of the table for the optimizer:
 <screen>
-<prompt>$ </prompt><userinput>vacuumdb --analyze --verbose --table='foo(bar)' xyzzy</userinput>
+<prompt>$ </prompt><userinput>pg_vacuumdb --analyze --verbose --table='foo(bar)' xyzzy</userinput>
 </screen></para>
 
    <para>
     To clean all tables in the <literal>foo</literal> and <literal>bar</literal> schemas
     in a database named <literal>xyzzy</literal>:
 <screen>
-<prompt>$ </prompt><userinput>vacuumdb --schema='foo' --schema='bar' xyzzy</userinput>
+<prompt>$ </prompt><userinput>pg_vacuumdb --schema='foo' --schema='bar' xyzzy</userinput>
 </screen></para>
 
 

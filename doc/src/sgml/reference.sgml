@@ -241,27 +241,27 @@
    </para>
   </partintro>
 
-   &clusterdb;
-   &createdb;
-   &createuser;
-   &dropdb;
-   &dropuser;
    &ecpgRef;
    &pgamcheck;
    &pgBasebackup;
    &pgbench;
+   &pgClusterdb;
    &pgCombinebackup;
    &pgConfig;
+   &pgCreatedb;
+   &pgCreateuser;
+   &pgDropdb;
+   &pgDropuser;
    &pgDump;
    &pgDumpall;
    &pgIsready;
    &pgReceivewal;
    &pgRecvlogical;
+   &pgReindexdb;
    &pgRestore;
+   &pgVacuumdb;
    &pgVerifyBackup;
    &psqlRef;
-   &reindexdb;
-   &vacuumdb;
 
  </reference>
 

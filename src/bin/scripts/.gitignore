@@ -1,10 +1,10 @@
-/clusterdb
-/createdb
-/createuser
-/dropdb
-/dropuser
-/reindexdb
-/vacuumdb
+/pg_clusterdb
+/pg_createdb
+/pg_createuser
+/pg_dropdb
+/pg_dropuser
 /pg_isready
+/pg_reindexdb
+/pg_vacuumdb
 
 /tmp_check/

@@ -8,20 +8,20 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
-program_help_ok('createdb');
-program_version_ok('createdb');
-program_options_handling_ok('createdb');
+program_help_ok('pg_createdb');
+program_version_ok('pg_createdb');
+program_options_handling_ok('pg_createdb');
 
 my $node = PostgreSQL::Test::Cluster->new('main');
 $node->init;
 $node->start;
 
 $node->issues_sql_like(
-	[ 'createdb', 'foobar1' ],
+	[ 'pg_createdb', 'foobar1' ],
 	qr/statement: CREATE DATABASE foobar1/,
 	'SQL CREATE DATABASE run');
 $node->issues_sql_like(
-	[ 'createdb', '-l', 'C', '-E', 'LATIN1', '-T', 'template0', 'foobar2' ],
+	[ 'pg_createdb', '-l', 'C', '-E', 'LATIN1', '-T', 'template0', 'foobar2' ],
 	qr/statement: CREATE DATABASE foobar2 ENCODING 'LATIN1'/,
 	'create database with encoding');
 
@@ -32,14 +32,14 @@ if ($ENV{with_icu} eq 'yes')
 	# provider.  XXX Maybe split into multiple tests?
 	$node->command_fails(
 		[
-			'createdb', '-T', 'template0', '-E', 'UTF8',
+			'pg_createdb', '-T', 'template0', '-E', 'UTF8',
 			'--locale-provider=icu', 'foobar4'
 		],
 		'create database with ICU fails without ICU locale specified');
 
 	$node->issues_sql_like(
 		[
-			'createdb', '-T',
+			'pg_createdb', '-T',
 			'template0', '-E',
 			'UTF8', '--locale-provider=icu',
 			'--locale=C', '--icu-locale=en',
@@ -50,7 +50,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	$node->command_fails(
 		[
-			'createdb', '-T', 'template0', '-E', 'UTF8',
+			'pg_createdb', '-T', 'template0', '-E', 'UTF8',
 			'--locale-provider=icu',
 			'--icu-locale=@colNumeric=lower', 'foobarX'
 		],
@@ -58,7 +58,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	$node->command_fails_like(
 		[
-			'createdb', '-T',
+			'pg_createdb', '-T',
 			'template0', '--locale-provider=icu',
 			'--encoding=SQL_ASCII', 'foobarX'
 		],
@@ -72,7 +72,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	$node2->command_ok(
 		[
-			'createdb', '-T',
+			'pg_createdb', '-T',
 			'template0', '--locale-provider=libc',
 			'foobar55'
 		],
@@ -81,7 +81,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	$node2->command_ok(
 		[
-			'createdb', '-T', 'template0', '--icu-locale', 'en-US',
+			'pg_createdb', '-T', 'template0', '--icu-locale', 'en-US',
 			'foobar56'
 		],
 		'create database with icu locale from template database with icu provider'
@@ -89,7 +89,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	$node2->command_ok(
 		[
-			'createdb', '-T',
+			'pg_createdb', '-T',
 			'template0', '--locale-provider',
 			'icu', '--locale',
 			'en', '--lc-collate',
@@ -101,13 +101,13 @@ if ($ENV{with_icu} eq 'yes')
 else
 {
 	$node->command_fails(
-		[ 'createdb', '-T', 'template0', '--locale-provider=icu', 'foobar4' ],
+		[ 'pg_createdb', '-T', 'template0', '--locale-provider=icu', 'foobar4' ],
 		'create database with ICU fails since no ICU support');
 }
 
 $node->command_fails(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'tbuiltin1'
 	],
@@ -115,7 +115,7 @@ $node->command_fails(
 
 $node->command_ok(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--locale=C', 'tbuiltin2'
 	],
@@ -123,7 +123,7 @@ $node->command_ok(
 
 $node->command_ok(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--locale=C', '--lc-collate=C',
 		'tbuiltin3'
@@ -132,7 +132,7 @@ $node->command_ok(
 
 $node->command_ok(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--locale=C', '--lc-ctype=C',
 		'tbuiltin4'
@@ -141,7 +141,7 @@ $node->command_ok(
 
 $node->command_ok(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--lc-collate=C', '--lc-ctype=C',
 		'-E UTF-8', '--builtin-locale=C.UTF8',
@@ -151,7 +151,7 @@ $node->command_ok(
 
 $node->command_fails(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--lc-collate=C', '--lc-ctype=C',
 		'-E LATIN1', '--builtin-locale=C.UTF-8',
@@ -161,7 +161,7 @@ $node->command_fails(
 
 $node->command_fails(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--locale=C', '--icu-locale=en',
 		'tbuiltin7'
@@ -170,7 +170,7 @@ $node->command_fails(
 
 $node->command_fails(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template0', '--locale-provider=builtin',
 		'--locale=C', '--icu-rules=""',
 		'tbuiltin8'
@@ -179,17 +179,17 @@ $node->command_fails(
 
 $node->command_fails(
 	[
-		'createdb', '-T',
+		'pg_createdb', '-T',
 		'template1', '--locale-provider=builtin',
 		'--locale=C', 'tbuiltin9'
 	],
 	'create database with provider "builtin" not matching template');
 
-$node->command_fails([ 'createdb', 'foobar1' ],
+$node->command_fails([ 'pg_createdb', 'foobar1' ],
 	'fails if database already exists');
 
 $node->command_fails(
-	[ 'createdb', '-T', 'template0', '--locale-provider=xyz', 'foobarX' ],
+	[ 'pg_createdb', '-T', 'template0', '--locale-provider=xyz', 'foobarX' ],
 	'fails for invalid locale provider');
 
 # Check use of templates with shared dependencies copied from the template.
@@ -200,7 +200,7 @@ CREATE TABLE tab_foobar (id int);
 ALTER TABLE tab_foobar owner to role_foobar;
 CREATE POLICY pol_foobar ON tab_foobar FOR ALL TO role_foobar;');
 $node->issues_sql_like(
-	[ 'createdb', '-l', 'C', '-T', 'foobar2', 'foobar3' ],
+	[ 'pg_createdb', '-l', 'C', '-T', 'foobar2', 'foobar3' ],
 	qr/statement: CREATE DATABASE foobar3 TEMPLATE foobar2 LOCALE 'C'/,
 	'create database with template');
 ($ret, $stdout, $stderr) = $node->psql(
@@ -218,61 +218,61 @@ table tab_foobar\|role role_foobar$/,
 
 # Check quote handling with incorrect option values.
 $node->command_checks_all(
-	[ 'createdb', '--encoding', "foo'; SELECT '1", 'foobar2' ],
+	[ 'pg_createdb', '--encoding', "foo'; SELECT '1", 'foobar2' ],
 	1,
 	[qr/^$/],
-	[qr/^createdb: error: "foo'; SELECT '1" is not a valid encoding name/s],
-	'createdb with incorrect --encoding');
+	[qr/^pg_createdb: error: "foo'; SELECT '1" is not a valid encoding name/s],
+	'pg_createdb with incorrect --encoding');
 $node->command_checks_all(
-	[ 'createdb', '--lc-collate', "foo'; SELECT '1", 'foobar2' ],
+	[ 'pg_createdb', '--lc-collate', "foo'; SELECT '1", 'foobar2' ],
 	1,
 	[qr/^$/],
 	[
-		qr/^createdb: error: database creation failed: ERROR:  invalid LC_COLLATE locale name|^createdb: error: database creation failed: ERROR:  new collation \(foo'; SELECT '1\) is incompatible with the collation of the template database/s
+		qr/^pg_createdb: error: database creation failed: ERROR:  invalid LC_COLLATE locale name|^createdb: error: database creation failed: ERROR:  new collation \(foo'; SELECT '1\) is incompatible with the collation of the template database/s
 	],
-	'createdb with incorrect --lc-collate');
+	'pg_createdb with incorrect --lc-collate');
 $node->command_checks_all(
-	[ 'createdb', '--lc-ctype', "foo'; SELECT '1", 'foobar2' ],
+	[ 'pg_createdb', '--lc-ctype', "foo'; SELECT '1", 'foobar2' ],
 	1,
 	[qr/^$/],
 	[
-		qr/^createdb: error: database creation failed: ERROR:  invalid LC_CTYPE locale name|^createdb: error: database creation failed: ERROR:  new LC_CTYPE \(foo'; SELECT '1\) is incompatible with the LC_CTYPE of the template database/s
+		qr/^pg_createdb: error: database creation failed: ERROR:  invalid LC_CTYPE locale name|^createdb: error: database creation failed: ERROR:  new LC_CTYPE \(foo'; SELECT '1\) is incompatible with the LC_CTYPE of the template database/s
 	],
-	'createdb with incorrect --lc-ctype');
+	'pg_createdb with incorrect --lc-ctype');
 
 $node->command_checks_all(
-	[ 'createdb', '--strategy', "foo", 'foobar2' ],
+	[ 'pg_createdb', '--strategy', "foo", 'foobar2' ],
 	1,
 	[qr/^$/],
 	[
-		qr/^createdb: error: database creation failed: ERROR:  invalid create database strategy "foo"/s
+		qr/^pg_createdb: error: database creation failed: ERROR:  invalid create database strategy "foo"/s
 	],
-	'createdb with incorrect --strategy');
+	'pg_createdb with incorrect --strategy');
 
 # Check database creation strategy
 $node->issues_sql_like(
-	[ 'createdb', '-T', 'foobar2', '-S', 'wal_log', 'foobar6' ],
+	[ 'pg_createdb', '-T', 'foobar2', '-S', 'wal_log', 'foobar6' ],
 	qr/statement: CREATE DATABASE foobar6 STRATEGY wal_log TEMPLATE foobar2/,
 	'create database with WAL_LOG strategy');
 
 $node->issues_sql_like(
-	[ 'createdb', '-T', 'foobar2', '-S', 'WAL_LOG', 'foobar6s' ],
+	[ 'pg_createdb', '-T', 'foobar2', '-S', 'WAL_LOG', 'foobar6s' ],
 	qr/statement: CREATE DATABASE foobar6s STRATEGY "WAL_LOG" TEMPLATE foobar2/,
 	'create database with WAL_LOG strategy');
 
 $node->issues_sql_like(
-	[ 'createdb', '-T', 'foobar2', '-S', 'file_copy', 'foobar7' ],
+	[ 'pg_createdb', '-T', 'foobar2', '-S', 'file_copy', 'foobar7' ],
 	qr/statement: CREATE DATABASE foobar7 STRATEGY file_copy TEMPLATE foobar2/,
 	'create database with FILE_COPY strategy');
 
 $node->issues_sql_like(
-	[ 'createdb', '-T', 'foobar2', '-S', 'FILE_COPY', 'foobar7s' ],
+	[ 'pg_createdb', '-T', 'foobar2', '-S', 'FILE_COPY', 'foobar7s' ],
 	qr/statement: CREATE DATABASE foobar7s STRATEGY "FILE_COPY" TEMPLATE foobar2/,
 	'create database with FILE_COPY strategy');
 
 # Create database owned by role_foobar.
 $node->issues_sql_like(
-	[ 'createdb', '-T', 'foobar2', '-O', 'role_foobar', 'foobar8' ],
+	[ 'pg_createdb', '-T', 'foobar2', '-O', 'role_foobar', 'foobar8' ],
 	qr/statement: CREATE DATABASE foobar8 OWNER role_foobar TEMPLATE foobar2/,
 	'create database with owner role_foobar');
 ($ret, $stdout, $stderr) =

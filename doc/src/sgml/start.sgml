@@ -130,7 +130,7 @@
    </indexterm>
 
    <indexterm zone="tutorial-createdb">
-    <primary>createdb</primary>
+    <primary>pg_createdb</primary>
    </indexterm>
 
    <para>
@@ -151,7 +151,7 @@
     To create a new database, in this example named
     <literal>mydb</literal>, you use the following command:
 <screen>
-<prompt>$</prompt> <userinput>createdb mydb</userinput>
+<prompt>$</prompt> <userinput>pg_createdb mydb</userinput>
 </screen>
     If this produces no response then this step was successful and you can skip over the
     remainder of this section.
@@ -160,13 +160,13 @@
    <para>
     If you see a message similar to:
 <screen>
-createdb: command not found
+pg_createdb: command not found
 </screen>
     then <productname>PostgreSQL</productname> was not installed properly.  Either it was not
     installed at all or your shell's search path was not set to include it.
     Try calling the command with an absolute path instead:
 <screen>
-<prompt>$</prompt> <userinput>/usr/local/pgsql/bin/createdb mydb</userinput>
+<prompt>$</prompt> <userinput>/usr/local/pgsql/bin/pg_createdb mydb</userinput>
 </screen>
     The path at your site might be different.  Contact your site
     administrator or check the installation instructions to
@@ -176,18 +176,18 @@ createdb: command not found
    <para>
     Another response could be this:
 <screen>
-createdb: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: No such file or directory
+pg_createdb: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: No such file or directory
         Is the server running locally and accepting connections on that socket?
 </screen>
     This means that the server was not started, or it is not listening
-    where <command>createdb</command> expects to contact it.  Again, check the
+    where <command>pg_createdb</command> expects to contact it.  Again, check the
     installation instructions or consult the administrator.
    </para>
 
    <para>
     Another response could be this:
 <screen>
-createdb: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: FATAL:  role "joe" does not exist
+pg_createdb: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: FATAL:  role "joe" does not exist
 </screen>
     where your own login name is mentioned.  This will happen if the
     administrator has not created a <productname>PostgreSQL</productname> user account
@@ -207,7 +207,7 @@ createdb: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: FAT
     If you have a user account but it does not have the privileges required to
     create a database, you will see the following:
 <screen>
-createdb: error: database creation failed: ERROR:  permission denied to create database
+pg_createdb: error: database creation failed: ERROR:  permission denied to create database
 </screen>
     Not every user has authorization to create new databases.  If
     <productname>PostgreSQL</productname> refuses to create databases
@@ -246,7 +246,7 @@ createdb: error: database creation failed: ERROR:  permission denied to create d
     name as the default, so it can save you some typing.  To create
     that database, simply type:
 <screen>
-<prompt>$</prompt> <userinput>createdb</userinput>
+<prompt>$</prompt> <userinput>pg_createdb</userinput>
 </screen>
    </para>
 
@@ -256,7 +256,7 @@ createdb: error: database creation failed: ERROR:  permission denied to create d
     <literal>mydb</literal>, you can destroy it using the following
     command:
 <screen>
-<prompt>$</prompt> <userinput>dropdb mydb</userinput>
+<prompt>$</prompt> <userinput>pg_dropdb mydb</userinput>
 </screen>
     (For this command, the database name does not default to the user
     account name.  You always need to specify it.)  This action
@@ -266,8 +266,8 @@ createdb: error: database creation failed: ERROR:  permission denied to create d
    </para>
 
    <para>
-    More about <command>createdb</command> and <command>dropdb</command> can
-    be found in <xref linkend="app-createdb"/> and <xref linkend="app-dropdb"/>
+    More about <command>pg_createdb</command> and <command>pg_dropdb</command> can
+    be found in <xref linkend="app-pgcreatedb"/> and <xref linkend="app-pgdropdb"/>
     respectively.
    </para>
   </sect1>
@@ -320,7 +320,7 @@ createdb: error: database creation failed: ERROR:  permission denied to create d
 </screen>
     If you do not supply the database name then it will default to your
     user account name.  You already discovered this scheme in the
-    previous section using <command>createdb</command>.
+    previous section using <command>pg_createdb</command>.
    </para>
 
    <para>
@@ -347,7 +347,7 @@ mydb=#
    <para>
     If you encounter problems starting <command>psql</command>
     then go back to the previous section.  The diagnostics of
-    <command>createdb</command> and <command>psql</command> are
+    <command>pg_createdb</command> and <command>psql</command> are
     similar, and if the former worked the latter should work as well.
    </para>
 

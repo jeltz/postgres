@@ -35,7 +35,7 @@ sub generate_db
 	$dbname =~ tr/\"\\//d if ($windows_os);
 
 	$node->command_ok(
-		[ 'createdb', $dbname ],
+		[ 'pg_createdb', $dbname ],
 		"created database with ASCII characters from $from_char to $to_char");
 
 	return $dbname;

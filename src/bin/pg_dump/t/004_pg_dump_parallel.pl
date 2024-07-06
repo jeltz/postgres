@@ -18,9 +18,9 @@ $node->start;
 
 my $backupdir = $node->backup_dir;
 
-$node->run_log([ 'createdb', $dbname1 ]);
-$node->run_log([ 'createdb', $dbname2 ]);
-$node->run_log([ 'createdb', $dbname3 ]);
+$node->run_log([ 'pg_createdb', $dbname1 ]);
+$node->run_log([ 'pg_createdb', $dbname2 ]);
+$node->run_log([ 'pg_createdb', $dbname3 ]);
 
 $node->safe_psql(
 	$dbname1,

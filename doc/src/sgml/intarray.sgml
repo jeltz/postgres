@@ -476,7 +476,7 @@ SELECT message.mid FROM message WHERE message.sections @@ '1&amp;2'::query_int;
 
 <programlisting>
 cd .../contrib/intarray/bench
-createdb TEST
+pg_createdb TEST
 psql -c "CREATE EXTENSION intarray" TEST
 ./create_test.pl | psql TEST
 ./bench.pl

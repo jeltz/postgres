@@ -157,17 +157,17 @@ CREATE DATABASE <replaceable>name</replaceable>;
   <para>
    As a convenience, there is a program you can
    execute from the shell to create new databases,
-   <command>createdb</command>.<indexterm><primary>createdb</primary></indexterm>
+   <command>pg_createdb</command>.<indexterm><primary>pg_createdb</primary></indexterm>
 
 <synopsis>
-createdb <replaceable class="parameter">dbname</replaceable>
+pg_createdb <replaceable class="parameter">dbname</replaceable>
 </synopsis>
 
-   <command>createdb</command> does no magic. It connects to the <literal>postgres</literal>
+   <command>pg_createdb</command> does no magic. It connects to the <literal>postgres</literal>
    database and issues the <command>CREATE DATABASE</command> command,
    exactly as described above.
-   The <xref linkend="app-createdb"/> reference page contains the invocation
-   details. Note that <command>createdb</command> without any arguments will create
+   The <xref linkend="app-pgcreatedb"/> reference page contains the invocation
+   details. Note that <command>pg_createdb</command> without any arguments will create
    a database with the current user name.
   </para>
 
@@ -188,7 +188,7 @@ CREATE DATABASE <replaceable>dbname</replaceable> OWNER <replaceable>rolename</r
 </programlisting>
    from the SQL environment, or:
 <programlisting>
-createdb -O <replaceable>rolename</replaceable> <replaceable>dbname</replaceable>
+pg_createdb -O <replaceable>rolename</replaceable> <replaceable>dbname</replaceable>
 </programlisting>
    from the shell.
    Only the superuser is allowed to create a database for
@@ -255,7 +255,7 @@ CREATE DATABASE <replaceable>dbname</replaceable> TEMPLATE template0;
 </programlisting>
    from the SQL environment, or:
 <programlisting>
-createdb -T template0 <replaceable>dbname</replaceable>
+pg_createdb -T template0 <replaceable>dbname</replaceable>
 </programlisting>
    from the shell.
   </para>
@@ -368,11 +368,11 @@ DROP DATABASE <replaceable>name</replaceable>;
 
   <para>
    For convenience, there is also a shell program to drop
-   databases, <xref linkend="app-dropdb"/>:<indexterm><primary>dropdb</primary></indexterm>
+   databases, <xref linkend="app-pgdropdb"/>:<indexterm><primary>pg_dropdb</primary></indexterm>
 <synopsis>
-dropdb <replaceable class="parameter">dbname</replaceable>
+pg_dropdb <replaceable class="parameter">dbname</replaceable>
 </synopsis>
-   (Unlike <command>createdb</command>, it is not the default action to drop
+   (Unlike <command>pg_createdb</command>, it is not the default action to drop
    the database with the current user name.)
   </para>
  </sect1>

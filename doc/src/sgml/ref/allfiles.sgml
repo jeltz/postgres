@@ -190,11 +190,6 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY values             SYSTEM "values.sgml">
 
 <!-- applications and utilities -->
-<!ENTITY clusterdb          SYSTEM "clusterdb.sgml">
-<!ENTITY createdb           SYSTEM "createdb.sgml">
-<!ENTITY createuser         SYSTEM "createuser.sgml">
-<!ENTITY dropdb             SYSTEM "dropdb.sgml">
-<!ENTITY dropuser           SYSTEM "dropuser.sgml">
 <!ENTITY ecpgRef            SYSTEM "ecpg-ref.sgml">
 <!ENTITY initdb             SYSTEM "initdb.sgml">
 <!ENTITY pgamcheck          SYSTEM "pg_amcheck.sgml">
@@ -202,19 +197,26 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY pgBasebackup       SYSTEM "pg_basebackup.sgml">
 <!ENTITY pgbench            SYSTEM "pgbench.sgml">
 <!ENTITY pgChecksums        SYSTEM "pg_checksums.sgml">
+<!ENTITY pgClusterdb        SYSTEM "pg_clusterdb.sgml">
 <!ENTITY pgCombinebackup    SYSTEM "pg_combinebackup.sgml">
 <!ENTITY pgConfig           SYSTEM "pg_config-ref.sgml">
 <!ENTITY pgControldata      SYSTEM "pg_controldata.sgml">
 <!ENTITY pgCreateSubscriber SYSTEM "pg_createsubscriber.sgml">
+<!ENTITY pgCreatedb         SYSTEM "pg_createdb.sgml">
+<!ENTITY pgCreateuser       SYSTEM "pg_createuser.sgml">
 <!ENTITY pgCtl              SYSTEM "pg_ctl-ref.sgml">
+<!ENTITY pgDropdb           SYSTEM "pg_dropdb.sgml">
+<!ENTITY pgDropuser         SYSTEM "pg_dropuser.sgml">
 <!ENTITY pgDump             SYSTEM "pg_dump.sgml">
 <!ENTITY pgDumpall          SYSTEM "pg_dumpall.sgml">
 <!ENTITY pgIsready          SYSTEM "pg_isready.sgml">
 <!ENTITY pgReceivewal       SYSTEM "pg_receivewal.sgml">
 <!ENTITY pgRecvlogical      SYSTEM "pg_recvlogical.sgml">
+<!ENTITY pgReindexdb        SYSTEM "pg_reindexdb.sgml">
 <!ENTITY pgResetwal         SYSTEM "pg_resetwal.sgml">
 <!ENTITY pgRestore          SYSTEM "pg_restore.sgml">
 <!ENTITY pgRewind           SYSTEM "pg_rewind.sgml">
+<!ENTITY pgVacuumdb         SYSTEM "pg_vacuumdb.sgml">
 <!ENTITY pgVerifyBackup     SYSTEM "pg_verifybackup.sgml">
 <!ENTITY pgtestfsync        SYSTEM "pgtestfsync.sgml">
 <!ENTITY pgtesttiming       SYSTEM "pgtesttiming.sgml">
@@ -223,5 +225,3 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY pgwalsummary       SYSTEM "pg_walsummary.sgml">
 <!ENTITY postgres           SYSTEM "postgres-ref.sgml">
 <!ENTITY psqlRef            SYSTEM "psql-ref.sgml">
-<!ENTITY reindexdb          SYSTEM "reindexdb.sgml">
-<!ENTITY vacuumdb           SYSTEM "vacuumdb.sgml">

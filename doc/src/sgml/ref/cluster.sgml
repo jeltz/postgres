@@ -269,7 +269,7 @@ CLUSTER <replaceable class="parameter">index_name</replaceable> ON <replaceable 
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-clusterdb"/></member>
+   <member><xref linkend="app-pgclusterdb"/></member>
    <member><xref linkend="cluster-progress-reporting"/></member>
   </simplelist>
  </refsect1>

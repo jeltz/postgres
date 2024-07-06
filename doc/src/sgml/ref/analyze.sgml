@@ -350,7 +350,7 @@ ANALYZE [ VERBOSE ] [ <replaceable class="parameter">table_and_columns</replacea
 
   <simplelist type="inline">
    <member><xref linkend="sql-vacuum"/></member>
-   <member><xref linkend="app-vacuumdb"/></member>
+   <member><xref linkend="app-pgvacuumdb"/></member>
    <member><xref linkend="runtime-config-resource-vacuum-cost"/></member>
    <member><xref linkend="autovacuum"/></member>
    <member><xref linkend="analyze-progress-reporting"/></member>

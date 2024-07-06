@@ -211,7 +211,7 @@ typedef enum VacOptValue
  * Note that at least one of VACOPT_VACUUM and VACOPT_ANALYZE must be set
  * in options.
  *
- * When adding a new VacuumParam member, consider adding it to vacuumdb as
+ * When adding a new VacuumParam member, consider adding it to pg_vacuumdb as
  * well.
  */
 typedef struct VacuumParams

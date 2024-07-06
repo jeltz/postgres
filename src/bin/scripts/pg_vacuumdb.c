@@ -1,11 +1,11 @@
 /*-------------------------------------------------------------------------
  *
- * vacuumdb
+ * pg_vacuumdb
  *
  * Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * src/bin/scripts/vacuumdb.c
+ * src/bin/scripts/pg_vacuumdb.c
  *
  *-------------------------------------------------------------------------
  */
@@ -163,7 +163,7 @@ main(int argc, char *argv[])
 	progname = get_progname(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pgscripts"));
 
-	handle_help_version_opts(argc, argv, "vacuumdb", help);
+	handle_help_version_opts(argc, argv, "pg_vacuumdb", help);
 
 	while ((c = getopt_long(argc, argv, "ad:efFh:j:n:N:p:P:qt:U:vwWzZ", long_options, &optindex)) != -1)
 	{

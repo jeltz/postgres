@@ -85,7 +85,7 @@ DROP ROLE [ IF EXISTS ] <replaceable class="parameter">name</replaceable> [, ...
 
   <para>
    <productname>PostgreSQL</productname> includes a program <xref
-   linkend="app-dropuser"/> that has the
+   linkend="app-pgdropuser"/> that has the
    same functionality as this command (in fact, it calls this command)
    but can be run from the command shell.
   </para>

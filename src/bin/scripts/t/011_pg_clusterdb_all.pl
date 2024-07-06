@@ -15,7 +15,7 @@ $node->start;
 # clusterdb -a is not compatible with -d.  This relies on PGDATABASE to be
 # set, something PostgreSQL::Test::Cluster does.
 $node->issues_sql_like(
-	[ 'clusterdb', '-a' ],
+	[ 'pg_clusterdb', '-a' ],
 	qr/statement: CLUSTER.*statement: CLUSTER/s,
 	'cluster all databases');
 
@@ -24,15 +24,15 @@ $node->safe_psql(
 	CREATE DATABASE regression_invalid;
 	UPDATE pg_database SET datconnlimit = -2 WHERE datname = 'regression_invalid';
 ));
-$node->command_ok([ 'clusterdb', '-a' ],
+$node->command_ok([ 'pg_clusterdb', '-a' ],
 	'invalid database not targeted by clusterdb -a');
 
 # Doesn't quite belong here, but don't want to waste time by creating an
 # invalid database in 010_clusterdb.pl as well.
 $node->command_fails_like(
-	[ 'clusterdb', '-d', 'regression_invalid' ],
+	[ 'pg_clusterdb', '-d', 'regression_invalid' ],
 	qr/FATAL:  cannot connect to invalid database "regression_invalid"/,
-	'clusterdb cannot target invalid database');
+	'pg_lusterdb cannot target invalid database');
 
 $node->safe_psql('postgres',
 	'CREATE TABLE test1 (a int); CREATE INDEX test1x ON test1 (a); CLUSTER test1 USING test1x'
@@ -41,7 +41,7 @@ $node->safe_psql('template1',
 	'CREATE TABLE test1 (a int); CREATE INDEX test1x ON test1 (a); CLUSTER test1 USING test1x'
 );
 $node->issues_sql_like(
-	[ 'clusterdb', '-a', '-t', 'test1' ],
+	[ 'pg_clusterdb', '-a', '-t', 'test1' ],
 	qr/statement: CLUSTER public\.test1/s,
 	'cluster specific table in all databases');
 

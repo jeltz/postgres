@@ -1,30 +1,30 @@
 <!--
-doc/src/sgml/ref/dropuser.sgml
+doc/src/sgml/ref/pg_dropdb.sgml
 PostgreSQL documentation
 -->
 
-<refentry id="app-dropuser">
- <indexterm zone="app-dropuser">
-  <primary>dropuser</primary>
+<refentry id="app-pgdropdb">
+ <indexterm zone="app-pgdropdb">
+  <primary>pg_dropdb</primary>
  </indexterm>
 
  <refmeta>
-  <refentrytitle><application>dropuser</application></refentrytitle>
+  <refentrytitle><application>pg_dropdb</application></refentrytitle>
   <manvolnum>1</manvolnum>
   <refmiscinfo>Application</refmiscinfo>
  </refmeta>
 
  <refnamediv>
-  <refname>dropuser</refname>
-  <refpurpose>remove a <productname>PostgreSQL</productname> user account</refpurpose>
+  <refname>pg_dropdb</refname>
+  <refpurpose>remove a <productname>PostgreSQL</productname> database</refpurpose>
  </refnamediv>
 
  <refsynopsisdiv>
   <cmdsynopsis>
-   <command>dropuser</command>
+   <command>pg_dropdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg rep="repeat"><replaceable>option</replaceable></arg>
-   <arg choice="opt"><replaceable>username</replaceable></arg>
+   <arg choice="plain"><replaceable>dbname</replaceable></arg>
   </cmdsynopsis>
  </refsynopsisdiv>
 
@@ -33,18 +33,16 @@ PostgreSQL documentation
   <title>Description</title>
 
   <para>
-   <application>dropuser</application> removes an existing
-   <productname>PostgreSQL</productname> user.
-   Superusers can use this command to remove any role; otherwise, only
-   non-superuser roles can be removed, and only by a user who possesses
-   the <literal>CREATEROLE</literal> privilege and has been granted
-   <literal>ADMIN OPTION</literal> on the target role.
+   <application>pg_dropdb</application> destroys an existing
+   <productname>PostgreSQL</productname> database.
+   The user who executes this command must be a database
+   superuser or the owner of the database.
   </para>
 
   <para>
-   <application>dropuser</application> is a wrapper around the
-   <acronym>SQL</acronym> command <link linkend="sql-droprole"><command>DROP ROLE</command></link>.
-   There is no effective difference between dropping users via
+   <application>pg_dropdb</application> is a wrapper around the
+   <acronym>SQL</acronym> command <link linkend="sql-dropdatabase"><command>DROP DATABASE</command></link>.
+   There is no effective difference between dropping databases via
    this utility and via other methods for accessing the server.
   </para>
 
@@ -55,17 +53,14 @@ PostgreSQL documentation
   <title>Options</title>
 
   <para>
-   <application>dropuser</application> accepts the following command-line arguments:
+   <application>pg_dropdb</application> accepts the following command-line arguments:
 
     <variablelist>
      <varlistentry>
-      <term><replaceable class="parameter">username</replaceable></term>
+      <term><replaceable class="parameter">dbname</replaceable></term>
       <listitem>
        <para>
-        Specifies the name of the <productname>PostgreSQL</productname> user to be removed.
-        You will be prompted for a name if none is specified on the command
-        line and the <option>-i</option>/<option>--interactive</option> option
-        is used.
+        Specifies the name of the database to be removed.
        </para>
       </listitem>
      </varlistentry>
@@ -75,8 +70,20 @@ PostgreSQL documentation
       <term><option>--echo</option></term>
       <listitem>
        <para>
-        Echo the commands that <application>dropuser</application> generates
+        Echo the commands that <application>pg_dropdb</application> generates
         and sends to the server.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><option>-f</option></term>
+      <term><option>--force</option></term>
+      <listitem>
+       <para>
+        Attempt to terminate all existing connections to the target database
+        before dropping it.   See <xref linkend="sql-dropdatabase"/> for more
+        information on this option.
        </para>
       </listitem>
      </varlistentry>
@@ -86,8 +93,7 @@ PostgreSQL documentation
       <term><option>--interactive</option></term>
       <listitem>
        <para>
-        Prompt for confirmation before actually removing the user, and prompt
-        for the user name if none is specified on the command line.
+       Issues a verification prompt before doing anything destructive.
        </para>
       </listitem>
      </varlistentry>
@@ -97,7 +103,7 @@ PostgreSQL documentation
        <term><option>--version</option></term>
        <listitem>
        <para>
-       Print the <application>dropuser</application> version and exit.
+       Print the <application>pg_dropdb</application> version and exit.
        </para>
        </listitem>
      </varlistentry>
@@ -106,8 +112,8 @@ PostgreSQL documentation
       <term><option>--if-exists</option></term>
       <listitem>
        <para>
-        Do not throw an error if the user does not exist. A notice is
-        issued in this case.
+       Do not throw an error if the database does not exist. A notice is issued
+       in this case.
        </para>
       </listitem>
      </varlistentry>
@@ -117,17 +123,18 @@ PostgreSQL documentation
        <term><option>--help</option></term>
        <listitem>
        <para>
-       Show help about <application>dropuser</application> command line
+       Show help about <application>pg_dropdb</application> command line
        arguments, and exit.
        </para>
        </listitem>
      </varlistentry>
 
     </variablelist>
+
   </para>
 
   <para>
-   <application>dropuser</application> also accepts the following
+   <application>pg_dropdb</application> also accepts the following
    command-line arguments for connection parameters:
 
    <variablelist>
@@ -161,7 +168,7 @@ PostgreSQL documentation
       <term><option>--username=<replaceable class="parameter">username</replaceable></option></term>
       <listitem>
        <para>
-        User name to connect as (not the user name to drop).
+        User name to connect as.
        </para>
       </listitem>
      </varlistentry>
@@ -186,18 +193,33 @@ PostgreSQL documentation
       <term><option>--password</option></term>
       <listitem>
        <para>
-        Force <application>dropuser</application> to prompt for a
+        Force <application>pg_dropdb</application> to prompt for a
         password before connecting to a database.
        </para>
 
        <para>
         This option is never essential, since
-        <application>dropuser</application> will automatically prompt
+        <application>pg_dropdb</application> will automatically prompt
         for a password if the server demands password authentication.
-        However, <application>dropuser</application> will waste a
+        However, <application>pg_dropdb</application> will waste a
         connection attempt finding out that the server wants a password.
         In some cases it is worth typing <option>-W</option> to avoid the extra
         connection attempt.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><option>--maintenance-db=<replaceable class="parameter">dbname</replaceable></option></term>
+      <listitem>
+       <para>
+         Specifies the name of the database to connect to in order to drop the
+         target database. If not specified, the <literal>postgres</literal>
+         database will be used; if that does not exist (or is the database
+         being dropped), <literal>template1</literal> will be used.
+         This can be a <link linkend="libpq-connstring">connection
+         string</link>.  If so, connection string parameters will override any
+         conflicting command line options.
        </para>
       </listitem>
      </varlistentry>
@@ -247,7 +269,7 @@ PostgreSQL documentation
   <title>Diagnostics</title>
 
   <para>
-   In case of difficulty, see <xref linkend="sql-droprole"/>
+   In case of difficulty, see <xref linkend="sql-dropdatabase"/>
    and <xref linkend="app-psql"/> for
    discussions of potential problems and error messages.
    The database server must be running at the
@@ -263,22 +285,22 @@ PostgreSQL documentation
   <title>Examples</title>
 
    <para>
-    To remove user <literal>joe</literal> from the default database
-    server:
+    To destroy the database <literal>demo</literal> on the default
+    database server:
 <screen>
-<prompt>$ </prompt><userinput>dropuser joe</userinput>
+<prompt>$ </prompt><userinput>pg_dropdb demo</userinput>
 </screen>
    </para>
 
    <para>
-    To remove user <literal>joe</literal> using the server on host
-    <literal>eden</literal>, port 5000, with verification and a peek at the underlying
-    command:
+    To destroy the database <literal>demo</literal> using the
+    server on host <literal>eden</literal>, port 5000, with verification and a peek
+    at the underlying command:
 <screen>
-<prompt>$ </prompt><userinput>dropuser -p 5000 -h eden -i -e joe</userinput>
-<computeroutput>Role "joe" will be permanently removed.
+<prompt>$ </prompt><userinput>pg_dropdb -p 5000 -h eden -i -e demo</userinput>
+<computeroutput>Database "demo" will be permanently deleted.
 Are you sure? (y/n) </computeroutput><userinput>y</userinput>
-<computeroutput>DROP ROLE joe;</computeroutput>
+<computeroutput>DROP DATABASE demo;</computeroutput>
 </screen></para>
  </refsect1>
 
@@ -287,8 +309,8 @@ Are you sure? (y/n) </computeroutput><userinput>y</userinput>
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-createuser"/></member>
-   <member><xref linkend="sql-droprole"/></member>
+   <member><xref linkend="app-pgcreatedb"/></member>
+   <member><xref linkend="sql-dropdatabase"/></member>
   </simplelist>
  </refsect1>
 

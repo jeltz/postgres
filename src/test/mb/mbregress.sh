@@ -14,8 +14,8 @@ if [ ! -d results ];then
     mkdir results
 fi
 
-dropdb --if-exists utf8
-createdb -T template0 -l C -E UTF8 utf8 || exit 1
+pg_dropdb --if-exists utf8
+pg_createdb -T template0 -l C -E UTF8 utf8 || exit 1
 
 PSQL="psql -X -n -e -q"
 
@@ -46,8 +46,8 @@ do
 		$PSQL utf8 < sql/gb18030.sql > results/gb18030.out 2>&1
 		unset PGCLIENTENCODING
 	else
-		dropdb $i >/dev/null 2>&1
-		createdb -T template0 -l C -E `echo $i | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'` $i >/dev/null
+		pg_dropdb $i >/dev/null 2>&1
+		pg_createdb -T template0 -l C -E `echo $i | tr 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'` $i >/dev/null
 		$PSQL $i < sql/${i}.sql > results/${i}.out 2>&1
 	fi
 

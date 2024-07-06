@@ -1,11 +1,11 @@
 /*-------------------------------------------------------------------------
  *
- * createuser
+ * pg_createuser
  *
  * Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * src/bin/scripts/createuser.c
+ * src/bin/scripts/pg_createuser.c
  *
  *-------------------------------------------------------------------------
  */
@@ -97,7 +97,7 @@ main(int argc, char *argv[])
 	progname = get_progname(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pgscripts"));
 
-	handle_help_version_opts(argc, argv, "createuser", help);
+	handle_help_version_opts(argc, argv, "pg_createuser", help);
 
 	while ((c = getopt_long(argc, argv, "a:c:dDeEg:h:iIlLm:p:PrRsSU:v:wW",
 							long_options, &optindex)) != -1)

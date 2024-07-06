@@ -566,7 +566,7 @@ REINDEX TABLE CONCURRENTLY my_broken_table;
   <simplelist type="inline">
    <member><xref linkend="sql-createindex"/></member>
    <member><xref linkend="sql-dropindex"/></member>
-   <member><xref linkend="app-reindexdb"/></member>
+   <member><xref linkend="app-pgreindexdb"/></member>
    <member><xref linkend="create-index-progress-reporting"/></member>
   </simplelist>
  </refsect1>

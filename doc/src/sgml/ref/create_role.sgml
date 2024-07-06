@@ -391,7 +391,7 @@ in sync when changing the above synopsis!
 
   <para>
    <productname>PostgreSQL</productname> includes a program <xref
-   linkend="app-createuser"/> that has
+   linkend="app-pgcreateuser"/> that has
    the same functionality as <command>CREATE ROLE</command> (in fact,
    it calls this command) but can be run from the command shell.
   </para>
@@ -408,7 +408,7 @@ in sync when changing the above synopsis!
    with this command.  The password will be transmitted to the server
    in cleartext, and it might also be logged in the client's command
    history or the server log.  The command <xref
-   linkend="app-createuser"/>, however, transmits
+   linkend="app-pgcreateuser"/>, however, transmits
    the password encrypted.  Also, <xref linkend="app-psql"/>
    contains a command
    <command>\password</command> that can be used to safely change the
@@ -509,7 +509,7 @@ IN GROUP <replaceable class="parameter">role_name</replaceable> [, ...]
    <member><xref linkend="sql-droprole"/></member>
    <member><xref linkend="sql-grant"/></member>
    <member><xref linkend="sql-revoke"/></member>
-   <member><xref linkend="app-createuser"/></member>
+   <member><xref linkend="app-pgcreateuser"/></member>
    <member><xref linkend="guc-createrole-self-grant"/></member>
   </simplelist>
  </refsect1>

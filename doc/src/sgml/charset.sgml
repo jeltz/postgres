@@ -313,7 +313,7 @@ initdb --locale=sv_SE
      <para>
       A locale can be selected separately for each database.  The SQL command
       <command>CREATE DATABASE</command> and its command-line equivalent
-      <command>createdb</command> have options for that.  Use this for example
+      <command>pg_createdb</command> have options for that.  Use this for example
       if a database cluster houses databases for multiple tenants with
       different requirements.
      </para>
@@ -2225,7 +2225,7 @@ initdb -E EUC_JP
      provided that the encoding is compatible with the selected locale:
 
 <screen>
-createdb -E EUC_KR -T template0 --lc-collate=ko_KR.euckr --lc-ctype=ko_KR.euckr korean
+pg_createdb -E EUC_KR -T template0 --lc-collate=ko_KR.euckr --lc-ctype=ko_KR.euckr korean
 </screen>
 
      This will create a database named <literal>korean</literal> that

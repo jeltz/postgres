@@ -1,10 +1,10 @@
 /*-------------------------------------------------------------------------
  *
- * clusterdb
+ * pg_clusterdb
  *
  * Portions Copyright (c) 2002-2024, PostgreSQL Global Development Group
  *
- * src/bin/scripts/clusterdb.c
+ * src/bin/scripts/pg_clusterdb.c
  *
  *-------------------------------------------------------------------------
  */
@@ -67,7 +67,7 @@ main(int argc, char *argv[])
 	progname = get_progname(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pgscripts"));
 
-	handle_help_version_opts(argc, argv, "clusterdb", help);
+	handle_help_version_opts(argc, argv, "pg_clusterdb", help);
 
 	while ((c = getopt_long(argc, argv, "ad:eh:p:qt:U:vwW", long_options, &optindex)) != -1)
 	{

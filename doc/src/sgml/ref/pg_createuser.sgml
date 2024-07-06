@@ -1,27 +1,27 @@
 <!--
-doc/src/sgml/ref/createuser.sgml
+doc/src/sgml/ref/pg_createuser.sgml
 PostgreSQL documentation
 -->
 
-<refentry id="app-createuser">
- <indexterm zone="app-createuser">
-  <primary>createuser</primary>
+<refentry id="app-pgcreateuser">
+ <indexterm zone="app-pgcreateuser">
+  <primary>pg_createuser</primary>
  </indexterm>
 
  <refmeta>
-  <refentrytitle><application>createuser</application></refentrytitle>
+  <refentrytitle><application>pg_createuser</application></refentrytitle>
   <manvolnum>1</manvolnum>
   <refmiscinfo>Application</refmiscinfo>
  </refmeta>
 
  <refnamediv>
-  <refname>createuser</refname>
+  <refname>pg_createuser</refname>
   <refpurpose>define a new <productname>PostgreSQL</productname> user account</refpurpose>
  </refnamediv>
 
  <refsynopsisdiv>
   <cmdsynopsis>
-   <command>createuser</command>
+   <command>pg_createuser</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg rep="repeat"><replaceable>option</replaceable></arg>
    <arg choice="opt"><replaceable>username</replaceable></arg>
@@ -32,10 +32,10 @@ PostgreSQL documentation
  <refsect1>
   <title>Description</title>
   <para>
-   <application>createuser</application> creates a
+   <application>pg_createuser</application> creates a
    new <productname>PostgreSQL</productname> user (or more precisely, a role).
    Only superusers and users with <literal>CREATEROLE</literal> privilege can create
-   new users, so <application>createuser</application> must be
+   new users, so <application>pg_createuser</application> must be
    invoked by someone who can connect as a superuser or a user with
    <literal>CREATEROLE</literal> privilege.
   </para>
@@ -52,7 +52,7 @@ PostgreSQL documentation
   </para>
 
   <para>
-   <application>createuser</application> is a wrapper around the
+   <application>pg_createuser</application> is a wrapper around the
    <acronym>SQL</acronym> command <link linkend="sql-createrole"><command>CREATE ROLE</command></link>.
    There is no effective difference between creating users via
    this utility and via other methods for accessing the server.
@@ -65,7 +65,7 @@ PostgreSQL documentation
   <title>Options</title>
 
   <para>
-   <application>createuser</application> accepts the following command-line arguments:
+   <application>pg_createuser</application> accepts the following command-line arguments:
 
     <variablelist>
      <varlistentry>
@@ -130,7 +130,7 @@ PostgreSQL documentation
       <term><option>--echo</option></term>
       <listitem>
        <para>
-        Echo the commands that <application>createuser</application> generates
+        Echo the commands that <application>pg_createuser</application> generates
         and sends to the server.
        </para>
       </listitem>
@@ -238,7 +238,7 @@ PostgreSQL documentation
       <term><option>--pwprompt</option></term>
       <listitem>
        <para>
-       If given, <application>createuser</application> will issue a prompt for
+       If given, <application>pg_createuser</application> will issue a prompt for
        the password of the new user. This is not necessary if you do not plan
        on using password authentication.
        </para>
@@ -306,7 +306,7 @@ PostgreSQL documentation
        <term><option>--version</option></term>
        <listitem>
        <para>
-       Print the <application>createuser</application> version and exit.
+       Print the <application>pg_createuser</application> version and exit.
        </para>
        </listitem>
      </varlistentry>
@@ -357,7 +357,7 @@ PostgreSQL documentation
        <term><option>--help</option></term>
        <listitem>
        <para>
-       Show help about <application>createuser</application> command line
+       Show help about <application>pg_createuser</application> command line
        arguments, and exit.
        </para>
        </listitem>
@@ -367,7 +367,7 @@ PostgreSQL documentation
   </para>
 
   <para>
-   <application>createuser</application> also accepts the following
+   <application>pg_createuser</application> also accepts the following
    command-line arguments for connection parameters:
 
    <variablelist>
@@ -426,16 +426,16 @@ PostgreSQL documentation
       <term><option>--password</option></term>
       <listitem>
        <para>
-        Force <application>createuser</application> to prompt for a
+        Force <application>pg_createuser</application> to prompt for a
         password (for connecting to the server, not for the
         password of the new user).
        </para>
 
        <para>
         This option is never essential, since
-        <application>createuser</application> will automatically prompt
+        <application>pg_createuser</application> will automatically prompt
         for a password if the server demands password authentication.
-        However, <application>createuser</application> will waste a
+        However, <application>pg_createuser</application> will waste a
         connection attempt finding out that the server wants a password.
         In some cases it is worth typing <option>-W</option> to avoid the extra
         connection attempt.
@@ -507,7 +507,7 @@ PostgreSQL documentation
     To create a user <literal>joe</literal> on the default database
     server:
 <screen>
-<prompt>$ </prompt><userinput>createuser joe</userinput>
+<prompt>$ </prompt><userinput>pg_createuser joe</userinput>
 </screen>
    </para>
 
@@ -515,7 +515,7 @@ PostgreSQL documentation
     To create a user <literal>joe</literal> on the default database
     server with prompting for some additional attributes:
 <screen>
-<prompt>$ </prompt><userinput>createuser --interactive joe</userinput>
+<prompt>$ </prompt><userinput>pg_createuser --interactive joe</userinput>
 <computeroutput>Shall the new role be a superuser? (y/n) </computeroutput><userinput>n</userinput>
 <computeroutput>Shall the new role be allowed to create databases? (y/n) </computeroutput><userinput>n</userinput>
 <computeroutput>Shall the new role be allowed to create more new roles? (y/n) </computeroutput><userinput>n</userinput>
@@ -527,7 +527,7 @@ PostgreSQL documentation
     server on host <literal>eden</literal>, port 5000, with attributes explicitly specified,
     taking a look at the underlying command:
 <screen>
-<prompt>$ </prompt><userinput>createuser -h eden -p 5000 -S -D -R -e joe</userinput>
+<prompt>$ </prompt><userinput>pg_createuser -h eden -p 5000 -S -D -R -e joe</userinput>
 <computeroutput>CREATE ROLE joe NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT LOGIN;</computeroutput>
 </screen>
    </para>
@@ -536,7 +536,7 @@ PostgreSQL documentation
     To create the user <literal>joe</literal> as a superuser,
     and assign a password immediately:
 <screen>
-<prompt>$ </prompt><userinput>createuser -P -s -e joe</userinput>
+<prompt>$ </prompt><userinput>pg_createuser -P -s -e joe</userinput>
 <computeroutput>Enter password for new role: </computeroutput><userinput>xyzzy</userinput>
 <computeroutput>Enter it again: </computeroutput><userinput>xyzzy</userinput>
 <computeroutput>CREATE ROLE joe PASSWORD 'md5b5f5ba1a423792b526f799ae4eb3d59e' SUPERUSER CREATEDB CREATEROLE INHERIT LOGIN;</computeroutput>
@@ -552,7 +552,7 @@ PostgreSQL documentation
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-dropuser"/></member>
+   <member><xref linkend="app-pgdropuser"/></member>
    <member><xref linkend="sql-createrole"/></member>
    <member><xref linkend="guc-createrole-self-grant"/></member>
   </simplelist>

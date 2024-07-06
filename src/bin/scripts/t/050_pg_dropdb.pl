@@ -8,9 +8,9 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
-program_help_ok('dropdb');
-program_version_ok('dropdb');
-program_options_handling_ok('dropdb');
+program_help_ok('pg_dropdb');
+program_version_ok('pg_dropdb');
+program_options_handling_ok('pg_dropdb');
 
 my $node = PostgreSQL::Test::Cluster->new('main');
 $node->init;
@@ -18,26 +18,26 @@ $node->start;
 
 $node->safe_psql('postgres', 'CREATE DATABASE foobar1');
 $node->issues_sql_like(
-	[ 'dropdb', 'foobar1' ],
+	[ 'pg_dropdb', 'foobar1' ],
 	qr/statement: DROP DATABASE foobar1/,
 	'SQL DROP DATABASE run');
 
 $node->safe_psql('postgres', 'CREATE DATABASE foobar2');
 $node->issues_sql_like(
-	[ 'dropdb', '--force', 'foobar2' ],
+	[ 'pg_dropdb', '--force', 'foobar2' ],
 	qr/statement: DROP DATABASE foobar2 WITH \(FORCE\);/,
 	'SQL DROP DATABASE (FORCE) run');
 
-$node->command_fails([ 'dropdb', 'nonexistent' ],
+$node->command_fails([ 'pg_dropdb', 'nonexistent' ],
 	'fails with nonexistent database');
 
-# check that invalid database can be dropped with dropdb
+# check that invalid database can be dropped with pg_dropdb
 $node->safe_psql(
 	'postgres', q(
 	CREATE DATABASE regression_invalid;
 	UPDATE pg_database SET datconnlimit = -2 WHERE datname = 'regression_invalid';
 ));
-$node->command_ok([ 'dropdb', 'regression_invalid' ],
+$node->command_ok([ 'pg_dropdb', 'regression_invalid' ],
 	'invalid database can be dropped');
 
 done_testing();

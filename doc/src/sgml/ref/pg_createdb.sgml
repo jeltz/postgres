@@ -1,27 +1,27 @@
 <!--
-doc/src/sgml/ref/createdb.sgml
+doc/src/sgml/ref/pg_createdb.sgml
 PostgreSQL documentation
 -->
 
-<refentry id="app-createdb">
- <indexterm zone="app-createdb">
-  <primary>createdb</primary>
+<refentry id="app-pgcreatedb">
+ <indexterm zone="app-pgcreatedb">
+  <primary>pg_createdb</primary>
  </indexterm>
 
  <refmeta>
-  <refentrytitle><application>createdb</application></refentrytitle>
+  <refentrytitle><application>pg_createdb</application></refentrytitle>
   <manvolnum>1</manvolnum>
   <refmiscinfo>Application</refmiscinfo>
  </refmeta>
 
  <refnamediv>
-  <refname>createdb</refname>
+  <refname>pg_createdb</refname>
   <refpurpose>create a new <productname>PostgreSQL</productname> database</refpurpose>
  </refnamediv>
 
  <refsynopsisdiv>
   <cmdsynopsis>
-   <command>createdb</command>
+   <command>pg_createdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg rep="repeat"><replaceable>option</replaceable></arg>
    <arg choice="opt"><replaceable>dbname</replaceable>
@@ -30,10 +30,10 @@ PostgreSQL documentation
  </refsynopsisdiv>
 
 
- <refsect1 id="r1-app-createdb-1">
+ <refsect1 id="r1-app-pgcreatedb-1">
   <title>Description</title>
   <para>
-   <application>createdb</application> creates a new <productname>PostgreSQL</productname>
+   <application>pg_createdb</application> creates a new <productname>PostgreSQL</productname>
    database.
   </para>
 
@@ -45,7 +45,7 @@ PostgreSQL documentation
   </para>
 
   <para>
-   <application>createdb</application> is a wrapper around the
+   <application>pg_createdb</application> is a wrapper around the
    <acronym>SQL</acronym> command <link linkend="sql-createdatabase"><command>CREATE DATABASE</command></link>.
    There is no effective difference between creating databases via
    this utility and via other methods for accessing the server.
@@ -58,7 +58,7 @@ PostgreSQL documentation
   <title>Options</title>
 
   <para>
-   <application>createdb</application> accepts the following command-line arguments:
+   <application>pg_createdb</application> accepts the following command-line arguments:
 
     <variablelist>
      <varlistentry>
@@ -99,7 +99,7 @@ PostgreSQL documentation
       <term><option>--echo</option></term>
       <listitem>
        <para>
-        Echo the commands that <application>createdb</application> generates
+        Echo the commands that <application>pg_createdb</application> generates
         and sends to the server.
        </para>
       </listitem>
@@ -227,7 +227,7 @@ PostgreSQL documentation
        <term><option>--version</option></term>
        <listitem>
        <para>
-       Print the <application>createdb</application> version and exit.
+       Print the <application>pg_createdb</application> version and exit.
        </para>
        </listitem>
      </varlistentry>
@@ -237,7 +237,7 @@ PostgreSQL documentation
       <term><option>--help</option></term>
       <listitem>
       <para>
-      Show help about <application>createdb</application> command line
+      Show help about <application>pg_createdb</application> command line
       arguments, and exit.
       </para>
       </listitem>
@@ -255,7 +255,7 @@ PostgreSQL documentation
    </para>
 
    <para>
-    <application>createdb</application> also accepts the following
+    <application>pg_createdb</application> also accepts the following
     command-line arguments for connection parameters:
 
     <variablelist>
@@ -312,15 +312,15 @@ PostgreSQL documentation
       <term><option>--password</option></term>
       <listitem>
        <para>
-        Force <application>createdb</application> to prompt for a
+        Force <application>pg_createdb</application> to prompt for a
         password before connecting to a database.
        </para>
 
        <para>
         This option is never essential, since
-        <application>createdb</application> will automatically prompt
+        <application>pg_createdb</application> will automatically prompt
         for a password if the server demands password authentication.
-        However, <application>createdb</application> will waste a
+        However, <application>pg_createdb</application> will waste a
         connection attempt finding out that the server wants a password.
         In some cases it is worth typing <option>-W</option> to avoid the extra
         connection attempt.
@@ -421,7 +421,7 @@ PostgreSQL documentation
     To create the database <literal>demo</literal> using the default
     database server:
 <screen>
-<prompt>$ </prompt><userinput>createdb demo</userinput>
+<prompt>$ </prompt><userinput>pg_createdb demo</userinput>
 </screen>
    </para>
 
@@ -431,7 +431,7 @@ PostgreSQL documentation
     <literal>template0</literal> template database,  here is the
     command-line command and the underlying SQL command:
 <screen>
-<prompt>$ </prompt><userinput>createdb -p 5000 -h eden -T template0 -e demo</userinput>
+<prompt>$ </prompt><userinput>pg_screatedb -p 5000 -h eden -T template0 -e demo</userinput>
 <computeroutput>CREATE DATABASE demo TEMPLATE template0;</computeroutput>
 </screen></para>
  </refsect1>
@@ -441,7 +441,7 @@ PostgreSQL documentation
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-dropdb"/></member>
+   <member><xref linkend="app-pgdropdb"/></member>
    <member><xref linkend="sql-createdatabase"/></member>
   </simplelist>
  </refsect1>

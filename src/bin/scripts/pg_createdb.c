@@ -1,11 +1,11 @@
 /*-------------------------------------------------------------------------
  *
- * createdb
+ * pg_createdb
  *
  * Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * src/bin/scripts/createdb.c
+ * src/bin/scripts/pg_createdb.c
  *
  *-------------------------------------------------------------------------
  */
@@ -81,7 +81,7 @@ main(int argc, char *argv[])
 	progname = get_progname(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pgscripts"));
 
-	handle_help_version_opts(argc, argv, "createdb", help);
+	handle_help_version_opts(argc, argv, "pg_createdb", help);
 
 	while ((c = getopt_long(argc, argv, "D:eE:h:l:O:p:S:T:U:wW", long_options, &optindex)) != -1)
 	{

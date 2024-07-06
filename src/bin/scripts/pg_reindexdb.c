@@ -1,10 +1,10 @@
 /*-------------------------------------------------------------------------
  *
- * reindexdb
+ * pg_reindexdb
  *
  * Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
  *
- * src/bin/scripts/reindexdb.c
+ * src/bin/scripts/pg_reindexdb.c
  *
  *-------------------------------------------------------------------------
  */
@@ -109,7 +109,7 @@ main(int argc, char *argv[])
 	progname = get_progname(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pgscripts"));
 
-	handle_help_version_opts(argc, argv, "reindexdb", help);
+	handle_help_version_opts(argc, argv, "pg_reindexdb", help);
 
 	/* process command-line options */
 	while ((c = getopt_long(argc, argv, "ad:eh:i:j:qp:sS:t:U:vwW", long_options, &optindex)) != -1)

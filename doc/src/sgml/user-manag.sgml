@@ -68,21 +68,21 @@ DROP ROLE <replaceable>name</replaceable>;
   </para>
 
   <indexterm>
-   <primary>createuser</primary>
+   <primary>pg_createuser</primary>
   </indexterm>
 
   <indexterm>
-   <primary>dropuser</primary>
+   <primary>pg_dropuser</primary>
   </indexterm>
 
   <para>
-   For convenience, the programs <xref linkend="app-createuser"/>
-   and <xref linkend="app-dropuser"/> are provided as wrappers
+   For convenience, the programs <xref linkend="app-pgcreateuser"/>
+   and <xref linkend="app-pgdropuser"/> are provided as wrappers
    around these SQL commands that can be called from the shell command
    line:
 <synopsis>
-createuser <replaceable>name</replaceable>
-dropuser <replaceable>name</replaceable>
+pg_createuser <replaceable>name</replaceable>
+pg_dropuser <replaceable>name</replaceable>
 </synopsis>
   </para>
 
@@ -122,7 +122,7 @@ SELECT rolname FROM pg_roles WHERE rolcanlogin;
    <option>-U</option> command line option to indicate the role to
    connect as.  Many applications assume the name of the current
    operating system user by default (including
-   <command>createuser</command> and <command>psql</command>).  Therefore it
+   <command>pg_createuser</command> and <command>psql</command>).  Therefore it
    is often convenient to maintain a naming correspondence between
    roles and operating system users.
   </para>

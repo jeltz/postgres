@@ -218,7 +218,7 @@
     their busiest tables as often as once every few minutes.) If you have
     multiple databases in a cluster, don't forget to
     <command>VACUUM</command> each one; the program <xref
-    linkend="app-vacuumdb"/> might be helpful.
+    linkend="app-pgvacuumdb"/> might be helpful.
    </para>
 
    <tip>

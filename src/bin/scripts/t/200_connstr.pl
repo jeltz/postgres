@@ -29,16 +29,16 @@ $node->start;
 
 foreach my $dbname ($dbname1, $dbname2, $dbname3, $dbname4, 'CamelCase')
 {
-	$node->run_log([ 'createdb', $dbname ]);
+	$node->run_log([ 'pg_createdb', $dbname ]);
 }
 
 $node->command_ok(
-	[qw(vacuumdb --all --echo --analyze-only)],
-	'vacuumdb --all with unusual database names');
-$node->command_ok([qw(reindexdb --all --echo)],
-	'reindexdb --all with unusual database names');
+	[qw(pg_vacuumdb --all --echo --analyze-only)],
+	'pg_vacuumdb --all with unusual database names');
+$node->command_ok([qw(pg_reindexdb --all --echo)],
+	'pg_reindexdb --all with unusual database names');
 $node->command_ok(
-	[qw(clusterdb --all --echo --verbose)],
-	'clusterdb --all with unusual database names');
+	[qw(pg_clusterdb --all --echo --verbose)],
+	'pg_clusterdb --all with unusual database names');
 
 done_testing();

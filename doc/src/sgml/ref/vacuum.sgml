@@ -535,7 +535,7 @@ VACUUM [ FULL ] [ FREEZE ] [ VERBOSE ] [ ANALYZE ] [ <replaceable class="paramet
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-vacuumdb"/></member>
+   <member><xref linkend="app-pgvacuumdb"/></member>
    <member><xref linkend="runtime-config-resource-vacuum-cost"/></member>
    <member><xref linkend="autovacuum"/></member>
    <member><xref linkend="vacuum-progress-reporting"/></member>

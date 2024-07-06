@@ -69,18 +69,18 @@ my $discard = "$backupdir/discard.sql";
 my $plain = "$backupdir/plain.sql";
 my $dirfmt = "$backupdir/dirfmt";
 
-$node->run_log([ 'createdb', '-U', $src_bootstrap_super, $dbname1 ]);
+$node->run_log([ 'pg_createdb', '-U', $src_bootstrap_super, $dbname1 ]);
 $node->run_log(
-	[ 'createuser', '-U', $src_bootstrap_super, '-s', $username1 ]);
-$node->run_log([ 'createdb', '-U', $src_bootstrap_super, $dbname2 ]);
+	[ 'pg_createuser', '-U', $src_bootstrap_super, '-s', $username1 ]);
+$node->run_log([ 'pg_createdb', '-U', $src_bootstrap_super, $dbname2 ]);
 $node->run_log(
-	[ 'createuser', '-U', $src_bootstrap_super, '-s', $username2 ]);
-$node->run_log([ 'createdb', '-U', $src_bootstrap_super, $dbname3 ]);
+	[ 'pg_createuser', '-U', $src_bootstrap_super, '-s', $username2 ]);
+$node->run_log([ 'pg_createdb', '-U', $src_bootstrap_super, $dbname3 ]);
 $node->run_log(
-	[ 'createuser', '-U', $src_bootstrap_super, '-s', $username3 ]);
-$node->run_log([ 'createdb', '-U', $src_bootstrap_super, $dbname4 ]);
+	[ 'pg_createuser', '-U', $src_bootstrap_super, '-s', $username3 ]);
+$node->run_log([ 'pg_createdb', '-U', $src_bootstrap_super, $dbname4 ]);
 $node->run_log(
-	[ 'createuser', '-U', $src_bootstrap_super, '-s', $username4 ]);
+	[ 'pg_createuser', '-U', $src_bootstrap_super, '-s', $username4 ]);
 
 
 # For these tests, pg_dumpall -r is used because it produces a short
@@ -122,13 +122,13 @@ $node->command_ok(
 	],
 	'pg_dumpall -l accepts connection string');
 
-$node->run_log([ 'createdb', '-U', $src_bootstrap_super, "foo\n\rbar" ]);
+$node->run_log([ 'pg_createdb', '-U', $src_bootstrap_super, "foo\n\rbar" ]);
 
 # not sufficient to use -r here
 $node->command_fails(
 	[ 'pg_dumpall', '-U', $src_bootstrap_super, '--no-sync', '-f', $discard ],
 	'pg_dumpall with \n\r in database name');
-$node->run_log([ 'dropdb', '-U', $src_bootstrap_super, "foo\n\rbar" ]);
+$node->run_log([ 'pg_dropdb', '-U', $src_bootstrap_super, "foo\n\rbar" ]);
 
 
 # make a table, so the parallel worker has something to dump
@@ -146,8 +146,8 @@ $node->command_ok(
 	'parallel dump');
 
 # recreate $dbname1 for restore test
-$node->run_log([ 'dropdb', '-U', $src_bootstrap_super, $dbname1 ]);
-$node->run_log([ 'createdb', '-U', $src_bootstrap_super, $dbname1 ]);
+$node->run_log([ 'pg_dropdb', '-U', $src_bootstrap_super, $dbname1 ]);
+$node->run_log([ 'pg_createdb', '-U', $src_bootstrap_super, $dbname1 ]);
 
 $node->command_ok(
 	[
@@ -156,7 +156,7 @@ $node->command_ok(
 	],
 	'parallel restore');
 
-$node->run_log([ 'dropdb', '-U', $src_bootstrap_super, $dbname1 ]);
+$node->run_log([ 'pg_dropdb', '-U', $src_bootstrap_super, $dbname1 ]);
 
 $node->command_ok(
 	[
@@ -191,7 +191,7 @@ $envar_node->start;
 
 # make superuser for restore
 $envar_node->run_log(
-	[ 'createuser', '-U', $dst_bootstrap_super, '-s', $restore_super ]);
+	[ 'pg_createuser', '-U', $dst_bootstrap_super, '-s', $restore_super ]);
 
 {
 	local $ENV{PGPORT} = $envar_node->port;
@@ -216,7 +216,7 @@ $cmdline_node->init(
 	  [ '--user', $dst_bootstrap_super, '--create-role', $restore_super ]);
 $cmdline_node->start;
 $cmdline_node->run_log(
-	[ 'createuser', '-U', $dst_bootstrap_super, '-s', $restore_super ]);
+	[ 'pg_createuser', '-U', $dst_bootstrap_super, '-s', $restore_super ]);
 {
 	$result = run_log(
 		[

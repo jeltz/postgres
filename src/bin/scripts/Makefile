@@ -16,31 +16,31 @@ subdir = src/bin/scripts
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-PROGRAMS = createdb createuser dropdb dropuser clusterdb vacuumdb reindexdb pg_isready
+PROGRAMS = pg_createdb pg_createuser pg_dropdb pg_dropuser pg_clusterdb pg_vacuumdb pg_reindexdb pg_isready
 
 override CPPFLAGS := -I$(libpq_srcdir) $(CPPFLAGS)
 LDFLAGS_INTERNAL += -L$(top_builddir)/src/fe_utils -lpgfeutils $(libpq_pgport)
 
 all: $(PROGRAMS)
 
-createdb: createdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
-createuser: createuser.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
-dropdb: dropdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
-dropuser: dropuser.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
-clusterdb: clusterdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
-vacuumdb: vacuumdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
-reindexdb: reindexdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_createdb: pg_createdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_createuser: pg_createuser.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_dropdb: pg_dropdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_dropuser: pg_dropuser.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_clusterdb: pg_clusterdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_vacuumdb: pg_vacuumdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_reindexdb: pg_reindexdb.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
 pg_isready: pg_isready.o common.o $(WIN32RES) | submake-libpq submake-libpgport submake-libpgfeutils
 
 install: all installdirs
-	$(INSTALL_PROGRAM) createdb$(X)   '$(DESTDIR)$(bindir)'/createdb$(X)
-	$(INSTALL_PROGRAM) dropdb$(X)     '$(DESTDIR)$(bindir)'/dropdb$(X)
-	$(INSTALL_PROGRAM) createuser$(X) '$(DESTDIR)$(bindir)'/createuser$(X)
-	$(INSTALL_PROGRAM) dropuser$(X)   '$(DESTDIR)$(bindir)'/dropuser$(X)
-	$(INSTALL_PROGRAM) clusterdb$(X)  '$(DESTDIR)$(bindir)'/clusterdb$(X)
-	$(INSTALL_PROGRAM) vacuumdb$(X)   '$(DESTDIR)$(bindir)'/vacuumdb$(X)
-	$(INSTALL_PROGRAM) reindexdb$(X)  '$(DESTDIR)$(bindir)'/reindexdb$(X)
-	$(INSTALL_PROGRAM) pg_isready$(X) '$(DESTDIR)$(bindir)'/pg_isready$(X)
+	$(INSTALL_PROGRAM) pg_createdb$(X)   '$(DESTDIR)$(bindir)'/pg_createdb$(X)
+	$(INSTALL_PROGRAM) pg_dropdb$(X)     '$(DESTDIR)$(bindir)'/pg_dropdb$(X)
+	$(INSTALL_PROGRAM) pg_createuser$(X) '$(DESTDIR)$(bindir)'/pg_createuser$(X)
+	$(INSTALL_PROGRAM) pg_dropuser$(X)   '$(DESTDIR)$(bindir)'/pg_dropuser$(X)
+	$(INSTALL_PROGRAM) pg_clusterdb$(X)  '$(DESTDIR)$(bindir)'/pg_clusterdb$(X)
+	$(INSTALL_PROGRAM) pg_vacuumdb$(X)   '$(DESTDIR)$(bindir)'/pg_vacuumdb$(X)
+	$(INSTALL_PROGRAM) pg_reindexdb$(X)  '$(DESTDIR)$(bindir)'/pg_reindexdb$(X)
+	$(INSTALL_PROGRAM) pg_isready$(X)    '$(DESTDIR)$(bindir)'/pg_isready$(X)
 
 installdirs:
 	$(MKDIR_P) '$(DESTDIR)$(bindir)'

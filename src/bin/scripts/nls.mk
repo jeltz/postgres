@@ -1,13 +1,13 @@
 # src/bin/scripts/nls.mk
 CATALOG_NAME     = pgscripts
 GETTEXT_FILES    = $(FRONTEND_COMMON_GETTEXT_FILES) \
-                   createdb.c \
-                   createuser.c \
-                   dropdb.c \
-                   dropuser.c \
-                   clusterdb.c \
-                   vacuumdb.c \
-                   reindexdb.c \
+                   pg_createdb.c \
+                   pg_createuser.c \
+                   pg_dropdb.c \
+                   pg_dropuser.c \
+                   pg_clusterdb.c \
+                   pg_vacuumdb.c \
+                   pg_reindexdb.c \
                    pg_isready.c \
                    common.c \
                    ../../fe_utils/parallel_slot.c \
