@@ -1,6 +1,5 @@
 # Copyright (c) 2022-2024, PostgreSQL Global Development Group
 
-subdir('initdb')
 subdir('pg_amcheck')
 subdir('pg_archivecleanup')
 subdir('pg_basebackup')
@@ -10,6 +9,7 @@ subdir('pg_config')
 subdir('pg_controldata')
 subdir('pg_ctl')
 subdir('pg_dump')
+subdir('pg_initdb')
 subdir('pg_resetwal')
 subdir('pg_rewind')
 subdir('pg_test_fsync')

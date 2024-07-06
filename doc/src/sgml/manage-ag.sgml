@@ -127,7 +127,7 @@ CREATE DATABASE <replaceable>name</replaceable>;
    execute the <command>CREATE DATABASE</command> command, the
    question remains how the <emphasis>first</emphasis> database at any given
    site can be created. The first database is always created by the
-   <command>initdb</command> command when the data storage area is
+   <command>pg_initdb</command> command when the data storage area is
    initialized. (See <xref linkend="creating-cluster"/>.)  This
    database is called
    <literal>postgres</literal>.<indexterm><primary>postgres</primary></indexterm> So to

@@ -278,12 +278,12 @@
    </para>
   </partintro>
 
-   &initdb;
    &pgarchivecleanup;
    &pgChecksums;
    &pgControldata;
    &pgCreateSubscriber;
    &pgCtl;
+   &pgInitdb;
    &pgResetwal;
    &pgRewind;
    &pgtestfsync;

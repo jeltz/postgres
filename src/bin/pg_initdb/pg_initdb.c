@@ -1,8 +1,8 @@
 /*-------------------------------------------------------------------------
  *
- * initdb --- initialize a PostgreSQL installation
+ * pg_initdb --- initialize a PostgreSQL installation
  *
- * initdb creates (initializes) a PostgreSQL database cluster (site,
+ * pg_initdb creates (initializes) a PostgreSQL database cluster (site,
  * instance, installation, whatever).  A database cluster is a
  * collection of PostgreSQL databases all managed by the same server.
  *
@@ -41,7 +41,7 @@
  * Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * src/bin/initdb/initdb.c
+ * src/bin/pg_initdb/pg_initdb.c
  *
  *-------------------------------------------------------------------------
  */
@@ -253,7 +253,7 @@ static const char *const subdirs[] = {
 };
 
 
-/* path to 'initdb' binary directory */
+/* path to 'pg_initdb' binary directory */
 static char bin_path[MAXPGPATH];
 static char backend_exec[MAXPGPATH];
 
@@ -3162,7 +3162,7 @@ main(int argc, char *argv[])
 		}
 		if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-V") == 0)
 		{
-			puts("initdb (PostgreSQL) " PG_VERSION);
+			puts("pg_initdb (PostgreSQL) " PG_VERSION);
 			exit(0);
 		}
 	}
@@ -3444,7 +3444,7 @@ main(int argc, char *argv[])
 		printf("\n");
 		pg_log_warning("enabling \"trust\" authentication for local connections");
 		pg_log_warning_hint("You can change this by editing pg_hba.conf or using the option -A, or "
-							"--auth-local and --auth-host, the next time you run initdb.");
+							"--auth-local and --auth-host, the next time you run pg_initdb.");
 	}
 
 	if (!noinstructions)
@@ -3454,7 +3454,7 @@ main(int argc, char *argv[])
 		 */
 		start_db_cmd = createPQExpBuffer();
 
-		/* Get directory specification used to start initdb ... */
+		/* Get directory specification used to start pg_initdb ... */
 		strlcpy(pg_ctl_path, argv[0], sizeof(pg_ctl_path));
 		canonicalize_path(pg_ctl_path);
 		get_parent_directory(pg_ctl_path);

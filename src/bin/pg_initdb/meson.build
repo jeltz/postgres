@@ -1,20 +1,20 @@
 # Copyright (c) 2022-2024, PostgreSQL Global Development Group
 
-initdb_sources = files(
+pg_initdb_sources = files(
   'findtimezone.c',
-  'initdb.c'
+  'pg_initdb.c'
 )
 
-initdb_sources += timezone_localtime_source
+pg_initdb_sources += timezone_localtime_source
 
 if host_system == 'windows'
-  initdb_sources += rc_bin_gen.process(win32ver_rc, extra_args: [
-    '--NAME', 'initdb',
-    '--FILEDESC', 'initdb - initialize a new database cluster',])
+  pg_initdb_sources += rc_bin_gen.process(win32ver_rc, extra_args: [
+    '--NAME', 'pg_initdb',
+    '--FILEDESC', 'pg_initdb - initialize a new database cluster',])
 endif
 
-initdb = executable('initdb',
-  initdb_sources,
+pg_initdb = executable('pg_initdb',
+  pg_initdb_sources,
   include_directories: [timezone_inc],
   # Note: it's important that we link to encnames.o from libpgcommon, not
   # from libpq, else we have risks of version skew if we run with a libpq
@@ -24,16 +24,16 @@ initdb = executable('initdb',
   dependencies: [frontend_code, libpq, icu, icu_i18n],
   kwargs: default_bin_args,
 )
-bin_targets += initdb
+bin_targets += pg_initdb
 
 tests += {
-  'name': 'initdb',
+  'name': 'pg_initdb',
   'sd': meson.current_source_dir(),
   'bd': meson.current_build_dir(),
   'tap': {
     'env': {'with_icu': icu.found() ? 'yes' : 'no'},
     'tests': [
-      't/001_initdb.pl',
+      't/001_pg_initdb.pl',
     ],
   },
 }

@@ -1,8 +1,8 @@
-# src/bin/initdb/nls.mk
+# src/bin/pg_initdb/nls.mk
 CATALOG_NAME     = initdb
 GETTEXT_FILES    = $(FRONTEND_COMMON_GETTEXT_FILES) \
                    findtimezone.c \
-                   initdb.c \
+                   pg_initdb.c \
                    ../../common/exec.c \
                    ../../common/fe_memutils.c \
                    ../../common/file_utils.c \

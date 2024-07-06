@@ -27419,7 +27419,7 @@ acl      | {postgres=arwdDxtm/postgres,foo=r/postgres}
 
    <para>
     The functions shown in <xref linkend="functions-controldata"/>
-    print information initialized during <command>initdb</command>, such
+    print information initialized during <command>pg_initdb</command>, such
     as the catalog version. They also show information about write-ahead
     logging and checkpoint processing. This information is cluster-wide,
     not specific to any one database. These functions provide most of the same
@@ -29823,7 +29823,7 @@ postgres=# SELECT '0/0'::pg_lsn + pd.segment_number * ps.setting::int + :offset 
         Adds collations to the system
         catalog <structname>pg_collation</structname> based on all the locales
         it finds in the operating system.  This is
-        what <command>initdb</command> uses; see
+        what <command>pg_initdb</command> uses; see
         <xref linkend="collation-managing"/> for more details.  If additional
         locales are installed into the operating system later on, this
         function can be run again to add collations for the new locales.

@@ -1,18 +1,18 @@
 #-------------------------------------------------------------------------
 #
-# Makefile for src/bin/initdb
+# Makefile for src/bin/pg_initdb
 #
 # Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
 # Portions Copyright (c) 1994, Regents of the University of California
 #
-# src/bin/initdb/Makefile
+# src/bin/pg_initdb/Makefile
 #
 #-------------------------------------------------------------------------
 
-PGFILEDESC = "initdb - initialize a new database cluster"
+PGFILEDESC = "pg_initdb - initialize a new database cluster"
 PGAPPICON=win32
 
-subdir = src/bin/initdb
+subdir = src/bin/pg_initdb
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
@@ -33,12 +33,12 @@ endif
 OBJS = \
 	$(WIN32RES) \
 	findtimezone.o \
-	initdb.o \
+	pg_initdb.o \
 	localtime.o
 
-all: initdb
+all: pg_initdb
 
-initdb: $(OBJS) | submake-libpq submake-libpgport submake-libpgfeutils
+pg_initdb: $(OBJS) | submake-libpq submake-libpgport submake-libpgfeutils
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) $(LDFLAGS_EX) $(LIBS) -o $@$(X)
 
 # We must pull in localtime.c from src/timezones
@@ -46,20 +46,20 @@ localtime.c: % : $(top_srcdir)/src/timezone/%
 	rm -f $@ && $(LN_S) $< .
 
 install: all installdirs
-	$(INSTALL_PROGRAM) initdb$(X) '$(DESTDIR)$(bindir)/initdb$(X)'
+	$(INSTALL_PROGRAM) pg_initdb$(X) '$(DESTDIR)$(bindir)/pg_initdb$(X)'
 
 installdirs:
 	$(MKDIR_P) '$(DESTDIR)$(bindir)'
 
 uninstall:
-	rm -f '$(DESTDIR)$(bindir)/initdb$(X)'
+	rm -f '$(DESTDIR)$(bindir)/pg_initdb$(X)'
 
 clean distclean:
-	rm -f initdb$(X) $(OBJS) localtime.c
+	rm -f pg_initdb$(X) $(OBJS) localtime.c
 	rm -rf tmp_check
 
 # ensure that changes in datadir propagate into object file
-initdb.o: initdb.c $(top_builddir)/src/Makefile.global
+pg_initdb.o: pg_initdb.c $(top_builddir)/src/Makefile.global
 
 export with_icu
 

@@ -460,7 +460,7 @@ stop_postmaster(void)
  * unlink the socket and lock file.  Unlink them here so we can proceed to
  * remove the directory.  Ignore errors; leaking a temporary directory is
  * unimportant.  This can run from a signal handler.  The code is not
- * acceptable in a Windows signal handler (see initdb.c:trapsig()), but
+ * acceptable in a Windows signal handler (see pg_initdb.c:trapsig()), but
  * on Windows, pg_regress does not use Unix sockets by default.
  */
 static void
@@ -1015,7 +1015,7 @@ config_sspi_auth(const char *pgdata, const char *superuser_name)
 	if (superuser_name == NULL)
 	{
 		/*
-		 * Compute the default superuser name the same way initdb does.
+		 * Compute the default superuser name the same way pg_initdb does.
 		 *
 		 * It's possible that this result always matches "accountname", the
 		 * value SSPI authentication discovers.  But the underlying system
@@ -1029,7 +1029,7 @@ config_sspi_auth(const char *pgdata, const char *superuser_name)
 	}
 
 	/*
-	 * Like initdb.c:setup_config(), determine whether the platform recognizes
+	 * Like pg_initdb.c:setup_config(), determine whether the platform recognizes
 	 * ::1 (IPv6 loopback) as a numeric host address string.
 	 */
 	{
@@ -2329,10 +2329,10 @@ regression_main(int argc, char *argv[],
 		initdb_template_dir = getenv("INITDB_TEMPLATE");
 		if (initdb_template_dir == NULL || nolocale || debug || initdb_extra_opts_env)
 		{
-			note("initializing database system by running initdb");
+			note("initializing database system by running pg_initdb");
 
 			appendStringInfo(&cmd,
-							 "\"%s%sinitdb\" -D \"%s/data\" --no-clean --no-sync",
+							 "\"%s%spg_initdb\" -D \"%s/data\" --no-clean --no-sync",
 							 bindir ? bindir : "",
 							 bindir ? "/" : "",
 							 temp_instance);
@@ -2426,7 +2426,7 @@ regression_main(int argc, char *argv[],
 		{
 			/*
 			 * Since we successfully used the same buffer for the much-longer
-			 * "initdb" command, this can't truncate.
+			 * "pg_initdb" command, this can't truncate.
 			 */
 			snprintf(buf, sizeof(buf), "%s/data", temp_instance);
 			config_sspi_auth(buf, NULL);

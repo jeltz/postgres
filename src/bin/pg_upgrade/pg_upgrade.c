@@ -215,7 +215,7 @@ main(int argc, char **argv)
 	{
 		prep_status("Sync data directory to disk");
 		exec_prog(UTILITY_LOG_FILE, NULL, true, true,
-				  "\"%s/initdb\" --sync-only \"%s\" --sync-method %s",
+				  "\"%s/pg_initdb\" --sync-only \"%s\" --sync-method %s",
 				  new_cluster.bindir,
 				  new_cluster.pgdata,
 				  user_opts.sync_method);
@@ -495,7 +495,7 @@ prepare_new_cluster(void)
 
 	/*
 	 * We do freeze after analyze so pg_statistic is also frozen. template0 is
-	 * not frozen here, but data rows were frozen by initdb, and we set its
+	 * not frozen here, but data rows were frozen by pg_initdb, and we set its
 	 * datfrozenxid, relfrozenxids, and relminmxid later to match the new xid
 	 * counter later.
 	 */
@@ -512,7 +512,7 @@ static void
 prepare_new_globals(void)
 {
 	/*
-	 * Before we restore anything, set frozenxids of initdb-created tables.
+	 * Before we restore anything, set frozenxids of pg_initdb-created tables.
 	 */
 	set_frozenxids(false);
 
@@ -776,7 +776,7 @@ copy_xact_xlog_xid(void)
 	else if (new_cluster.controldata.cat_ver >= MULTIXACT_FORMATCHANGE_CAT_VER)
 	{
 		/*
-		 * Remove offsets/0000 file created by initdb that no longer matches
+		 * Remove offsets/0000 file created by pg_initdb that no longer matches
 		 * the new multi-xid value.  "members" starts at zero so no need to
 		 * remove it.
 		 */
@@ -816,7 +816,7 @@ copy_xact_xlog_xid(void)
  *	set_frozenxids()
  *
  * This is called on the new cluster before we restore anything, with
- * minmxid_only = false.  Its purpose is to ensure that all initdb-created
+ * minmxid_only = false.  Its purpose is to ensure that all pg_initdb-created
  * vacuumable tables have relfrozenxid/relminmxid matching the old cluster's
  * xid/mxid counters.  We also initialize the datfrozenxid/datminmxid of the
  * built-in databases to match.
@@ -830,7 +830,7 @@ copy_xact_xlog_xid(void)
  *
  * Hence, with a pre-9.3 source database, a second call occurs after
  * everything is restored, with minmxid_only = true.  This pass will
- * initialize all tables and databases, both those made by initdb and user
+ * initialize all tables and databases, both those made by pg_initdb and user
  * objects, with the desired minmxid value.  frozenxid values are left alone.
  */
 static void

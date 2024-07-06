@@ -12,15 +12,15 @@ PostgreSQL::Test::Utils - helper module for writing PostgreSQL's C<prove> tests.
   use PostgreSQL::Test::Utils;
 
   # Test basic output of a command
-  program_help_ok('initdb');
-  program_version_ok('initdb');
-  program_options_handling_ok('initdb');
+  program_help_ok('pg_initdb');
+  program_version_ok('pg_initdb');
+  program_options_handling_ok('pg_initdb');
 
   # Test option combinations
-  command_fails(['initdb', '--invalid-option'],
+  command_fails(['pg_initdb', '--invalid-option'],
               'command fails with invalid option');
   my $tempdir = PostgreSQL::Test::Utils::tempdir;
-  command_ok('initdb', '-D', $tempdir);
+  command_ok('pg_initdb', '-D', $tempdir);
 
   # Miscellanea
   print "on Windows" if $PostgreSQL::Test::Utils::windows_os;

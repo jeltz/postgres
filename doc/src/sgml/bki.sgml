@@ -27,7 +27,7 @@
  <para>
   Many of the catalogs have initial data that must be loaded into them
   during the <quote>bootstrap</quote> phase
-  of <application>initdb</application>, to bring the system up to a point
+  of <application>pg_initdb</application>, to bring the system up to a point
   where it is capable of executing SQL commands.  (For
   example, <filename>pg_class.h</filename> must contain an entry for itself,
   as well as one for each other system catalog and index.)  This
@@ -431,10 +431,10 @@
     are considered <quote>pinned</quote>, preventing them from being
     deleted.  (There are a small number of exceptions, which are
     hard-wired into <function>IsPinnedObject()</function>.)
-    <application>initdb</application> forces the OID counter up
+    <application>pg_initdb</application> forces the OID counter up
     to <symbol>FirstUnpinnedObjectId</symbol> as soon as it's ready to
     create unpinned objects.  Thus objects created during the later phases
-    of <application>initdb</application>, such as objects created while
+    of <application>pg_initdb</application>, such as objects created while
     running the <filename>information_schema.sql</filename> script, will
     not be pinned, while all objects known
     to <filename>genbki.pl</filename> will be.
@@ -444,7 +444,7 @@
     OIDs assigned during normal database operation are constrained to be
     16384 or higher.  This ensures that the range 10000&mdash;16383 is free
     for OIDs assigned automatically by <filename>genbki.pl</filename> or
-    during <application>initdb</application>.  These
+    during <application>pg_initdb</application>.  These
     automatically-assigned OIDs are not considered stable, and may change
     from one installation to another.
    </para>

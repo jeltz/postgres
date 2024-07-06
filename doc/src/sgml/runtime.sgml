@@ -91,7 +91,7 @@
    <filename>/usr/local/pgsql/data</filename> or
    <filename>/var/lib/pgsql/data</filename> are popular.
    The data directory must be initialized before being used, using the program
-   <xref linkend="app-initdb"/><indexterm><primary>initdb</primary></indexterm>
+   <xref linkend="app-pginitdb"/><indexterm><primary>pg_initdb</primary></indexterm>
    which is installed with <productname>PostgreSQL</productname>.
   </para>
 
@@ -101,17 +101,17 @@
    convention for where to place the data directory, and it may also
    provide a script for creating the data directory.  In that case you
    should use that script in preference to
-   running <command>initdb</command> directly.
+   running <command>pg_initdb</command> directly.
    Consult the package-level documentation for details.
   </para>
 
   <para>
    To initialize a database cluster manually,
-   run <command>initdb</command> and specify the desired
+   run <command>pg_initdb</command> and specify the desired
    file system location of the database cluster with the
    <option>-D</option> option, for example:
 <screen>
-<prompt>$</prompt> <userinput>initdb -D /usr/local/pgsql/data</userinput>
+<prompt>$</prompt> <userinput>pg_initdb -D /usr/local/pgsql/data</userinput>
 </screen>
    Note that you must execute this command while logged into the
    <productname>PostgreSQL</productname> user account, which is
@@ -127,7 +127,7 @@
   </tip>
 
   <para>
-   Alternatively, you can run <command>initdb</command> via
+   Alternatively, you can run <command>pg_initdb</command> via
    the <xref linkend="app-pg-ctl"/>
    program<indexterm><primary>pg_ctl</primary></indexterm> like so:
 <screen>
@@ -141,9 +141,9 @@
   </para>
 
   <para>
-   <command>initdb</command> will attempt to create the directory you
+   <command>pg_initdb</command> will attempt to create the directory you
    specify if it does not already exist.  Of course, this will fail if
-   <command>initdb</command> does not have permissions to write in the
+   <command>pg_initdb</command> does not have permissions to write in the
    parent directory.  It's generally recommendable that the
    <productname>PostgreSQL</productname> user own not just the data
    directory but its parent directory as well, so that this should not
@@ -155,12 +155,12 @@
 root# <userinput>mkdir /usr/local/pgsql</userinput>
 root# <userinput>chown postgres /usr/local/pgsql</userinput>
 root# <userinput>su postgres</userinput>
-postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
+postgres$ <userinput>pg_initdb -D /usr/local/pgsql/data</userinput>
 </screen>
   </para>
 
   <para>
-   <command>initdb</command> will refuse to run if the data directory
+   <command>pg_initdb</command> will refuse to run if the data directory
    exists and already contains files; this is to prevent accidentally
    overwriting an existing installation.
   </para>
@@ -168,7 +168,7 @@ postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
   <para>
    Because the data directory contains all the data stored in the
    database, it is essential that it be secured from unauthorized
-   access. <command>initdb</command> therefore revokes access
+   access. <command>pg_initdb</command> therefore revokes access
    permissions from everyone but the
    <productname>PostgreSQL</productname> user, and optionally, group.
    Group access, when enabled, is read-only.  This allows an unprivileged
@@ -193,7 +193,7 @@ postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
    client authentication setup allows any local user to connect to the
    database and even become the database superuser. If you do not
    trust other local users, we recommend you use one of
-   <command>initdb</command>'s <option>-W</option>, <option>--pwprompt</option>
+   <command>pg_initdb</command>'s <option>-W</option>, <option>--pwprompt</option>
    or <option>--pwfile</option> options to assign a password to the
    database superuser.<indexterm>
      <primary>password</primary>
@@ -202,7 +202,7 @@ postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
    Also, specify <option>-A scram-sha-256</option>
    so that the default <literal>trust</literal> authentication
    mode is not used; or modify the generated <filename>pg_hba.conf</filename>
-   file after running <command>initdb</command>, but
+   file after running <command>pg_initdb</command>, but
    <emphasis>before</emphasis> you start the server for the first time. (Other
    reasonable approaches include using <literal>peer</literal> authentication
    or file system permissions to restrict connections. See <xref
@@ -210,14 +210,14 @@ postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
   </para>
 
   <para>
-   <command>initdb</command> also initializes the default
+   <command>pg_initdb</command> also initializes the default
    locale<indexterm><primary>locale</primary></indexterm> for the database cluster.
    Normally, it will just take the locale settings in the environment
    and apply them to the initialized database.  It is possible to
    specify a different locale for the database; more information about
    that can be found in <xref linkend="locale"/>.  The default sort order used
    within the particular database cluster is set by
-   <command>initdb</command>, and while you can create new databases using
+   <command>pg_initdb</command>, and while you can create new databases using
    different sort order, the order used in the template databases that initdb
    creates cannot be changed without dropping and recreating them.
    There is also a performance impact for using locales
@@ -226,7 +226,7 @@ postgres$ <userinput>initdb -D /usr/local/pgsql/data</userinput>
   </para>
 
   <para>
-   <command>initdb</command> also sets the default character set encoding
+   <command>pg_initdb</command> also sets the default character set encoding
    for the database cluster.  Normally this should be chosen to match the
    locale setting.  For details see <xref linkend="multibyte"/>.
   </para>
@@ -1902,7 +1902,7 @@ pg_dumpall -p 5432 | psql -d postgres -p 5433
     version to another.  Upgrades can be performed in minutes,
     particularly with <option>--link</option> mode.  It requires steps similar to
     <application>pg_dumpall</application> above, e.g.,  starting/stopping the server,
-    running <application>initdb</application>.  The <application>pg_upgrade</application> <link
+    running <application>pg_initdb</application>.  The <application>pg_upgrade</application> <link
     linkend="pgupgrade">documentation</link> outlines the necessary steps.
    </para>
 

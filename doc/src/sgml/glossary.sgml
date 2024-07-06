@@ -557,7 +557,7 @@
      Sometimes referred to as a
      <firstterm>cluster</firstterm>.
      A database cluster is created using the
-     <xref linkend="app-initdb" /> program.
+     <xref linkend="app-pginitdb" /> program.
     </para>
     <para>
      In <productname>PostgreSQL</productname>, the term

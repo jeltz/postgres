@@ -471,7 +471,7 @@
     <para>
      Also, system catalogs may contain rows with <structname>xmin</structname> equal
      to <literal>BootstrapTransactionId</literal> (1), indicating that they were
-     inserted during the first phase of <application>initdb</application>.
+     inserted during the first phase of <application>pg_initdb</application>.
      Like <literal>FrozenTransactionId</literal>, this special XID is treated as
      older than every normal XID.
     </para>

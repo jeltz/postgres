@@ -9,7 +9,7 @@
 
 #
 # This script compares the timezone information in the Windows registry
-# with that in src/bin/initdb/findtimezone.c.  A list of changes will be
+# with that in src/bin/pg_initdb/findtimezone.c.  A list of changes will be
 # written to stdout - no attempt is made to automatically edit the file.
 #
 # Run the script from the top-level PG source directory.
@@ -31,7 +31,7 @@ BEGIN
 	}
 }
 
-my $tzfile = 'src/bin/initdb/findtimezone.c';
+my $tzfile = 'src/bin/pg_initdb/findtimezone.c';
 
 #
 # Fetch all timezones in the registry

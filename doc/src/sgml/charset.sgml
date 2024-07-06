@@ -51,17 +51,17 @@
 
    <para>
     Locale support is automatically initialized when a database
-    cluster is created using <command>initdb</command>.
-    <command>initdb</command> will initialize the database cluster
+    cluster is created using <command>pg_initdb</command>.
+    <command>pg_initdb</command> will initialize the database cluster
     with the locale setting of its execution environment by default,
     so if your system is already set to use the locale that you want
     in your database cluster then there is nothing else you need to
     do.  If you want to use a different locale (or you are not sure
     which locale your system is set to), you can instruct
-    <command>initdb</command> exactly which locale to use by
+    <command>pg_initdb</command> exactly which locale to use by
     specifying the <option>--locale</option> option. For example:
 <screen>
-initdb --locale=sv_SE
+pg_initdb --locale=sv_SE
 </screen>
    </para>
 
@@ -127,10 +127,10 @@ initdb --locale=sv_SE
     </informaltable>
 
     The category names translate into names of
-    <command>initdb</command> options to override the locale choice
+    <command>pg_initdb</command> options to override the locale choice
     for a specific category.  For instance, to set the locale to
     French Canadian, but use U.S. rules for formatting currency, use
-    <literal>initdb --locale=fr_CA --lc-monetary=en_US</literal>.
+    <literal>pg_initdb --locale=fr_CA --lc-monetary=en_US</literal>.
    </para>
 
    <para>
@@ -150,7 +150,7 @@ initdb --locale=sv_SE
     (But you can alleviate this restriction using collations, as discussed
     in <xref linkend="collation"/>.)
     The default values for these
-    categories are determined when <command>initdb</command> is run, and
+    categories are determined when <command>pg_initdb</command> is run, and
     those values are used when new databases are created, unless
     specified otherwise in the <command>CREATE DATABASE</command> command.
    </para>
@@ -160,7 +160,7 @@ initdb --locale=sv_SE
     by setting the server configuration parameters
     that have the same name as the locale categories (see <xref
     linkend="runtime-config-client-format"/> for details).  The values
-    that are chosen by <command>initdb</command> are actually only written
+    that are chosen by <command>pg_initdb</command> are actually only written
     into the configuration file <filename>postgresql.conf</filename> to
     serve as defaults when the server is started.  If you remove these
     assignments from <filename>postgresql.conf</filename> then the
@@ -282,7 +282,7 @@ initdb --locale=sv_SE
    <para>
     Locales can be selected in different scopes depending on requirements.
     The above overview showed how locales are specified using
-    <command>initdb</command> to set the defaults for the entire cluster.  The
+    <command>pg_initdb</command> to set the defaults for the entire cluster.  The
     following list shows where locales can be selected.  Each item provides
     the defaults for the subsequent items, and each lower item allows
     overriding the defaults on a finer granularity.
@@ -302,7 +302,7 @@ initdb --locale=sv_SE
 
     <listitem>
      <para>
-      As shown above, command-line options for <command>initdb</command>
+      As shown above, command-line options for <command>pg_initdb</command>
       specify the locale settings for a newly initialized database cluster.
       Use this if the operating system does not have the locale configuration
       you want for your database system.
@@ -351,7 +351,7 @@ initdb --locale=sv_SE
     above, each have an option to select the locale provider. Here is an
     example to initialize a database cluster using the ICU provider:
 <programlisting>
-initdb --locale-provider=icu --icu-locale=en
+pg_initdb --locale-provider=icu --icu-locale=en
 </programlisting>
     See the description of the respective commands and programs for
     details.  Note that you can mix locale providers at different
@@ -945,7 +945,7 @@ SELECT * FROM test1 ORDER BY a || b COLLATE "fr_FR";
     If the operating system provides support for using multiple locales
     within a single program (<function>newlocale</function> and related functions),
     or if support for ICU is configured,
-    then when a database cluster is initialized, <command>initdb</command>
+    then when a database cluster is initialized, <command>pg_initdb</command>
     populates the system catalog <literal>pg_collation</literal> with
     collations based on all the locales it finds in the operating
     system at the time.
@@ -963,7 +963,7 @@ SELECT * FROM test1 ORDER BY a || b COLLATE "fr_FR";
    <para>
     For example, the operating system might
     provide a locale named <literal>de_DE.utf8</literal>.
-    <command>initdb</command> would then create a collation named
+    <command>pg_initdb</command> would then create a collation named
     <literal>de_DE.utf8</literal> for encoding <literal>UTF8</literal>
     that has both <symbol>LC_COLLATE</symbol> and
     <symbol>LC_CTYPE</symbol> set to <literal>de_DE.utf8</literal>.
@@ -1021,7 +1021,7 @@ SELECT a COLLATE "C" &lt; b COLLATE "POSIX" FROM test1;
     With ICU, it is not sensible to enumerate all possible locale names.  ICU
     uses a particular naming system for locales, but there are many more ways
     to name a locale than there are actually distinct locales.
-    <command>initdb</command> uses the ICU APIs to extract a set of distinct
+    <command>pg_initdb</command> uses the ICU APIs to extract a set of distinct
     locales to populate the initial set of collations.  Collations provided by
     ICU are created in the SQL environment with names in BCP 47 language tag
     format, with a <quote>private use</quote>
@@ -1743,7 +1743,7 @@ ORDER BY c COLLATE ebcdic;
    for use within the server (that is, as a server-side encoding).
    The default character set is selected while
    initializing your <productname>PostgreSQL</productname> database
-   cluster using <command>initdb</command>.  It can be overridden when you
+   cluster using <command>pg_initdb</command>.  It can be overridden when you
    create a database, so you can have multiple
    databases each with a different character set.
   </para>
@@ -2204,11 +2204,11 @@ ORDER BY c COLLATE ebcdic;
     <title>Setting the Character Set</title>
 
     <para>
-     <command>initdb</command> defines the default character set (encoding)
+     <command>pg_initdb</command> defines the default character set (encoding)
      for a <productname>PostgreSQL</productname> cluster. For example,
 
 <screen>
-initdb -E EUC_JP
+pg_initdb -E EUC_JP
 </screen>
 
      sets the default character set to
@@ -2216,7 +2216,7 @@ initdb -E EUC_JP
      can use <option>--encoding</option> instead of
      <option>-E</option> if you prefer longer option strings.
      If no <option>-E</option> or <option>--encoding</option> option is
-     given, <command>initdb</command> attempts to determine the appropriate
+     given, <command>pg_initdb</command> attempts to determine the appropriate
      encoding to use based on the specified or default locale.
     </para>
 

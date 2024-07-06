@@ -3349,7 +3349,7 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
       These settings cannot be changed directly; they reflect internally
       determined values.  Some of them may be adjustable by rebuilding the
       server with different configuration options, or by changing options
-      supplied to <application>initdb</application>.
+      supplied to <application>pg_initdb</application>.
      </para>
     </listitem>
    </varlistentry>

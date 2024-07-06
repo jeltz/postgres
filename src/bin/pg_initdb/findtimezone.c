@@ -6,7 +6,7 @@
  * Portions Copyright (c) 1996-2024, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *	  src/bin/initdb/findtimezone.c
+ *	  src/bin/pg_initdb/findtimezone.c
  *
  *-------------------------------------------------------------------------
  */

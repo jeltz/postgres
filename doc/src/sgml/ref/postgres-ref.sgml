@@ -51,7 +51,7 @@ PostgreSQL documentation
    <option>-D</option> option or the <envar>PGDATA</envar> environment
    variable; there is no default.  Typically, <option>-D</option> or
    <envar>PGDATA</envar> points directly to the data area directory
-   created by <xref linkend="app-initdb"/>.  Other possible file layouts are
+   created by <xref linkend="app-pginitdb"/>.  Other possible file layouts are
    discussed in <xref linkend="runtime-config-file-locations"/>.
   </para>
 
@@ -65,7 +65,7 @@ PostgreSQL documentation
   <para>
    The <command>postgres</command> command can also be called in
    single-user mode.  The primary use for this mode is during
-   bootstrapping by <xref linkend="app-initdb"/>.  Sometimes it is used
+   bootstrapping by <xref linkend="app-pginitdb"/>.  Sometimes it is used
    for debugging or disaster recovery;  note that running a single-user
    server is not truly suitable for debugging the server, since no
    realistic interprocess communication and locking will happen.
@@ -107,7 +107,7 @@ PostgreSQL documentation
        <para>
         Sets the number of shared buffers for use by the server
         processes.  The default value of this parameter is chosen
-        automatically by <application>initdb</application>.
+        automatically by <application>pg_initdb</application>.
         Specifying this option is equivalent to setting the
         <xref linkend="guc-shared-buffers"/> configuration parameter.
        </para>
@@ -281,7 +281,7 @@ PostgreSQL documentation
        <para>
         Sets the maximum number of client connections that this
         server will accept.  The default value of this parameter is chosen
-        automatically by <application>initdb</application>.
+        automatically by <application>pg_initdb</application>.
         Specifying this option is equivalent to setting the
         <xref linkend="guc-max-connections"/> configuration parameter.
        </para>
@@ -414,7 +414,7 @@ PostgreSQL documentation
       <listitem>
        <para>
         Allows the structure of system tables to be modified.  This is
-        used by <command>initdb</command>.
+        used by <command>pg_initdb</command>.
        </para>
       </listitem>
      </varlistentry>
@@ -815,7 +815,7 @@ PostgreSQL documentation
   <title>See Also</title>
 
   <para>
-   <xref linkend="app-initdb"/>,
+   <xref linkend="app-pginitdb"/>,
    <xref linkend="app-pg-ctl"/>
   </para>
  </refsect1>

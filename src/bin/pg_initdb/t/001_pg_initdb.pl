@@ -18,25 +18,25 @@ my $xlogdir = "$tempdir/pgxlog";
 my $datadir = "$tempdir/data";
 my $supports_syncfs = check_pg_config("#define HAVE_SYNCFS 1");
 
-program_help_ok('initdb');
-program_version_ok('initdb');
-program_options_handling_ok('initdb');
+program_help_ok('pg_initdb');
+program_version_ok('pg_initdb');
+program_options_handling_ok('pg_initdb');
 
-command_fails([ 'initdb', '-S', "$tempdir/nonexistent" ],
+command_fails([ 'pg_initdb', '-S', "$tempdir/nonexistent" ],
 	'sync missing data directory');
 
 mkdir $xlogdir;
 mkdir "$xlogdir/lost+found";
 command_fails(
-	[ 'initdb', '-X', $xlogdir, $datadir ],
+	[ 'pg_initdb', '-X', $xlogdir, $datadir ],
 	'existing nonempty xlog directory');
 rmdir "$xlogdir/lost+found";
 command_fails(
-	[ 'initdb', '-X', 'pgxlog', $datadir ],
+	[ 'pg_initdb', '-X', 'pgxlog', $datadir ],
 	'relative xlog directory not allowed');
 
 command_fails(
-	[ 'initdb', '-U', 'pg_test', $datadir ],
+	[ 'pg_initdb', '-U', 'pg_test', $datadir ],
 	'role names cannot begin with "pg_"');
 
 mkdir $datadir;
@@ -52,7 +52,7 @@ mkdir $datadir;
 	# while we are here, also exercise -T and -c options
 	command_ok(
 		[
-			'initdb', '-N', '-T', 'german', '-c',
+			'pg_initdb', '-N', '-T', 'german', '-c',
 			'default_text_search_config=german',
 			'-X', $xlogdir, $datadir
 		],
@@ -80,17 +80,17 @@ command_like(
 command_fails([ 'pg_checksums', '-D', $datadir ],
 	"pg_checksums fails with data checksum disabled");
 
-command_ok([ 'initdb', '-S', $datadir ], 'sync only');
-command_fails([ 'initdb', $datadir ], 'existing data directory');
+command_ok([ 'pg_initdb', '-S', $datadir ], 'sync only');
+command_fails([ 'pg_initdb', $datadir ], 'existing data directory');
 
 if ($supports_syncfs)
 {
-	command_ok([ 'initdb', '-S', $datadir, '--sync-method', 'syncfs' ],
+	command_ok([ 'pg_initdb', '-S', $datadir, '--sync-method', 'syncfs' ],
 		'sync method syncfs');
 }
 else
 {
-	command_fails([ 'initdb', '-S', $datadir, '--sync-method', 'syncfs' ],
+	command_fails([ 'pg_initdb', '-S', $datadir, '--sync-method', 'syncfs' ],
 		'sync method syncfs');
 }
 
@@ -104,7 +104,7 @@ SKIP:
 	my $datadir_group = "$tempdir/data_group";
 
 	command_ok(
-		[ 'initdb', '-g', $datadir_group ],
+		[ 'pg_initdb', '-g', $datadir_group ],
 		'successful creation with group access');
 
 	ok(check_mode_recursive($datadir_group, 0750, 0640),
@@ -116,13 +116,13 @@ SKIP:
 if ($ENV{with_icu} eq 'yes')
 {
 	command_fails_like(
-		[ 'initdb', '--no-sync', '--locale-provider=icu', "$tempdir/data2" ],
+		[ 'pg_initdb', '--no-sync', '--locale-provider=icu', "$tempdir/data2" ],
 		qr/initdb: error: locale must be specified if provider is icu/,
 		'locale provider ICU requires --icu-locale');
 
 	command_ok(
 		[
-			'initdb', '--no-sync',
+			'pg_initdb', '--no-sync',
 			'--locale-provider=icu', '--icu-locale=en',
 			"$tempdir/data3"
 		],
@@ -130,7 +130,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	command_like(
 		[
-			'initdb', '--no-sync',
+			'pg_initdb', '--no-sync',
 			'-A', 'trust',
 			'--locale-provider=icu', '--locale=und',
 			'--lc-collate=C', '--lc-ctype=C',
@@ -143,7 +143,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	command_fails_like(
 		[
-			'initdb', '--no-sync',
+			'pg_initdb', '--no-sync',
 			'--locale-provider=icu', '--icu-locale=@colNumeric=lower',
 			"$tempdir/dataX"
 		],
@@ -152,7 +152,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	command_fails_like(
 		[
-			'initdb', '--no-sync',
+			'pg_initdb', '--no-sync',
 			'--locale-provider=icu', '--encoding=SQL_ASCII',
 			'--icu-locale=en', "$tempdir/dataX"
 		],
@@ -161,7 +161,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	command_fails_like(
 		[
-			'initdb', '--no-sync',
+			'pg_initdb', '--no-sync',
 			'--locale-provider=icu', '--icu-locale=nonsense-nowhere',
 			"$tempdir/dataX"
 		],
@@ -170,7 +170,7 @@ if ($ENV{with_icu} eq 'yes')
 
 	command_fails_like(
 		[
-			'initdb', '--no-sync',
+			'pg_initdb', '--no-sync',
 			'--locale-provider=icu', '--icu-locale=@colNumeric=lower',
 			"$tempdir/dataX"
 		],
@@ -180,17 +180,17 @@ if ($ENV{with_icu} eq 'yes')
 else
 {
 	command_fails(
-		[ 'initdb', '--no-sync', '--locale-provider=icu', "$tempdir/data2" ],
+		[ 'pg_initdb', '--no-sync', '--locale-provider=icu', "$tempdir/data2" ],
 		'locale provider ICU fails since no ICU support');
 }
 
 command_fails(
-	[ 'initdb', '--no-sync', '--locale-provider=builtin', "$tempdir/data6" ],
+	[ 'pg_initdb', '--no-sync', '--locale-provider=builtin', "$tempdir/data6" ],
 	'locale provider builtin fails without --locale');
 
 command_ok(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=builtin', '--locale=C',
 		"$tempdir/data7"
 	],
@@ -198,7 +198,7 @@ command_ok(
 
 command_ok(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=builtin', '-E UTF-8',
 		'--lc-collate=C', '--lc-ctype=C',
 		'--builtin-locale=C.UTF-8', "$tempdir/data8"
@@ -207,7 +207,7 @@ command_ok(
 
 command_fails(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=builtin', '-E SQL_ASCII',
 		'--lc-collate=C', '--lc-ctype=C',
 		'--builtin-locale=C.UTF-8', "$tempdir/data9"
@@ -217,7 +217,7 @@ command_fails(
 
 command_ok(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=builtin', '--lc-ctype=C',
 		'--locale=C', "$tempdir/data10"
 	],
@@ -225,7 +225,7 @@ command_ok(
 
 command_fails(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=builtin', '--icu-locale=en',
 		"$tempdir/dataX"
 	],
@@ -233,31 +233,31 @@ command_fails(
 
 command_fails(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=builtin', '--icu-rules=""',
 		"$tempdir/dataX"
 	],
 	'fails for locale provider builtin with ICU rules');
 
 command_fails(
-	[ 'initdb', '--no-sync', '--locale-provider=xyz', "$tempdir/dataX" ],
+	[ 'pg_initdb', '--no-sync', '--locale-provider=xyz', "$tempdir/dataX" ],
 	'fails for invalid locale provider');
 
 command_fails(
 	[
-		'initdb', '--no-sync',
+		'pg_initdb', '--no-sync',
 		'--locale-provider=libc', '--icu-locale=en',
 		"$tempdir/dataX"
 	],
 	'fails for invalid option combination');
 
-command_fails([ 'initdb', '--no-sync', '--set', 'foo=bar', "$tempdir/dataX" ],
+command_fails([ 'pg_initdb', '--no-sync', '--set', 'foo=bar', "$tempdir/dataX" ],
 	'fails for invalid --set option');
 
 # Make sure multiple invocations of -c parameters are added case insensitive
 command_ok(
 	[
-		'initdb', '-cwork_mem=128',
+		'pg_initdb', '-cwork_mem=128',
 		'-cWork_Mem=256', '-cWORK_MEM=512',
 		"$tempdir/dataY"
 	],

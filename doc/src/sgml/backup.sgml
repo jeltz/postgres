@@ -571,7 +571,7 @@ tar -cf backup.tar /usr/local/pgsql/data
     produces an indefinitely long sequence of WAL records.  The system
     physically divides this sequence into WAL <firstterm>segment
     files</firstterm>, which are normally 16MB apiece (although the segment size
-    can be altered during <application>initdb</application>).  The segment
+    can be altered during <application>pg_initdb</application>).  The segment
     files are given numeric names that reflect their position in the
     abstract WAL sequence.  When not using WAL archiving, the system
     normally creates just a few segment files and then

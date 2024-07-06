@@ -257,7 +257,7 @@ parseCommandLine(int argc, char *argv[])
 #ifdef WIN32
 
 	/*
-	 * On Windows, initdb --sync-only will fail with a "Permission denied"
+	 * On Windows, pg_initdb --sync-only will fail with a "Permission denied"
 	 * error on file pg_upgrade_utility.log if pg_upgrade is run inside the
 	 * new cluster directory, so we do a check here.
 	 */
@@ -310,7 +310,7 @@ usage(void)
 	printf(_("  -?, --help                    show this help, then exit\n"));
 	printf(_("\n"
 			 "Before running pg_upgrade you must:\n"
-			 "  create a new database cluster (using the new version of initdb)\n"
+			 "  create a new database cluster (using the new version of pg_initdb)\n"
 			 "  shutdown the postmaster servicing the old cluster\n"
 			 "  shutdown the postmaster servicing the new cluster\n"));
 	printf(_("\n"

@@ -384,7 +384,7 @@ adduser postgres
 mkdir -p /usr/local/pgsql/data
 chown postgres /usr/local/pgsql/data
 su - postgres
-/usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data
+/usr/local/pgsql/bin/pg_initdb -D /usr/local/pgsql/data
 /usr/local/pgsql/bin/pg_ctl -D /usr/local/pgsql/data -l logfile start
 /usr/local/pgsql/bin/pg_createdb test
 /usr/local/pgsql/bin/psql test
@@ -1991,7 +1991,7 @@ adduser postgres
 mkdir -p /usr/local/pgsql/data
 chown postgres /usr/local/pgsql/data
 su - postgres
-/usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data
+/usr/local/pgsql/bin/pg_initdb -D /usr/local/pgsql/data
 /usr/local/pgsql/bin/pg_ctl -D /usr/local/pgsql/data -l logfile start
 /usr/local/pgsql/bin/pg_createdb test
 /usr/local/pgsql/bin/psql test
@@ -3502,7 +3502,7 @@ export MANPATH
        To do this, enter the command <literal>/usr/sbin/cygserver
        &amp;</literal>.  This program needs to be running anytime you
        start the PostgreSQL server or initialize a database cluster
-       (<command>initdb</command>).  The
+       (<command>pg_initdb</command>).  The
        default <command>cygserver</command> configuration may need to
        be changed (e.g., increase <symbol>SEMMNS</symbol>) to prevent
        PostgreSQL from failing due to a lack of system resources.

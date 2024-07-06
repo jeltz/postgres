@@ -552,7 +552,7 @@ sub init
 		or !defined $ENV{INITDB_TEMPLATE})
 	{
 		note("initializing database system by running initdb");
-		PostgreSQL::Test::Utils::system_or_bail('initdb', '-D', $pgdata, '-A',
+		PostgreSQL::Test::Utils::system_or_bail('pg_initdb', '-D', $pgdata, '-A',
 			'trust', '-N', @{ $params{extra} });
 	}
 	else

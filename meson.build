@@ -3255,7 +3255,7 @@ sp = subprocess.run(sys.argv[2:] + [sys.argv[1]])
 sys.exit(sp.returncode)
 ''',
        test_initdb_template,
-       temp_install_bindir / 'initdb',
+       temp_install_bindir / 'pg_initdb',
        '--auth', 'trust', '--no-sync', '--no-instructions', '--lc-messages=C',
        '--no-clean'
      ],

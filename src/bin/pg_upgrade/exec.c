@@ -416,7 +416,7 @@ check_bin_dir(ClusterInfo *cluster, bool check_versions)
 		 * pg_dumpall are used to dump the old cluster, but must be of the
 		 * target version.
 		 */
-		check_exec(cluster->bindir, "initdb", check_versions);
+		check_exec(cluster->bindir, "pg_initdb", check_versions);
 		check_exec(cluster->bindir, "pg_dump", check_versions);
 		check_exec(cluster->bindir, "pg_dumpall", check_versions);
 		check_exec(cluster->bindir, "pg_restore", check_versions);

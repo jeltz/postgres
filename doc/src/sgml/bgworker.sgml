@@ -198,7 +198,7 @@ typedef struct BackgroundWorker
    to any particular database, but shared catalogs can be accessed.
    If <varname>username</varname> is NULL or <varname>useroid</varname> is
    <literal>InvalidOid</literal>, the process will run as the superuser created
-   during <command>initdb</command>. If <literal>BGWORKER_BYPASS_ALLOWCONN</literal>
+   during <command>pg_initdb</command>. If <literal>BGWORKER_BYPASS_ALLOWCONN</literal>
    is specified as <varname>flags</varname> it is possible to bypass the restriction
    to connect to databases not allowing user connections.
    If <literal>BGWORKER_BYPASS_ROLELOGINCHECK</literal> is specified as

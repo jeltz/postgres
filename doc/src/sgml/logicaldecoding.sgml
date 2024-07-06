@@ -616,7 +616,7 @@ typedef void (*LogicalOutputPluginInit) (struct OutputPluginCallbacks *cb);
      To decode, format and output changes, output plugins can use most of the
      backend's normal infrastructure, including calling output functions. Read
      only access to relations is permitted as long as only relations are
-     accessed that either have been created by <command>initdb</command> in
+     accessed that either have been created by <command>pg_initdb</command> in
      the <literal>pg_catalog</literal> schema, or have been marked as user
      provided catalog tables using
 <programlisting>

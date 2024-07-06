@@ -361,7 +361,7 @@ make check-world PG_TEST_EXTRA='kerberos ldap ssl load_balance libpq_encryption'
    <para>
     By default, tests using a temporary installation use the
     locale defined in the current environment and the corresponding
-    database encoding as determined by <command>initdb</command>.  It
+    database encoding as determined by <command>pg_initdb</command>.  It
     can be useful to test different locales by setting the appropriate
     environment variables, for example:
 <screen>
@@ -410,7 +410,7 @@ make check LANG=C ENCODING=EUC_JP
    </para>
 
    <para>
-    Extra options can be passed to the various <command>initdb</command>
+    Extra options can be passed to the various <command>pg_initdb</command>
     commands that are run internally during test setup using the environment
     variable <envar>PG_TEST_INITDB_EXTRA_OPTS</envar>.  For example, to run a
     test with checksums enabled and a custom WAL segment size and
@@ -555,7 +555,7 @@ make check NO_LOCALE=1
      locale setup is determined by the existing installation.  To
      change it, initialize the database cluster with a different
      locale by passing the appropriate options
-     to <command>initdb</command>.
+     to <command>pg_initdb</command>.
     </para>
 
     <para>

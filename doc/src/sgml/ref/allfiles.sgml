@@ -191,7 +191,6 @@ Complete list of usable sgml source files in this directory.
 
 <!-- applications and utilities -->
 <!ENTITY ecpgRef            SYSTEM "ecpg-ref.sgml">
-<!ENTITY initdb             SYSTEM "initdb.sgml">
 <!ENTITY pgamcheck          SYSTEM "pg_amcheck.sgml">
 <!ENTITY pgarchivecleanup   SYSTEM "pgarchivecleanup.sgml">
 <!ENTITY pgBasebackup       SYSTEM "pg_basebackup.sgml">
@@ -209,6 +208,7 @@ Complete list of usable sgml source files in this directory.
 <!ENTITY pgDropuser         SYSTEM "pg_dropuser.sgml">
 <!ENTITY pgDump             SYSTEM "pg_dump.sgml">
 <!ENTITY pgDumpall          SYSTEM "pg_dumpall.sgml">
+<!ENTITY pgInitdb           SYSTEM "pg_initdb.sgml">
 <!ENTITY pgIsready          SYSTEM "pg_isready.sgml">
 <!ENTITY pgReceivewal       SYSTEM "pg_receivewal.sgml">
 <!ENTITY pgRecvlogical      SYSTEM "pg_recvlogical.sgml">

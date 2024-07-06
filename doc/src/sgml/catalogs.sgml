@@ -2481,7 +2481,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
    (<replaceable>schema</replaceable>.<replaceable>name</replaceable>) to identify a collation,
    even though this is not unique according to the catalog definition.
    The reason for defining the catalog this way is that
-   <application>initdb</application> fills it in at cluster initialization time with
+   <application>pg_initdb</application> fills it in at cluster initialization time with
    entries for all locales available on the system, so it must be able to
    hold entries for all encodings that might ever be used in the cluster.
   </para>
@@ -3622,7 +3622,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
   </para>
 
   <para>
-   Most objects created during <application>initdb</application> are
+   Most objects created during <application>pg_initdb</application> are
    considered <quote>pinned</quote>, which means that the system itself
    depends on them.  Therefore, they are never allowed to be dropped.
    Also, knowing that pinned objects will not be dropped, the dependency
@@ -4681,7 +4681,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
 
   <para>
    Objects can have initial privileges either by having those privileges set
-   when the system is initialized (by <application>initdb</application>) or when the
+   when the system is initialized (by <application>pg_initdb</application>) or when the
    object is created during a <link linkend="sql-createextension"><command>CREATE EXTENSION</command></link> and the
    extension script sets initial privileges using the <link linkend="sql-grant"><command>GRANT</command></link>
    system.  Note that the system will automatically handle recording of the
@@ -4689,12 +4689,12 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
    only use the <command>GRANT</command> and <command>REVOKE</command>
    statements in their script to have the privileges recorded.  The
    <literal>privtype</literal> column indicates if the initial privilege was
-   set by <application>initdb</application> or during a
+   set by <application>pg_initdb</application> or during a
    <command>CREATE EXTENSION</command> command.
   </para>
 
   <para>
-   Objects which have initial privileges set by <application>initdb</application> will
+   Objects which have initial privileges set by <application>pg_initdb</application> will
    have entries where <literal>privtype</literal> is
    <literal>'i'</literal>, while objects which have initial privileges set
    by <command>CREATE EXTENSION</command> will have entries where
@@ -7215,7 +7215,7 @@ SCRAM-SHA-256$<replaceable>&lt;iteration count&gt;</replaceable>:<replaceable>&l
 
   <para>
    As in the <structname>pg_depend</structname> catalog, most objects
-   created during <application>initdb</application> are
+   created during <application>pg_initdb</application> are
    considered <quote>pinned</quote>.  No entries are made
    in <structname>pg_shdepend</structname> that would have a pinned
    object as either referenced or dependent object.

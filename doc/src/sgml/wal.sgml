@@ -196,7 +196,7 @@
      <para>
       Data pages are not currently checksummed by default, though full page images
       recorded in WAL records will be protected; see <link
-      linkend="app-initdb-data-checksums"><application>initdb</application></link>
+      linkend="app-pginitdb-data-checksums"><application>pg_initdb</application></link>
       for details about enabling data checksums.
      </para>
     </listitem>
@@ -247,7 +247,7 @@
 
   <para>
    Checksums are normally enabled when the cluster is initialized using <link
-   linkend="app-initdb-data-checksums"><application>initdb</application></link>.
+   linkend="app-pginitdb-data-checksums"><application>pg_initdb</application></link>.
    They can also be enabled or disabled at a later time as an offline
    operation. Data checksums are enabled or disabled at the full cluster
    level, and cannot be specified individually for databases or tables.
@@ -877,7 +877,7 @@
    <acronym>WAL</acronym> files are stored in the directory
    <filename>pg_wal</filename> under the data directory, as a set of
    segment files, normally each 16 MB in size (but the size can be changed
-   by altering the <option>--wal-segsize</option> <application>initdb</application> option).  Each segment is
+   by altering the <option>--wal-segsize</option> <application>pg_initdb</application> option).  Each segment is
    divided into pages, normally 8 kB each (this size can be changed via the
    <option>--with-wal-blocksize</option> configure option).  The WAL record headers
    are described in <filename>access/xlogrecord.h</filename>; the record

@@ -156,11 +156,11 @@ PostgreSQL documentation
   </para>
 
   <para>
-   The <option>init</option> or <option>initdb</option> mode creates a new
+   The <option>init</option> or <option>pg_initdb</option> mode creates a new
    <productname>PostgreSQL</productname> database cluster, that is,
    a collection of databases that will be managed by a single
-   server instance.  This mode invokes the <command>initdb</command>
-   command.  See <xref linkend="app-initdb"/> for details.
+   server instance.  This mode invokes the <command>pg_initdb</command>
+   command.  See <xref linkend="app-pginitdb"/> for details.
   </para>
 
   <para>
@@ -342,7 +342,7 @@ PostgreSQL documentation
       <listitem>
        <para>
         Specifies options to be passed directly to the
-        <command>initdb</command> command.
+        <command>pg_initdb</command> command.
         <option>-o</option> can be specified multiple times, with all the given
         options being passed through.
        </para>
@@ -367,7 +367,7 @@ PostgreSQL documentation
 
        <para>
         In <literal>init</literal> mode, this option analogously
-        specifies the location of the <filename>initdb</filename>
+        specifies the location of the <filename>pg_initdb</filename>
         executable.
        </para>
       </listitem>
@@ -698,7 +698,7 @@ pg_ctl: server is running (PID: 13718)
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-initdb"/></member>
+   <member><xref linkend="app-pginitdb"/></member>
    <member><xref linkend="app-postgres"/></member>
   </simplelist>
  </refsect1>

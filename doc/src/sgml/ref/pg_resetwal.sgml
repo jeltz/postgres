@@ -54,7 +54,7 @@ PostgreSQL documentation
   <para>
    Some options, such as <option>--wal-segsize</option> (see below), can also
    be used to modify certain global settings of a database cluster without the
-   need to rerun <command>initdb</command>.  This can be done safely on an
+   need to rerun <command>pg_initdb</command>.  This can be done safely on an
    otherwise sound database cluster, if none of the dangerous modes mentioned
    below are used.
   </para>
@@ -75,7 +75,7 @@ PostgreSQL documentation
    corrupted control file, it should be possible to start the server,
    but bear in mind that the database might contain inconsistent data due to
    partially-committed transactions.  You should immediately dump your data,
-   run <command>initdb</command>, and restore.  After restore, check for
+   run <command>pg_initdb</command>, and restore.  After restore, check for
    inconsistencies and repair as needed.
   </para>
 
@@ -319,13 +319,13 @@ PostgreSQL documentation
      <para>
       Set the new WAL segment size, in megabytes.  The value must be set to a
       power of 2 between 1 and 1024 (megabytes).  See the same option of <xref
-      linkend="app-initdb"/> for more information.
+      linkend="app-pginitdb"/> for more information.
      </para>
 
      <para>
       This option can also be used to change the WAL segment size of an
       existing database cluster, avoiding the need to
-      re-<command>initdb</command>.
+      re-<command>pg_initdb</command>.
      </para>
 
      <note>

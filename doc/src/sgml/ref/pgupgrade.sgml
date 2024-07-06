@@ -351,8 +351,8 @@ make prefix=/usr/local/pgsql.new install
     <title>Initialize the new PostgreSQL cluster</title>
 
     <para>
-     Initialize the new cluster using <command>initdb</command>.
-     Again, use compatible <command>initdb</command>
+     Initialize the new cluster using <command>pg_initdb</command>.
+     Again, use compatible <command>pg_initdb</command>
      flags that match the old cluster. Many
      prebuilt installers do this step automatically. There is no need to
      start the new cluster.
@@ -675,7 +675,7 @@ pg_upgrade.exe
 
       <para>
        Make sure the new standby data directories do <emphasis>not</emphasis>
-       exist or are empty.  If <application>initdb</application> was run, delete
+       exist or are empty.  If <application>pg_initdb</application> was run, delete
        the standby servers' new data directories.
       </para>
      </step>
@@ -1122,7 +1122,7 @@ psql --username=postgres --file=script.sql postgres
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="app-initdb"/></member>
+   <member><xref linkend="app-pginitdb"/></member>
    <member><xref linkend="app-pg-ctl"/></member>
    <member><xref linkend="app-pgdump"/></member>
    <member><xref linkend="app-postgres"/></member>
