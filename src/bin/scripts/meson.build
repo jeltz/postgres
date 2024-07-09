@@ -17,6 +17,16 @@ binaries = [
   'pg_isready',
 ]
 
+legacy_links = [
+  'createdb',
+  'dropdb',
+  'createuser',
+  'dropuser',
+  'clusterdb',
+  'vacuumdb',
+  'reindexdb',
+]
+
 foreach binary : binaries
   binary_sources = files('@0@.c'.format(binary))
 
@@ -33,6 +43,13 @@ foreach binary : binaries
     kwargs: default_bin_args,
   )
   bin_targets += binary
+endforeach
+
+foreach link : legacy_links
+  install_symlink(link,
+    pointing_to: 'pg_' + link,
+    install_dir: dir_bin,
+  )
 endforeach
 
 tests += {
