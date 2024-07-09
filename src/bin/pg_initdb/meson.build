@@ -26,6 +26,11 @@ pg_initdb = executable('pg_initdb',
 )
 bin_targets += pg_initdb
 
+install_symlink('initdb',
+  pointing_to: 'pg_initdb',
+  install_dir: dir_bin,
+)
+
 tests += {
   'name': 'pg_initdb',
   'sd': meson.current_source_dir(),

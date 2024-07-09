@@ -47,6 +47,7 @@ localtime.c: % : $(top_srcdir)/src/timezone/%
 
 install: all installdirs
 	$(INSTALL_PROGRAM) pg_initdb$(X) '$(DESTDIR)$(bindir)/pg_initdb$(X)'
+	$(LN_S) pg_initdb$(X) '$(DESTDIR)$(bindir)/initdb$(X)'
 
 installdirs:
 	$(MKDIR_P) '$(DESTDIR)$(bindir)'
