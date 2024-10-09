@@ -14,10 +14,6 @@
 
 #include "mb/pg_wchar.h"
 
-#ifdef USE_ICU
-#include <unicode/ucol.h>
-#endif
-
 /*
  * Character properties for regular expressions.
  */
