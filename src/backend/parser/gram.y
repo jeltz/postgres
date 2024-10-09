@@ -432,7 +432,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 				old_aggr_definition old_aggr_list
 				oper_argtypes RuleActionList RuleActionMulti
 				opt_column_list columnList opt_name_list
-				sort_clause opt_sort_clause sortby_list index_params
+				sort_clause opt_sort_clause sortby_list opt_index_params index_params
 				stats_params
 				opt_include opt_c_include index_including_params
 				name_list role_list from_clause from_list opt_array_bounds
@@ -8125,7 +8125,7 @@ defacl_privilege_target:
  *****************************************************************************/
 
 IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_single_name
-			ON relation_expr access_method_clause '(' index_params ')'
+			ON relation_expr access_method_clause '(' opt_index_params ')'
 			opt_include opt_unique_null_treatment opt_reloptions OptTableSpace where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
@@ -8157,7 +8157,7 @@ IndexStmt:	CREATE opt_unique INDEX opt_concurrently opt_single_name
 					$$ = (Node *) n;
 				}
 			| CREATE opt_unique INDEX opt_concurrently IF_P NOT EXISTS name
-			ON relation_expr access_method_clause '(' index_params ')'
+			ON relation_expr access_method_clause '(' opt_index_params ')'
 			opt_include opt_unique_null_treatment opt_reloptions OptTableSpace where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
@@ -8198,6 +8198,11 @@ opt_unique:
 access_method_clause:
 			USING name								{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = DEFAULT_INDEX_TYPE; }
+		;
+
+opt_index_params:
+			index_params							{ $$ = $1; }
+			| /*EMPTY*/								{ $$ = NIL; }
 		;
 
 index_params:	index_elem							{ $$ = list_make1($1); }

@@ -767,7 +767,6 @@ makeIndexInfo(int numattrs, int numkeyattrs, Oid amoid, List *expressions,
 
 	n->ii_NumIndexAttrs = numattrs;
 	n->ii_NumIndexKeyAttrs = numkeyattrs;
-	Assert(n->ii_NumIndexKeyAttrs != 0);
 	Assert(n->ii_NumIndexKeyAttrs <= n->ii_NumIndexAttrs);
 	n->ii_Unique = unique;
 	n->ii_NullsNotDistinct = nulls_not_distinct;

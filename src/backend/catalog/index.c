@@ -784,12 +784,6 @@ index_create(Relation heapRelation,
 	mapped_relation = RelationIsMapped(heapRelation);
 	relpersistence = heapRelation->rd_rel->relpersistence;
 
-	/*
-	 * check parameters
-	 */
-	if (indexInfo->ii_NumIndexAttrs < 1)
-		elog(ERROR, "must index at least one column");
-
 	if (!allow_system_table_mods &&
 		IsSystemRelation(heapRelation) &&
 		IsNormalProcessingMode())
@@ -2436,7 +2430,7 @@ BuildIndexInfo(Relation index)
 
 	/* check the number of keys, and copy attr numbers into the IndexInfo */
 	numAtts = indexStruct->indnatts;
-	if (numAtts < 1 || numAtts > INDEX_MAX_KEYS)
+	if (numAtts < 0 || numAtts > INDEX_MAX_KEYS)
 		elog(ERROR, "invalid indnatts %d for index %u",
 			 numAtts, RelationGetRelid(index));
 
@@ -2496,7 +2490,7 @@ BuildDummyIndexInfo(Relation index)
 
 	/* check the number of keys, and copy attr numbers into the IndexInfo */
 	numAtts = indexStruct->indnatts;
-	if (numAtts < 1 || numAtts > INDEX_MAX_KEYS)
+	if (numAtts < 0 || numAtts > INDEX_MAX_KEYS)
 		elog(ERROR, "invalid indnatts %d for index %u",
 			 numAtts, RelationGetRelid(index));
 

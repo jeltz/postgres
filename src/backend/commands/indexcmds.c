@@ -648,10 +648,6 @@ DefineIndex(Oid tableId,
 									  stmt->indexIncludingParams);
 	numberOfAttributes = list_length(allIndexParams);
 
-	if (numberOfKeyAttributes <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("must specify at least one column")));
 	if (numberOfAttributes > INDEX_MAX_KEYS)
 		ereport(ERROR,
 				(errcode(ERRCODE_TOO_MANY_COLUMNS),
