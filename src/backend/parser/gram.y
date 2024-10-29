@@ -677,6 +677,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %token <ival>	ICONST PARAM
 %token			TYPECAST DOT_DOT COLON_EQUALS EQUALS_GREATER
 %token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS
+%token			LEFT_ARROW_LESS LEFT_ARROW_MINUS RIGHT_ARROW
 
 /*
  * If you want to make any keyword changes, update the keyword table in
@@ -817,7 +818,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %left		AND
 %right		NOT
 %nonassoc	IS ISNULL NOTNULL	/* IS sets precedence for IS NULL, etc */
-%nonassoc	'<' '>' '=' LESS_EQUALS GREATER_EQUALS NOT_EQUALS
+%nonassoc	'<' LEFT_ARROW_LESS '>' '=' LESS_EQUALS GREATER_EQUALS NOT_EQUALS
 %nonassoc	BETWEEN IN_P LIKE ILIKE SIMILAR NOT_LA
 %nonassoc	ESCAPE			/* ESCAPE must be just above LIKE/ILIKE/SIMILAR */
 
@@ -870,8 +871,8 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %nonassoc	UNBOUNDED NESTED /* ideally would have same precedence as IDENT */
 %nonassoc	IDENT PARTITION RANGE ROWS GROUPS PRECEDING FOLLOWING CUBE ROLLUP
 			SET KEYS OBJECT_P SCALAR VALUE_P WITH WITHOUT PATH
-%left		Op OPERATOR		/* multi-character ops and user-defined operators */
-%left		'+' '-'
+%left		Op OPERATOR RIGHT_ARROW	/* multi-character ops and user-defined operators */
+%left		'+' '-' LEFT_ARROW_MINUS
 %left		'*' '/' '%'
 %left		'^'
 /* Unary Operators */
@@ -14842,6 +14843,8 @@ a_expr:		c_expr									{ $$ = $1; }
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "+", NULL, $2, @1); }
 			| '-' a_expr					%prec UMINUS
 				{ $$ = doNegate($2, @1); }
+			| LEFT_ARROW_MINUS a_expr		%prec UMINUS
+				{ $$ = doNegate($2, @1); }
 			| a_expr '+' a_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "+", $1, $3, @2); }
 			| a_expr '-' a_expr
@@ -14856,6 +14859,8 @@ a_expr:		c_expr									{ $$ = $1; }
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "^", $1, $3, @2); }
 			| a_expr '<' a_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<", $1, $3, @2); }
+			| a_expr LEFT_ARROW_LESS a_expr
+				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<", $1, $3, @2); }
 			| a_expr '>' a_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">", $1, $3, @2); }
 			| a_expr '=' a_expr
@@ -14866,6 +14871,8 @@ a_expr:		c_expr									{ $$ = $1; }
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">=", $1, $3, @2); }
 			| a_expr NOT_EQUALS a_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<>", $1, $3, @2); }
+			| a_expr RIGHT_ARROW a_expr
+				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "->", $1, $3, @2); }
 
 			| a_expr qual_Op a_expr				%prec Op
 				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $2, $1, $3, @2); }
@@ -15335,6 +15342,8 @@ b_expr:		c_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "^", $1, $3, @2); }
 			| b_expr '<' b_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<", $1, $3, @2); }
+			| b_expr LEFT_ARROW_LESS b_expr
+				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<", $1, $3, @2); }
 			| b_expr '>' b_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">", $1, $3, @2); }
 			| b_expr '=' b_expr
@@ -15345,6 +15354,8 @@ b_expr:		c_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, ">=", $1, $3, @2); }
 			| b_expr NOT_EQUALS b_expr
 				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "<>", $1, $3, @2); }
+			| b_expr RIGHT_ARROW b_expr
+				{ $$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "->", $1, $3, @2); }
 			| b_expr qual_Op b_expr				%prec Op
 				{ $$ = (Node *) makeA_Expr(AEXPR_OP, $2, $1, $3, @2); }
 			| qual_Op b_expr					%prec Op
@@ -16503,16 +16514,19 @@ all_Op:		Op										{ $$ = $1; }
 
 MathOp:		 '+'									{ $$ = "+"; }
 			| '-'									{ $$ = "-"; }
+			| LEFT_ARROW_MINUS						{ $$ = "-"; }
 			| '*'									{ $$ = "*"; }
 			| '/'									{ $$ = "/"; }
 			| '%'									{ $$ = "%"; }
 			| '^'									{ $$ = "^"; }
 			| '<'									{ $$ = "<"; }
+			| LEFT_ARROW_LESS						{ $$ = "<"; }
 			| '>'									{ $$ = ">"; }
 			| '='									{ $$ = "="; }
 			| LESS_EQUALS							{ $$ = "<="; }
 			| GREATER_EQUALS						{ $$ = ">="; }
 			| NOT_EQUALS							{ $$ = "<>"; }
+			| RIGHT_ARROW							{ $$ = "->"; }
 		;
 
 qual_Op:	Op
