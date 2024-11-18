@@ -2867,6 +2867,9 @@ ExecOnConflictSelect(ModifyTableContext *context,
 		return true;			/* done with the tuple */
 	}
 
+	/* Project the new tuple version */
+	ExecProject(resultRelInfo->ri_onConflict->oc_ProjInfo);
+
 	/* Parse analysis should already have disallowed this */
 	Assert(resultRelInfo->ri_projectReturning);
 
@@ -4786,10 +4789,15 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	else if (node->onConflictAction == ONCONFLICT_SELECT)
 	{
 		OnConflictSetState *onconfl = makeNode(OnConflictSetState);
+		ExprContext *econtext;
+		TupleDesc	relationDesc;
 
 		/* already exists if created by RETURNING processing above */
 		if (mtstate->ps.ps_ExprContext == NULL)
 			ExecAssignExprContext(estate, &mtstate->ps);
+
+		econtext = mtstate->ps.ps_ExprContext;
+		relationDesc = resultRelInfo->ri_RelationDesc->rd_att;
 
 		/* create state for DO SELECT operation */
 		resultRelInfo->ri_onConflict = onconfl;
@@ -4798,6 +4806,26 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		onconfl->oc_Existing =
 			table_slot_create(resultRelInfo->ri_RelationDesc,
 							  &mtstate->ps.state->es_tupleTable);
+
+		/*
+		 * Create the tuple slot for the SELECT projection. We want a slot of
+		 * the table's type here, because the slot will be used to insert into
+		 * the table, and for RETURNING processing - which may access system
+		 * attributes.
+		 */
+		onconfl->oc_ProjSlot =
+			table_slot_create(resultRelInfo->ri_RelationDesc,
+							  &mtstate->ps.state->es_tupleTable);
+
+		/* build SELECT projection state */
+		onconfl->oc_ProjInfo =
+			ExecBuildUpdateProjection(node->onConflictSet,
+									  true,
+									  node->onConflictCols,
+									  relationDesc,
+									  econtext,
+									  onconfl->oc_ProjSlot,
+									  &mtstate->ps);
 
 		/* initialize state to evaluate the WHERE clause, if any */
 		if (node->onConflictWhere)
