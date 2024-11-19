@@ -2866,6 +2866,9 @@ ExecOnConflictSelect(ModifyTableContext *context,
 	/* Project the new tuple version */
 	ExecProject(resultRelInfo->ri_onConflict->oc_ProjInfo);
 
+	/* Parse analysis should already have disallowed this */
+	Assert(resultRelInfo->ri_projectReturning);
+
 	*returning = ExecProcessReturning(resultRelInfo, existing, planSlot);
 
 	/*
