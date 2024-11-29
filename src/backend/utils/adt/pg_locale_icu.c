@@ -60,6 +60,7 @@ extern size_t strnxfrm_icu(char *dest, size_t destsize,
 extern size_t strnxfrm_prefix_icu(char *dest, size_t destsize,
 								  const char *src, ssize_t srclen,
 								  pg_locale_t locale);
+extern char *get_collation_actual_version_icu(const char *collcollate);
 
 /*
  * Converter object for converting between ICU's UChar strings and C strings
@@ -443,6 +444,22 @@ strnxfrm_prefix_icu(char *dest, size_t destsize,
 											 locale);
 
 	return result;
+}
+
+char *
+get_collation_actual_version_icu(const char *collcollate)
+{
+	UCollator  *collator;
+	UVersionInfo versioninfo;
+	char		buf[U_MAX_VERSION_STRING_LENGTH];
+
+	collator = pg_ucol_open(collcollate);
+
+	ucol_getVersion(collator, versioninfo);
+	ucol_close(collator);
+
+	u_versionToString(versioninfo, buf);
+	return pstrdup(buf);
 }
 
 /*
