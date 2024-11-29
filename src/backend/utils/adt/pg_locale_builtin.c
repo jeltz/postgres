@@ -25,13 +25,6 @@
 extern pg_locale_t create_pg_locale_builtin(Oid collid,
 											MemoryContext context);
 extern char *get_collation_actual_version_builtin(const char *collcollate);
-extern size_t strlower_builtin(char *dst, size_t dstsize, const char *src,
-							   ssize_t srclen, pg_locale_t locale);
-extern size_t strtitle_builtin(char *dst, size_t dstsize, const char *src,
-							   ssize_t srclen, pg_locale_t locale);
-extern size_t strupper_builtin(char *dst, size_t dstsize, const char *src,
-							   ssize_t srclen, pg_locale_t locale);
-
 
 struct WordBoundaryState
 {
@@ -74,14 +67,14 @@ initcap_wbnext(void *state)
 	return wbstate->len;
 }
 
-size_t
+static size_t
 strlower_builtin(char *dest, size_t destsize, const char *src, ssize_t srclen,
 				 pg_locale_t locale)
 {
 	return unicode_strlower(dest, destsize, src, srclen);
 }
 
-size_t
+static size_t
 strtitle_builtin(char *dest, size_t destsize, const char *src, ssize_t srclen,
 				 pg_locale_t locale)
 {
@@ -97,12 +90,66 @@ strtitle_builtin(char *dest, size_t destsize, const char *src, ssize_t srclen,
 							initcap_wbnext, &wbstate);
 }
 
-size_t
+static size_t
 strupper_builtin(char *dest, size_t destsize, const char *src, ssize_t srclen,
 				 pg_locale_t locale)
 {
 	return unicode_strupper(dest, destsize, src, srclen);
 }
+
+static int
+char_properties_builtin(pg_wchar wc, int mask, pg_locale_t locale)
+{
+	int			result = 0;
+
+	if ((mask & PG_ISDIGIT) && pg_u_isdigit(wc, true))
+		result |= PG_ISDIGIT;
+	if ((mask & PG_ISALPHA) && pg_u_isalpha(wc))
+		result |= PG_ISALPHA;
+	if ((mask & PG_ISUPPER) && pg_u_isupper(wc))
+		result |= PG_ISUPPER;
+	if ((mask & PG_ISLOWER) && pg_u_islower(wc))
+		result |= PG_ISLOWER;
+	if ((mask & PG_ISGRAPH) && pg_u_isgraph(wc))
+		result |= PG_ISGRAPH;
+	if ((mask & PG_ISPRINT) && pg_u_isprint(wc))
+		result |= PG_ISPRINT;
+	if ((mask & PG_ISPUNCT) && pg_u_ispunct(wc, true))
+		result |= PG_ISPUNCT;
+	if ((mask & PG_ISSPACE) && pg_u_isspace(wc))
+		result |= PG_ISSPACE;
+
+	return result;
+}
+
+static bool
+char_is_cased_builtin(char ch, pg_locale_t locale)
+{
+	return IS_HIGHBIT_SET(ch) ||
+		(ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+}
+
+static pg_wchar
+wc_toupper_builtin(pg_wchar wc, pg_locale_t locale)
+{
+	return unicode_uppercase_simple(wc);
+}
+
+static pg_wchar
+wc_tolower_builtin(pg_wchar wc, pg_locale_t locale)
+{
+	return unicode_lowercase_simple(wc);
+}
+
+static const struct ctype_methods ctype_methods_builtin = {
+	.strlower = strlower_builtin,
+	.strtitle = strtitle_builtin,
+	.strupper = strupper_builtin,
+	.char_properties = char_properties_builtin,
+	.char_is_cased = char_is_cased_builtin,
+	.wc_tolower = wc_tolower_builtin,
+	.wc_toupper = wc_toupper_builtin,
+};
 
 pg_locale_t
 create_pg_locale_builtin(Oid collid, MemoryContext context)
@@ -146,6 +193,8 @@ create_pg_locale_builtin(Oid collid, MemoryContext context)
 	result->deterministic = true;
 	result->collate_is_c = true;
 	result->ctype_is_c = (strcmp(locstr, "C") == 0);
+	if (!result->ctype_is_c)
+		result->ctype = &ctype_methods_builtin;
 
 	return result;
 }
