@@ -1716,7 +1716,7 @@ icu_language_tag(const char *loc_str, int elevel)
  * Perform best-effort check that the locale is a valid one.
  */
 void
-icu_validate_locale(const char *loc_str)
+icu_validate_locale(int encoding, const char *loc_str)
 {
 #ifdef USE_ICU
 	UCollator  *collator;
@@ -1724,6 +1724,17 @@ icu_validate_locale(const char *loc_str)
 	char		lang[ULOC_LANG_CAPACITY];
 	bool		found = false;
 	int			elevel = icu_validation_level;
+
+	/*
+	 * Only allow locales to be created when the encoding is supported.
+	 * Otherwise the collation is useless, plus we get surprising behaviors
+	 * like not being able to drop the collation.
+	 */
+	if (!(is_encoding_supported_by_icu(encoding)))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("encoding \"%s\" is not supported with ICU provider",
+						pg_encoding_to_char(encoding))));
 
 	/* no validation */
 	if (elevel < 0)

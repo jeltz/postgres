@@ -108,7 +108,7 @@ extern size_t pg_strnxfrm_prefix(char *dest, size_t destsize, const char *src,
 
 extern int	builtin_locale_encoding(const char *locale);
 extern const char *builtin_validate_locale(int encoding, const char *locale);
-extern void icu_validate_locale(const char *loc_str);
+extern void icu_validate_locale(int encoding, const char *loc_str);
 extern char *icu_language_tag(const char *loc_str, int elevel);
 
 #ifdef USE_ICU
