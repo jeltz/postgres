@@ -93,6 +93,7 @@ extern void init_database_collation(void);
 extern pg_locale_t pg_newlocale_from_collation(Oid collid);
 
 extern char *get_collation_actual_version(char collprovider, const char *collcollate);
+extern bool is_encoding_supported_by_collprovider(char collprovider, int encoding);
 extern size_t pg_strlower(char *dest, size_t destsize,
 						  const char *src, ssize_t srclen,
 						  pg_locale_t locale);

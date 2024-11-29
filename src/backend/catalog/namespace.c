@@ -57,6 +57,7 @@
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
+#include "utils/pg_locale.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
 #include "utils/varlena.h"
@@ -2346,17 +2347,10 @@ lookup_collation(const char *collname, Oid collnamespace, int32 encoding)
 	if (!HeapTupleIsValid(colltup))
 		return InvalidOid;
 	collform = (Form_pg_collation) GETSTRUCT(colltup);
-	if (collform->collprovider == COLLPROVIDER_ICU)
-	{
-		if (is_encoding_supported_by_icu(encoding))
-			collid = collform->oid;
-		else
-			collid = InvalidOid;
-	}
-	else
-	{
+	if (is_encoding_supported_by_collprovider(collform->collprovider, encoding))
 		collid = collform->oid;
-	}
+	else
+		collid = InvalidOid;
 	ReleaseSysCache(colltup);
 	return collid;
 }
