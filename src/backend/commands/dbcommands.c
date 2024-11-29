@@ -1116,12 +1116,6 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	}
 	else if (dblocprovider == COLLPROVIDER_ICU)
 	{
-		if (!(is_encoding_supported_by_icu(encoding)))
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("encoding \"%s\" is not supported with ICU provider",
-							pg_encoding_to_char(encoding))));
-
 		/*
 		 * This would happen if template0 uses the libc provider but the new
 		 * database uses icu.
@@ -1151,7 +1145,7 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 			}
 		}
 
-		icu_validate_locale(dblocale);
+		icu_validate_locale(encoding, dblocale);
 	}
 
 	/* for libc, locale comes from datcollate and datctype */

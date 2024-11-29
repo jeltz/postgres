@@ -59,7 +59,7 @@ if ($ENV{with_icu} eq 'yes')
 	$node->command_fails_like(
 		[
 			'createdb', '-T',
-			'template0', '--locale-provider=icu',
+			'template0', '--locale-provider=icu', '--icu-locale=en',
 			'--encoding=SQL_ASCII', 'foobarX'
 		],
 		qr/ERROR:  encoding "SQL_ASCII" is not supported with ICU provider/,
