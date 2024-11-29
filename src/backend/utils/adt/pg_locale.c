@@ -1381,6 +1381,15 @@ get_collation_actual_version(char collprovider, const char *collcollate)
 	return collversion;
 }
 
+bool
+is_encoding_supported_by_collprovider(char collprovider, int encoding)
+{
+	if (collprovider == COLLPROVIDER_ICU)
+		return is_encoding_supported_by_icu(encoding);
+	else
+		return true;
+}
+
 /*
  * pg_strcoll
  *
