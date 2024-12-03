@@ -153,7 +153,6 @@ static bool ExecOnConflictUpdate(ModifyTableContext *context,
 static bool ExecOnConflictSelect(ModifyTableContext *context,
 								 ResultRelInfo *resultRelInfo,
 								 ItemPointer conflictTid,
-								 TupleTableSlot *planSlot,
 								 bool canSetTag,
 								 TupleTableSlot **returning);
 static TupleTableSlot *ExecPrepareTupleRouting(ModifyTableState *mtstate,
@@ -1090,7 +1089,7 @@ ExecInsert(ModifyTableContext *context,
 					TupleTableSlot *returning = NULL;
 
 					if (ExecOnConflictSelect(context, resultRelInfo,
-											 &conflictTid, slot, canSetTag,
+											 &conflictTid, canSetTag,
 											 &returning))
 					{
 						InstrCountTuples2(&mtstate->ps, 1);
@@ -2797,9 +2796,8 @@ static bool
 ExecOnConflictSelect(ModifyTableContext *context,
 					 ResultRelInfo *resultRelInfo,
 					 ItemPointer conflictTid,
-					 TupleTableSlot *planSlot,
 					 bool canSetTag,
-					 TupleTableSlot **returning)
+					 TupleTableSlot **rslot)
 {
 	ModifyTableState *mtstate = context->mtstate;
 	ExprContext *econtext = mtstate->ps.ps_ExprContext;
@@ -2872,10 +2870,16 @@ ExecOnConflictSelect(ModifyTableContext *context,
 	/* Parse analysis should already have disallowed this */
 	Assert(resultRelInfo->ri_projectReturning);
 
-	*returning = ExecProcessReturning(resultRelInfo, existing, planSlot);
+	*rslot = ExecProcessReturning(resultRelInfo, existing, context->planSlot);
 
 	if (canSetTag)
 		context->estate->es_processed++;
+
+	/*
+	 * Before releasing the existing tuple, make sure rslot has a local copy
+	 * of any pass-by-reference values.
+	 */
+	ExecMaterializeSlot(*rslot);
 
 	/*
 	 * Clear out existing tuple, as there might not be another conflict among
