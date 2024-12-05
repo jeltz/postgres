@@ -2867,6 +2867,28 @@ ExecOnConflictSelect(ModifyTableContext *context,
 		return true;			/* done with the tuple */
 	}
 
+	if (resultRelInfo->ri_WithCheckOptions != NIL)
+	{
+		/*
+		 * Check target's existing tuple against UPDATE-applicable USING
+		 * security barrier quals (if any), enforced here as RLS checks/WCOs.
+		 *
+		 * The rewriter creates UPDATE RLS checks/WCOs for UPDATE security
+		 * quals, and stores them as WCOs of "kind" WCO_RLS_CONFLICT_CHECK,
+		 * but that's almost the extent of its special handling for ON
+		 * CONFLICT DO UPDATE.
+		 *
+		 * The rewriter will also have associated UPDATE applicable straight
+		 * RLS checks/WCOs for the benefit of the ExecUpdate() call that
+		 * follows.  INSERTs and UPDATEs naturally have mutually exclusive WCO
+		 * kinds, so there is no danger of spurious over-enforcement in the
+		 * INSERT or UPDATE path.
+		 */
+		ExecWithCheckOptions(WCO_RLS_CONFLICT_CHECK, resultRelInfo,
+							 existing,
+							 mtstate->ps.state);
+	}
+
 	/* Parse analysis should already have disallowed this */
 	Assert(resultRelInfo->ri_projectReturning);
 
