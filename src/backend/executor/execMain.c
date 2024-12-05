@@ -2156,15 +2156,16 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 					break;
 				case WCO_RLS_INSERT_CHECK:
 				case WCO_RLS_UPDATE_CHECK:
+				case WCO_RLS_CONFLICT_CHECK:
 					if (wco->polname != NULL)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy \"%s\" for table \"%s\"",
+								 errmsg("new row violates row-level security policy \"%s\" (USING expression) for table \"%s\"",
 										wco->polname, wco->relname)));
 					else
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy for table \"%s\"",
+								 errmsg("new row violates row-level security policy (USING expression) for table \"%s\"",
 										wco->relname)));
 					break;
 				case WCO_RLS_MERGE_UPDATE_CHECK:
@@ -2178,18 +2179,6 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 								 errmsg("target row violates row-level security policy (USING expression) for table \"%s\"",
-										wco->relname)));
-					break;
-				case WCO_RLS_CONFLICT_CHECK:
-					if (wco->polname != NULL)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy \"%s\" (USING expression) for table \"%s\"",
-										wco->polname, wco->relname)));
-					else
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("new row violates row-level security policy (USING expression) for table \"%s\"",
 										wco->relname)));
 					break;
 				default:
