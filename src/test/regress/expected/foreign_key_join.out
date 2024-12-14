@@ -493,7 +493,10 @@ CREATE TABLE t6
 (
     c13 int not null,
     c14 int not null,
-    CONSTRAINT t6_c13_c14_fkey FOREIGN KEY (c13, c14) REFERENCES t5 (c9, c10)
+    c29 int,
+    c30 int,
+    CONSTRAINT t6_c13_c14_fkey FOREIGN KEY (c13, c14) REFERENCES t5 (c9, c10),
+    CONSTRAINT t6_c29_c30_fkey FOREIGN KEY (c29, c30) REFERENCES t5 (c9, c10)
 );
 INSERT INTO t6 (c13, c14) VALUES (1, 2);
 INSERT INTO t6 (c13, c14) VALUES (3, 4);
@@ -1304,3 +1307,121 @@ JOIN
 ERROR:  there is no foreign key constraint on table "t17" (b_id, b_id2) referencing table "t16" (id2, id)
 LINE 5:     t16 JOIN t17 KEY (b_id, b_id2) -> t16 (id2, id)
                          ^
+--
+-- Test foreign key joins where the referenced columns are unique due to matching GROUP BY
+--
+WITH q AS
+(
+    SELECT
+        t5.c9,
+        t5.c10,
+        COUNT(*)
+    FROM t5
+    JOIN t6 KEY (c13, c14) -> t5 (c9, c10)
+    GROUP BY t5.c9, t5.c10
+)
+SELECT
+    t7.c15,
+    t7.c16
+FROM t7
+JOIN q KEY (c9, c10) <- t7 (c15, c16);
+ c15 | c16 
+-----+-----
+   1 |   2
+   1 |   2
+   3 |   4
+(3 rows)
+
+--
+-- Test swapping group by columns columns.
+--
+WITH q AS
+(
+    SELECT
+        t5.c10,
+        t5.c9,
+        COUNT(*)
+    FROM t5
+    JOIN t6 KEY (c13, c14) -> t5 (c9, c10)
+    GROUP BY t5.c10, t5.c9
+)
+SELECT
+    t7.c15,
+    t7.c16
+FROM t7
+JOIN q KEY (c9, c10) <- t7 (c15, c16);
+ c15 | c16 
+-----+-----
+   1 |   2
+   1 |   2
+   3 |   4
+(3 rows)
+
+--
+-- The query below should fail, which it does, since it is filtering the referenced side.
+--
+WITH q AS
+(
+    SELECT
+        t5.c9,
+        t5.c10,
+        COUNT(*)
+    FROM t5
+    JOIN t6 KEY (c13, c14) -> t5 (c9, c10)
+    GROUP BY t5.c9, t5.c10
+    HAVING COUNT(*) > 1
+)
+SELECT
+    t7.c15,
+    t7.c16
+FROM t7
+JOIN q KEY (c9, c10) <- t7 (c15, c16);
+ERROR:  foreign key joins not supported for these relations
+LINE 16: JOIN q KEY (c9, c10) <- t7 (c15, c16);
+                ^
+--
+-- The query below should fail, which it does, since it is filtering the referenced side.
+--
+WITH q AS
+(
+    SELECT
+        t5.c9,
+        t5.c10,
+        COUNT(*)
+    FROM t5
+    JOIN t6 KEY (c13, c14) -> t5 (c9, c10)
+    WHERE t5.c9 = 1
+    GROUP BY t5.c9, t5.c10
+)
+SELECT
+    t7.c15,
+    t7.c16
+FROM t7
+JOIN q KEY (c9, c10) <- t7 (c15, c16);
+ERROR:  cannot use filtered query as referenced table in foreign key join
+LINE 16: JOIN q KEY (c9, c10) <- t7 (c15, c16);
+                ^
+DETAIL:  Using a filtered query as the referenced table would violate referential integrity.
+--
+-- The query below should fail, since the referencing columns are nullable,
+-- which can cause filtering of the referenced side.
+--
+WITH q AS
+(
+    SELECT
+        t5.c9,
+        t5.c10,
+        COUNT(*)
+    FROM t5
+    JOIN t6 KEY (c29, c30) -> t5 (c9, c10)
+    GROUP BY t5.c9, t5.c10
+)
+SELECT
+    t7.c15,
+    t7.c16
+FROM t7
+JOIN q KEY (c9, c10) <- t7 (c15, c16);
+ERROR:  virtual foreign key constraint violation
+LINE 15: JOIN q KEY (c9, c10) <- t7 (c15, c16);
+                ^
+DETAIL:  Nullable columns in derived table's referencing relation violate referential integrity

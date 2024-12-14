@@ -32,6 +32,7 @@
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
+#include "optimizer/optimizer.h"
 
 static Node *build_fk_join_on_clause(ParseState *pstate, List *referencingVars,
 									 List *referencedVars);
@@ -40,15 +41,18 @@ static Oid	find_foreign_key(Oid referencing_relid, Oid referenced_relid,
 static char *column_list_to_string(const List *columns);
 static Oid	drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 								   List **colnames_out, List *colnames,
-								   bool is_referenced, int location);
+								   bool is_referenced, int location,
+								   Query *current_query);
 static Oid	validate_and_resolve_derived_rel(ParseState *pstate, Query *query,
 											 RangeTblEntry *rte,
 											 List *colnames,
 											 List **colnames_out,
-											 bool is_referenced, int location);
+											 bool is_referenced, int location,
+											 Query *current_query);
 static void validate_derived_rel_joins(ParseState *pstate, Query *query,
 									   JoinExpr *join, RangeTblEntry *trunk_rte,
-									   int location);
+									   int location, bool group_by_provides_uniqueness);
+static bool grouping_matches_columns(Query *query, List *expected_colnames);
 
 void
 transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
@@ -126,13 +130,14 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 	referencing_relid = drill_down_to_base_rel(pstate, referencing_rte,
 											   &referencing_base_cols,
 											   referencing_cols, false,
-											   fkjn->location);
+											   fkjn->location,
+											   NULL);
+
 	referenced_relid = drill_down_to_base_rel(pstate, referenced_rte,
 											  &referenced_base_cols,
 											  referenced_cols, true,
-											  fkjn->location);
-
-	Assert(referencing_relid != InvalidOid && referenced_relid != InvalidOid);
+											  fkjn->location,
+											  NULL);
 
 	fkoid = find_foreign_key(referencing_relid, referenced_relid,
 							 referencing_base_cols, referenced_base_cols);
@@ -358,9 +363,10 @@ column_list_to_string(const List *columns)
 static Oid
 drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 					   List **colnames_out, List *colnames,
-					   bool is_referenced, int location)
+					   bool is_referenced, int location,
+					   Query *current_query)
 {
-	Oid			base_relid;
+	Oid			base_relid = InvalidOid;
 	Query	   *query = NULL;
 
 	switch (rte->rtekind)
@@ -423,9 +429,9 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 		case RTE_JOIN:
 			{
 				ListCell   *lc_col;
-				Node	   *aliasnode;
 				RangeTblEntry *childrte = NULL;
 				List	   *child_colnames = NIL;
+				List	   *rtable = current_query ? current_query->rtable : pstate->p_rtable;
 
 				/*
 				 * For each requested column, find its position in the join
@@ -440,8 +446,11 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 					int			colpos = 0;
 					bool		found = false;
 					ListCell   *lc_alias;
+					Node	   *aliasnode;
 					Var		   *aliasvar;
 					RangeTblEntry *aliasrte;
+
+					lc_alias = list_head(rte->eref->colnames);
 
 					/*
 					 * Locate the requested column in the join's output
@@ -474,7 +483,7 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 
 					aliasvar = castNode(Var, aliasnode);
 
-					aliasrte = rt_fetch(aliasvar->varno, pstate->p_rtable);
+					aliasrte = rt_fetch(aliasvar->varno, rtable);
 
 					/* Check that all columns map to the same rte */
 					if (childrte == NULL)
@@ -485,7 +494,7 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 								 errmsg("key columns must all come from the same table"),
 								 parser_errposition(pstate, location)));
 
-					child_colnames = lappend(child_colnames, makeString(get_rte_attribute_name(childrte, aliasvar->varattno)));
+					child_colnames = lappend(child_colnames, makeString(get_rte_attribute_name(aliasrte, aliasvar->varattno)));
 				}
 
 				base_relid = drill_down_to_base_rel(pstate,
@@ -493,8 +502,96 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 													colnames_out,
 													child_colnames,
 													is_referenced,
-													location);
+													location,
+													current_query);
+				return base_relid;
+			}
 
+		case RTE_GROUP:
+			{
+				ListCell   *lc_col;
+				RangeTblEntry *childrte = NULL;
+				List	   *child_colnames = NIL;
+				List	   *rtable;
+
+				if (!rte->groupexprs || list_length(rte->groupexprs) == 0)
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("RTE_GROUP with no grouping expressions is not supported"),
+							 parser_errposition(pstate, location)));
+
+				if (current_query == NULL)
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("RTE_GROUP encountered without a current_query context"),
+							 parser_errposition(pstate, location)));
+
+				rtable = current_query->rtable;
+
+				foreach(lc_col, colnames)
+				{
+					char	   *colname = strVal(lfirst(lc_col));
+					int			colpos = 0;
+					bool		found = false;
+					ListCell   *lc_alias;
+					Node	   *gexpr;
+					Var		   *gvar;
+					RangeTblEntry *aliasrte;
+					char	   *base_colname;
+
+					lc_alias = list_head(rte->eref->colnames);
+
+					foreach(lc_alias, rte->eref->colnames)
+					{
+						char	   *aliasname = strVal(lfirst(lc_alias));
+
+						if (strcmp(aliasname, colname) == 0)
+						{
+							found = true;
+							break;
+						}
+						colpos++;
+					}
+
+					if (!found)
+						ereport(ERROR,
+								(errcode(ERRCODE_UNDEFINED_COLUMN),
+								 errmsg("column reference \"%s\" not found in grouped relation", colname),
+								 parser_errposition(pstate, location)));
+
+					if (colpos >= list_length(rte->groupexprs))
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("column position mismatch in RTE_GROUP"),
+								 parser_errposition(pstate, location)));
+
+					gexpr = list_nth(rte->groupexprs, colpos);
+
+					if (!IsA(gexpr, Var))
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("grouping expression is not a simple column reference"),
+								 parser_errposition(pstate, location)));
+
+					gvar = (Var *) gexpr;
+					aliasrte = rt_fetch(gvar->varno, rtable);
+
+					if (childrte == NULL)
+						childrte = aliasrte;
+					else if (childrte != aliasrte)
+						ereport(ERROR,
+								(errcode(ERRCODE_UNDEFINED_TABLE),
+								 errmsg("key columns must all come from the same table in grouped relation"),
+								 parser_errposition(pstate, location)));
+
+					base_colname = get_rte_attribute_name(aliasrte, gvar->varattno);
+					child_colnames = lappend(child_colnames, makeString(base_colname));
+				}
+
+				base_relid = drill_down_to_base_rel(pstate, childrte,
+													colnames_out, child_colnames,
+													is_referenced, location,
+													current_query);
 				return base_relid;
 			}
 			break;
@@ -507,12 +604,10 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 	}
 
 	if (query)
-		base_relid = validate_and_resolve_derived_rel(pstate, query,
-													  rte,
-													  colnames,
+		base_relid = validate_and_resolve_derived_rel(pstate, query, rte, colnames,
 													  colnames_out,
-													  is_referenced,
-													  location);
+													  is_referenced, location,
+													  query);
 
 	return base_relid;
 }
@@ -524,22 +619,26 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 static Oid
 validate_and_resolve_derived_rel(ParseState *pstate, Query *query, RangeTblEntry *rte,
 								 List *colnames, List **colnames_out,
-								 bool is_referenced, int location)
+								 bool is_referenced, int location,
+								 Query *current_query)
 {
 	RangeTblEntry *trunk_rte = NULL;
 	List	   *base_colnames = NIL;
 	Index		first_varno = InvalidOid;
 	ListCell   *lc_colname;
+	bool		group_by_provides_uniqueness = false;
+
+	current_query = query;
 
 	if (query->setOperations != NULL)
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("foreign key joins involving set operations are not supported"),
 				 parser_errposition(pstate, location)));
+	}
 
-	/* XXX: Overly aggressive disallowing */
 	if (query->commandType != CMD_SELECT ||
-		query->groupClause ||
 		query->distinctClause ||
 		query->groupingSets ||
 		query->hasTargetSRFs ||
@@ -638,15 +737,57 @@ validate_and_resolve_derived_rel(ParseState *pstate, Query *query, RangeTblEntry
 					 errdetail("Using a filtered query as the referenced table would violate referential integrity."),
 					 parser_errposition(pstate, location)));
 
-		if (list_length(query->rtable) > 1 &&
-			IsA(query->jointree->fromlist, List))
+		if (query->groupClause)
+		{
+			if (grouping_matches_columns(query, base_colnames))
+				group_by_provides_uniqueness = true;
+			else
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("GROUP BY columns do not match the referenced key columns"),
+						 parser_errposition(pstate, location)));
+		}
+
+		/*
+		 * Examine the fromlist structure to determine if we have multiple
+		 * relations and if so, ensure they are joined via foreign key joins
+		 * only.
+		 */
+		Assert(IsA(query->jointree->fromlist, List));
+		Assert(query->jointree->fromlist != NIL);
+
+		/*
+		 * If we have exactly one fromlist item and it's a RangeTblRef, that's
+		 * allowed (representing a single table or grouped table). If it's a
+		 * single JoinExpr, validate it. If it's anything else unsupported,
+		 * raise an error.
+		 */
+		if (list_length(query->jointree->fromlist) == 1)
+		{
+			Node	   *node = (Node *) linitial(query->jointree->fromlist);
+
+			if (IsA(node, JoinExpr))
+				validate_derived_rel_joins(pstate, query, castNode(JoinExpr, node),
+										   trunk_rte, location, group_by_provides_uniqueness);
+			else if (!IsA(node, RangeTblRef))
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("unsupported query structure in referenced table"),
+						 parser_errposition(pstate, location)));
+			/* If it's a RangeTblRef, no further checks needed */
+		}
+
+		/*
+		 * If there's more than one fromlist item, we must validate each as a
+		 * JoinExpr
+		 */
+		else
 		{
 			ListCell   *lc;
 
 			foreach(lc, query->jointree->fromlist)
 			{
 				Node	   *node = lfirst(lc);
-				JoinExpr   *join;
 
 				if (!IsA(node, JoinExpr))
 					ereport(ERROR,
@@ -654,8 +795,8 @@ validate_and_resolve_derived_rel(ParseState *pstate, Query *query, RangeTblEntry
 							 errmsg("unsupported query structure in referenced table"),
 							 parser_errposition(pstate, location)));
 
-				join = castNode(JoinExpr, node);
-				validate_derived_rel_joins(pstate, query, join, trunk_rte, location);
+				validate_derived_rel_joins(pstate, query, castNode(JoinExpr, node),
+										   trunk_rte, location, group_by_provides_uniqueness);
 			}
 		}
 	}
@@ -665,7 +806,8 @@ validate_and_resolve_derived_rel(ParseState *pstate, Query *query, RangeTblEntry
 	 * which is then returned.
 	 */
 	return drill_down_to_base_rel(pstate, trunk_rte, colnames_out,
-								  base_colnames, is_referenced, location);
+								  base_colnames, is_referenced, location,
+								  current_query);
 }
 
 /*
@@ -674,15 +816,16 @@ validate_and_resolve_derived_rel(ParseState *pstate, Query *query, RangeTblEntry
  */
 static void
 validate_derived_rel_joins(ParseState *pstate, Query *query, JoinExpr *join,
-						   RangeTblEntry *trunk_rte, int location)
+						   RangeTblEntry *trunk_rte, int location,
+						   bool group_by_provides_uniqueness)
 {
 	ForeignKeyJoinNode *fkjn;
 	RangeTblEntry *referencing_rte;
 	List	   *referencing_attnums;
-	ListCell   *lc;
+	Oid			base_relid;
 	List	   *base_colnames = NIL;
 	List	   *colaliases = NIL;
-	Oid			base_relid;
+	ListCell   *lc;
 
 	if (join->fkJoin == NULL)
 		ereport(ERROR,
@@ -702,7 +845,10 @@ validate_derived_rel_joins(ParseState *pstate, Query *query, JoinExpr *join,
 	referencing_rte = rt_fetch(fkjn->referencingVarno, query->rtable);
 	Assert(referencing_rte != NULL);
 
-	if (trunk_rte != referencing_rte)
+	/*
+	 * If no GROUP BY uniqueness and trunk_rte != referencing_rte, fail.
+	 */
+	if (!group_by_provides_uniqueness && trunk_rte != referencing_rte)
 		ereport(ERROR,
 				(errcode(ERRCODE_INTEGRITY_CONSTRAINT_VIOLATION),
 				 errmsg("virtual foreign key constraint violation"),
@@ -721,7 +867,7 @@ validate_derived_rel_joins(ParseState *pstate, Query *query, JoinExpr *join,
 
 	base_relid = drill_down_to_base_rel(pstate, referencing_rte,
 										&base_colnames, colaliases, false,
-										location);
+										location, query);
 
 	foreach(lc, base_colnames)
 	{
@@ -754,4 +900,62 @@ validate_derived_rel_joins(ParseState *pstate, Query *query, JoinExpr *join,
 
 		ReleaseSysCache(tuple);
 	}
+}
+
+static bool
+grouping_matches_columns(Query *query, List *expected_colnames)
+{
+	int			num_expected;
+	List	   *grouped_colnames = NIL;
+	List	   *diff;
+	ListCell   *lc;
+
+	num_expected = list_length(expected_colnames);
+
+	/* If lengths differ, sets cannot be equal */
+	if (list_length(query->groupClause) != num_expected)
+		return false;
+
+	/* Extract the grouped columns */
+	foreach(lc, query->groupClause)
+	{
+		SortGroupClause *sgc = (SortGroupClause *) lfirst(lc);
+		TargetEntry *tle = get_sortgroupclause_tle(sgc, query->targetList);
+		Var		   *var;
+		RangeTblEntry *rte;
+		char	   *colname;
+
+		if (!IsA(tle->expr, Var))
+			return false;
+
+		var = (Var *) tle->expr;
+		rte = rt_fetch(var->varno, query->rtable);
+		colname = get_rte_attribute_name(rte, var->varattno);
+
+		grouped_colnames = lappend(grouped_colnames, makeString(colname));
+	}
+
+	/*
+	 * Check that there are no columns in expected_colnames that are not in
+	 * grouped_colnames.
+	 */
+	diff = list_difference(expected_colnames, grouped_colnames);
+	if (diff != NIL)
+	{
+		list_free(diff);
+		return false;
+	}
+
+	/*
+	 * Check that there are no columns in grouped_colnames that are not in
+	 * expected_colnames.
+	 */
+	diff = list_difference(grouped_colnames, expected_colnames);
+	if (diff != NIL)
+	{
+		list_free(diff);
+		return false;
+	}
+
+	return true;
 }
