@@ -52,6 +52,7 @@ extern pg_locale_t create_pg_locale_icu(Oid collid, MemoryContext context);
 #ifdef USE_ICU
 
 extern UCollator *pg_ucol_open(const char *loc_str);
+static UCaseMap *pg_ucasemap_open(const char *loc_str);
 
 static size_t strlower_icu(char *dest, size_t destsize, const char *src,
 						   ssize_t srclen, pg_locale_t locale);
@@ -111,9 +112,12 @@ static size_t icu_from_uchar(char *dest, size_t destsize,
 							 const UChar *buff_uchar, int32_t len_uchar);
 static void icu_set_collation_attributes(UCollator *collator, const char *loc,
 										 UErrorCode *status);
-static int32_t icu_convert_case(ICU_Convert_Func func, pg_locale_t mylocale,
-								UChar **buff_dest, UChar *buff_source,
-								int32_t len_source);
+static int32_t icu_convert_case_no_utf8(ICU_Convert_Func func, char *dest,
+										size_t destsize, const char *src,
+										ssize_t srclen, pg_locale_t locale);
+static int32_t icu_convert_case_uchar(ICU_Convert_Func func, pg_locale_t mylocale,
+									  UChar **buff_dest, UChar *buff_source,
+									  int32_t len_source);
 static int32_t u_strToTitle_default_BI(UChar *dest, int32_t destCapacity,
 									   const UChar *src, int32_t srcLength,
 									   const char *locale,
@@ -139,6 +143,8 @@ tolower_icu(pg_wchar wc, pg_locale_t locale)
 {
 	return u_tolower(wc);
 }
+
+static int32_t icu_foldcase_options(const char *locale);
 
 static const struct collate_methods collate_methods_icu = {
 	.strncoll = strncoll_icu,
@@ -278,6 +284,7 @@ create_pg_locale_icu(Oid collid, MemoryContext context)
 	const char *icurules = NULL;
 	UCollator  *collator;
 	locale_t	loc = (locale_t) 0;
+	UCaseMap   *casemap = NULL;
 	pg_locale_t result;
 
 	if (collid == DEFAULT_COLLATION_OID)
@@ -339,10 +346,14 @@ create_pg_locale_icu(Oid collid, MemoryContext context)
 
 	collator = make_icu_collator(iculocstr, icurules);
 
+	if (GetDatabaseEncoding() == PG_UTF8)
+		casemap = pg_ucasemap_open(iculocstr);
+
 	result = MemoryContextAllocZero(context, sizeof(struct pg_locale_struct));
 	result->icu.locale = MemoryContextStrdup(context, iculocstr);
 	result->icu.ucol = collator;
 	result->icu.lt = loc;
+	result->icu.ucasemap = casemap;
 	result->deterministic = deterministic;
 	result->collate_is_c = false;
 	result->ctype_is_c = false;
@@ -366,6 +377,44 @@ create_pg_locale_icu(Oid collid, MemoryContext context)
 #ifdef USE_ICU
 
 /*
+ * In ICU versions 54 and earlier, "und" is not a recognized spelling of the
+ * root locale. If the first component of the locale is "und", replace with
+ * "root" before opening.
+ */
+static char *
+fix_icu_locale_str(const char *loc_str)
+{
+	if (U_ICU_VERSION_MAJOR_NUM < 55)
+	{
+		char		lang[ULOC_LANG_CAPACITY];
+		UErrorCode status = U_ZERO_ERROR;
+
+		uloc_getLanguage(loc_str, lang, ULOC_LANG_CAPACITY, &status);
+		if (U_FAILURE(status) || status == U_STRING_NOT_TERMINATED_WARNING)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("could not get language from locale \"%s\": %s",
+							loc_str, u_errorName(status))));
+		}
+
+		if (strcmp(lang, "und") == 0)
+		{
+			const char *remainder = loc_str + strlen("und");
+			char	   *fixed_str;
+
+			fixed_str = palloc(strlen("root") + strlen(remainder) + 1);
+			strcpy(fixed_str, "root");
+			strcat(fixed_str, remainder);
+
+			return fixed_str;
+		}
+	}
+
+	return NULL;
+}
+
+/*
  * Wrapper around ucol_open() to handle API differences for older ICU
  * versions.
  *
@@ -377,7 +426,7 @@ pg_ucol_open(const char *loc_str)
 	UCollator  *collator;
 	UErrorCode	status;
 	const char *orig_str = loc_str;
-	char	   *fixed_str = NULL;
+	char	   *fixed_str;
 
 	/*
 	 * Must never open default collator, because it depends on the environment
@@ -391,36 +440,9 @@ pg_ucol_open(const char *loc_str)
 	if (loc_str == NULL)
 		elog(ERROR, "opening default collator is not supported");
 
-	/*
-	 * In ICU versions 54 and earlier, "und" is not a recognized spelling of
-	 * the root locale. If the first component of the locale is "und", replace
-	 * with "root" before opening.
-	 */
-	if (U_ICU_VERSION_MAJOR_NUM < 55)
-	{
-		char		lang[ULOC_LANG_CAPACITY];
-
-		status = U_ZERO_ERROR;
-		uloc_getLanguage(loc_str, lang, ULOC_LANG_CAPACITY, &status);
-		if (U_FAILURE(status) || status == U_STRING_NOT_TERMINATED_WARNING)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("could not get language from locale \"%s\": %s",
-							loc_str, u_errorName(status))));
-		}
-
-		if (strcmp(lang, "und") == 0)
-		{
-			const char *remainder = loc_str + strlen("und");
-
-			fixed_str = palloc(strlen("root") + strlen(remainder) + 1);
-			strcpy(fixed_str, "root");
-			strcat(fixed_str, remainder);
-
-			loc_str = fixed_str;
-		}
-	}
+	fixed_str = fix_icu_locale_str(loc_str);
+	if (fixed_str)
+		loc_str = fixed_str;
 
 	status = U_ZERO_ERROR;
 	collator = ucol_open(loc_str, &status);
@@ -454,6 +476,34 @@ pg_ucol_open(const char *loc_str)
 		pfree(fixed_str);
 
 	return collator;
+}
+
+/*
+ * Wrapper around ucasemap_open() to handle API differences for older ICU
+ * versions.
+ *
+ * Additional makes sure we get the right options for case folding.
+ */
+static UCaseMap *
+pg_ucasemap_open(const char *loc_str)
+{
+	UErrorCode	status = U_ZERO_ERROR;
+	UCaseMap   *casemap;
+	char	   *fixed_str;
+
+	fixed_str = fix_icu_locale_str(loc_str);
+	if (fixed_str)
+		loc_str = fixed_str;
+
+	casemap = ucasemap_open(loc_str, icu_foldcase_options(loc_str), &status);
+	if (U_FAILURE(status))
+		ereport(ERROR,
+				(errmsg("casemap lookup failed: %s", u_errorName(status))));
+
+	if (fixed_str != NULL)
+		pfree(fixed_str);
+
+	return casemap;
 }
 
 /*
@@ -528,80 +578,76 @@ static size_t
 strlower_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		int32_t		needed;
 
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strToLower, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+		needed = ucasemap_utf8ToLower(locale->icu.ucasemap, dest, destsize, src, srclen, &status);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+		return icu_convert_case_no_utf8(u_strToLower, dest, destsize, src, srclen, locale);
 }
 
 static size_t
 strtitle_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		int32_t		needed;
 
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strToTitle_default_BI, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+		needed = ucasemap_utf8ToTitle(locale->icu.ucasemap, dest, destsize, src, srclen, &status);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+		return icu_convert_case_no_utf8(u_strToTitle_default_BI, dest, destsize, src, srclen, locale);
 }
 
 static size_t
 strupper_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		int32_t		needed;
 
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strToUpper, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+		needed = ucasemap_utf8ToUpper(locale->icu.ucasemap, dest, destsize, src, srclen, &status);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+		return icu_convert_case_no_utf8(u_strToUpper, dest, destsize, src, srclen, locale);
 }
 
 static size_t
 strfold_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		int32_t		needed;
 
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strFoldCase_default, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+		needed = ucasemap_utf8FoldCase(locale->icu.ucasemap, dest, destsize, src, srclen, &status);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+		return icu_convert_case_no_utf8(u_strFoldCase_default, dest, destsize, src, srclen, locale);
 }
 
 /*
@@ -829,8 +875,28 @@ icu_from_uchar(char *dest, size_t destsize, const UChar *buff_uchar, int32_t len
 }
 
 static int32_t
-icu_convert_case(ICU_Convert_Func func, pg_locale_t mylocale,
-				 UChar **buff_dest, UChar *buff_source, int32_t len_source)
+icu_convert_case_no_utf8(ICU_Convert_Func func, char *dest, size_t destsize,
+						 const char *src, ssize_t srclen, pg_locale_t locale)
+{
+	int32_t		len_uchar;
+	int32_t		len_conv;
+	UChar	   *buff_uchar;
+	UChar	   *buff_conv;
+	size_t		result_len;
+
+	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
+	len_conv = icu_convert_case_uchar(func, locale, &buff_conv,
+									  buff_uchar, len_uchar);
+	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
+	pfree(buff_uchar);
+	pfree(buff_conv);
+
+	return result_len;
+}
+
+static int32_t
+icu_convert_case_uchar(ICU_Convert_Func func, pg_locale_t mylocale,
+					   UChar **buff_dest, UChar *buff_source, int32_t len_source)
 {
 	UErrorCode	status;
 	int32_t		len_dest;
@@ -871,9 +937,16 @@ u_strFoldCase_default(UChar *dest, int32_t destCapacity,
 					  const char *locale,
 					  UErrorCode *pErrorCode)
 {
+	return u_strFoldCase(dest, destCapacity, src, srcLength,
+						 icu_foldcase_options(locale), pErrorCode);
+}
+
+static int32_t
+icu_foldcase_options(const char *locale)
+{
 	uint32		options = U_FOLD_CASE_DEFAULT;
 	char		lang[ULOC_LANG_CAPACITY];
-	UErrorCode	status;
+	UErrorCode	status = U_ZERO_ERROR;
 
 	/*
 	 * Unlike the ICU APIs for lowercasing, titlecasing, and uppercasing, case
@@ -881,7 +954,6 @@ u_strFoldCase_default(UChar *dest, int32_t destCapacity,
 	 * option relevant to Turkic languages 'az' and 'tr'; check for those
 	 * languages to enable the option.
 	 */
-	status = U_ZERO_ERROR;
 	uloc_getLanguage(locale, lang, ULOC_LANG_CAPACITY, &status);
 	if (U_SUCCESS(status))
 	{
@@ -893,8 +965,7 @@ u_strFoldCase_default(UChar *dest, int32_t destCapacity,
 			options = U_FOLD_CASE_EXCLUDE_SPECIAL_I;
 	}
 
-	return u_strFoldCase(dest, destCapacity, src, srcLength,
-						 options, pErrorCode);
+	return options;
 }
 
 /*
