@@ -100,9 +100,12 @@ static size_t icu_from_uchar(char *dest, size_t destsize,
 							 const UChar *buff_uchar, int32_t len_uchar);
 static void icu_set_collation_attributes(UCollator *collator, const char *loc,
 										 UErrorCode *status);
-static int32_t icu_convert_case(ICU_Convert_Func func, pg_locale_t mylocale,
-								UChar **buff_dest, UChar *buff_source,
-								int32_t len_source);
+static int32_t icu_convert_case(ICU_Convert_Func func, char *dest,
+								size_t destsize, const char *src,
+								ssize_t srclen, pg_locale_t locale);
+static int32_t icu_convert_case_uchar(ICU_Convert_Func func, pg_locale_t mylocale,
+									  UChar **buff_dest, UChar *buff_source,
+									  int32_t len_source);
 static int32_t u_strToTitle_default_BI(UChar *dest, int32_t destCapacity,
 									   const UChar *src, int32_t srcLength,
 									   const char *locale,
@@ -350,60 +353,21 @@ size_t
 strlower_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
-
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strToLower, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+	return icu_convert_case(u_strToLower, dest, destsize, src, srclen, locale);
 }
 
 size_t
 strtitle_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
-
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strToTitle_default_BI, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+	return icu_convert_case(u_strToTitle_default_BI, dest, destsize, src, srclen, locale);
 }
 
 size_t
 strupper_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	int32_t		len_uchar;
-	int32_t		len_conv;
-	UChar	   *buff_uchar;
-	UChar	   *buff_conv;
-	size_t		result_len;
-
-	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
-	len_conv = icu_convert_case(u_strToUpper, locale,
-								&buff_conv, buff_uchar, len_uchar);
-	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
-	pfree(buff_uchar);
-	pfree(buff_conv);
-
-	return result_len;
+	return icu_convert_case(u_strToUpper, dest, destsize, src, srclen, locale);
 }
 
 /*
@@ -599,8 +563,28 @@ icu_from_uchar(char *dest, size_t destsize, const UChar *buff_uchar, int32_t len
 }
 
 static int32_t
-icu_convert_case(ICU_Convert_Func func, pg_locale_t mylocale,
-				 UChar **buff_dest, UChar *buff_source, int32_t len_source)
+icu_convert_case(ICU_Convert_Func func, char *dest, size_t destsize,
+				 const char *src, ssize_t srclen, pg_locale_t locale)
+{
+	int32_t		len_uchar;
+	int32_t		len_conv;
+	UChar	   *buff_uchar;
+	UChar	   *buff_conv;
+	size_t		result_len;
+
+	len_uchar = icu_to_uchar(&buff_uchar, src, srclen);
+	len_conv = icu_convert_case_uchar(func, locale, &buff_conv,
+									  buff_uchar, len_uchar);
+	result_len = icu_from_uchar(dest, destsize, buff_conv, len_conv);
+	pfree(buff_uchar);
+	pfree(buff_conv);
+
+	return result_len;
+}
+
+static int32_t
+icu_convert_case_uchar(ICU_Convert_Func func, pg_locale_t mylocale,
+					   UChar **buff_dest, UChar *buff_source, int32_t len_source)
 {
 	UErrorCode	status;
 	int32_t		len_dest;
