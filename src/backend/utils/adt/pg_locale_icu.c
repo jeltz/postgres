@@ -12,6 +12,7 @@
 #include "postgres.h"
 
 #ifdef USE_ICU
+#include "unicode/ucasemap.h"
 #include <unicode/ucnv.h>
 #include <unicode/ustring.h>
 
@@ -100,9 +101,9 @@ static size_t icu_from_uchar(char *dest, size_t destsize,
 							 const UChar *buff_uchar, int32_t len_uchar);
 static void icu_set_collation_attributes(UCollator *collator, const char *loc,
 										 UErrorCode *status);
-static int32_t icu_convert_case(ICU_Convert_Func func, char *dest,
-								size_t destsize, const char *src,
-								ssize_t srclen, pg_locale_t locale);
+static int32_t icu_convert_case_no_utf8(ICU_Convert_Func func, char *dest,
+										size_t destsize, const char *src,
+										ssize_t srclen, pg_locale_t locale);
 static int32_t icu_convert_case_uchar(ICU_Convert_Func func, pg_locale_t mylocale,
 									  UChar **buff_dest, UChar *buff_source,
 									  int32_t len_source);
@@ -353,21 +354,87 @@ size_t
 strlower_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	return icu_convert_case(u_strToLower, dest, destsize, src, srclen, locale);
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		UCaseMap   *casemap;
+		int32_t		needed;
+
+		casemap = ucasemap_open(locale->info.icu.locale, U_FOLD_CASE_DEFAULT, &status);
+		if (U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("casemap lookup failed: %s", u_errorName(status))));
+
+		status = U_ZERO_ERROR;
+		needed = ucasemap_utf8ToLower(casemap, dest, destsize, src, srclen, &status);
+		ucasemap_close(casemap);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+	{
+		return icu_convert_case_no_utf8(u_strToLower, dest, destsize, src, srclen, locale);
+	}
 }
 
 size_t
 strtitle_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	return icu_convert_case(u_strToTitle_default_BI, dest, destsize, src, srclen, locale);
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		UCaseMap   *casemap;
+		int32_t		needed;
+
+		casemap = ucasemap_open(locale->info.icu.locale, U_FOLD_CASE_DEFAULT, &status);
+		if (U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("casemap lookup failed: %s", u_errorName(status))));
+
+		status = U_ZERO_ERROR;
+		needed = ucasemap_utf8ToTitle(casemap, dest, destsize, src, srclen, &status);
+		ucasemap_close(casemap);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+	{
+		return icu_convert_case_no_utf8(u_strToTitle_default_BI, dest, destsize, src, srclen, locale);
+	}
 }
 
 size_t
 strupper_icu(char *dest, size_t destsize, const char *src, ssize_t srclen,
 			 pg_locale_t locale)
 {
-	return icu_convert_case(u_strToUpper, dest, destsize, src, srclen, locale);
+	if (GetDatabaseEncoding() == PG_UTF8)
+	{
+		UErrorCode	status = U_ZERO_ERROR;
+		UCaseMap   *casemap;
+		int32_t		needed;
+
+		casemap = ucasemap_open(locale->info.icu.locale, U_FOLD_CASE_DEFAULT, &status);
+		if (U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("casemap lookup failed: %s", u_errorName(status))));
+
+		status = U_ZERO_ERROR;
+		needed = ucasemap_utf8ToUpper(casemap, dest, destsize, src, srclen, &status);
+		ucasemap_close(casemap);
+		if (status != U_BUFFER_OVERFLOW_ERROR && U_FAILURE(status))
+			ereport(ERROR,
+					(errmsg("case conversion failed: %s", u_errorName(status))));
+		return needed;
+	}
+	else
+	{
+		return icu_convert_case_no_utf8(u_strToUpper, dest, destsize, src, srclen, locale);
+	}
 }
 
 /*
@@ -563,8 +630,8 @@ icu_from_uchar(char *dest, size_t destsize, const UChar *buff_uchar, int32_t len
 }
 
 static int32_t
-icu_convert_case(ICU_Convert_Func func, char *dest, size_t destsize,
-				 const char *src, ssize_t srclen, pg_locale_t locale)
+icu_convert_case_no_utf8(ICU_Convert_Func func, char *dest, size_t destsize,
+						 const char *src, ssize_t srclen, pg_locale_t locale)
 {
 	int32_t		len_uchar;
 	int32_t		len_conv;
