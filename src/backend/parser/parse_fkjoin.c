@@ -269,8 +269,8 @@ find_foreign_key(Oid referencing_relid, Oid referenced_relid,
 	Oid			fkoid = InvalidOid;
 	int			i,
 				j;
-	AttrNumber *ref_attnums = palloc(sizeof(AttrNumber) * ncols);
-	AttrNumber *refd_attnums = palloc(sizeof(AttrNumber) * ncols);
+	AttrNumber *ref_attnums = palloc_array(AttrNumber, ncols);
+	AttrNumber *refd_attnums = palloc_array(AttrNumber, ncols);
 	ListCell   *lc;
 	int			pos = 0;
 
