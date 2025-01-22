@@ -24,6 +24,7 @@
 #include "access/syncscan.h"
 #include "access/tableam.h"
 #include "access/xact.h"
+#include "commands/defrem.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/plancat.h"
 #include "port/pg_bitutils.h"
@@ -758,4 +759,11 @@ table_block_relation_estimate_size(Relation rel, int32 *attr_widths,
 		*allvisfrac = 1;
 	else
 		*allvisfrac = (double) relallvisible / curpages;
+}
+
+
+Oid
+get_tde_table_am_oid(void)
+{
+	return get_table_am_oid("tde_heap", false);
 }
