@@ -47,9 +47,9 @@ CREATE DATABASE regress_pg_tde_other;
 CREATE EXTENSION pg_tde;
 CREATE EXTENSION pg_buffercache;
 
--- Should fail: no principal key for the database yet
+-- TODO
 SELECT  key_provider_id, key_provider_name, key_name
-		FROM pg_tde_key_info();
+		FROM pg_tde_principal_key_info();
 
 -- Should succeed: "localizes" the default principal key for the database
 CREATE TABLE test_enc(

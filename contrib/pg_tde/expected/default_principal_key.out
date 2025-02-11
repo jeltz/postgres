@@ -69,11 +69,14 @@ CREATE DATABASE regress_pg_tde_other;
 \c regress_pg_tde_other
 CREATE EXTENSION pg_tde;
 CREATE EXTENSION pg_buffercache;
--- Should fail: no principal key for the database yet
+-- TODO
 SELECT  key_provider_id, key_provider_name, key_name
-		FROM pg_tde_key_info();
-ERROR:  Principal key does not exists for the database
-HINT:  Use set_key interface to set the principal key
+		FROM pg_tde_principal_key_info();
+ key_provider_id | key_provider_name |  key_name   
+-----------------+-------------------+-------------
+              -3 | file-provider     | default-key
+(1 row)
+
 -- Should succeed: "localizes" the default principal key for the database
 CREATE TABLE test_enc(
 	id SERIAL,

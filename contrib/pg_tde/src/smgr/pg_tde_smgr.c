@@ -58,19 +58,15 @@ tde_smgr_is_encrypted(const RelFileLocatorBackend *smgr_rlocator)
 static InternalKey *
 tde_smgr_get_key(const RelFileLocatorBackend *smgr_rlocator)
 {
-	/* Do not try to encrypt/decrypt catalog tables */
-	if (IsCatalogRelationOid(smgr_rlocator->locator.relNumber))
-		return NULL;
-
 	return GetSMGRRelationKey(*smgr_rlocator);
 }
 
 static bool
 tde_smgr_should_encrypt(const RelFileLocatorBackend *smgr_rlocator, RelFileLocator *old_locator)
 {
-	/* Do not try to encrypt/decrypt catalog tables */
+	/* Always encrypt catalog tables */
 	if (IsCatalogRelationOid(smgr_rlocator->locator.relNumber))
-		return false;
+		return true;
 
 	switch (currentTdeEncryptModeValidated())
 	{
