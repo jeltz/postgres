@@ -3546,7 +3546,7 @@ foreach test_dir : tests
           '--temp-instance', test_output / 'tmp_check',
           '--port', testport.to_string(),
           test_selection,
-        ],
+        ] + get_option('EXTRA_REGRESS_OPTS'),
         suite: test_group,
         kwargs: test_kwargs,
       )
@@ -3564,7 +3564,7 @@ foreach test_dir : tests
             test_command_base,
             '--outputdir', test_output_running,
             test_selection,
-          ],
+          ] + get_option('EXTRA_REGRESS_OPTS'),
           is_parallel: t.get('runningcheck-parallel', true),
           suite: test_group_running,
           kwargs: test_kwargs,
@@ -3591,6 +3591,7 @@ foreach test_dir : tests
       env.prepend('PATH', temp_install_bindir, test_dir['bd'], test_dir['bd'] / 'test')
       temp_install_datadir = '@0@@1@'.format(test_install_destdir, dir_prefix / dir_data)
       env.set('share_contrib_dir', temp_install_datadir / 'contrib')
+      env.set('EXTRA_REGRESS_OPTS', ' '.join(get_option('EXTRA_REGRESS_OPTS')))
 
       foreach name, value : t.get('env', {})
         env.set(name, value)
