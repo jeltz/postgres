@@ -30,20 +30,24 @@ iv_prefix_debug(const char *iv_prefix, char *out_hex)
  */
 
 /*
- * pg_tde_crypt_simple:
  * Encrypts/decrypts `data` with a given `key`. The result is written to `out`.
+ *
  * start_offset: is the absolute location of start of data in the file.
- * This function assumes that everything is in a single block, and has an assertion ensuring this
+ *
+ * This function assumes that everything is in a single block, and has an
+ * assertion ensuring this. We require data_len to be a multiple of 16 which
+ * XLOG_BLCKSZ is always a multiple of.
  */
 static void
 pg_tde_crypt_simple(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context)
 {
 	const uint64 aes_start_block = start_offset / AES_BLOCK_SIZE;
-	const uint64 aes_end_block = (start_offset + data_len + (AES_BLOCK_SIZE - 1)) / AES_BLOCK_SIZE;
-	const uint64 aes_block_no = start_offset % AES_BLOCK_SIZE;
-	unsigned char enc_key[DATA_BYTES_PER_AES_BATCH + AES_BLOCK_SIZE];
+	const uint64 aes_end_block = (start_offset + data_len) / AES_BLOCK_SIZE;
+	unsigned char enc_key[DATA_BYTES_PER_AES_BATCH];
 
-	Assert(aes_end_block - aes_start_block <= NUM_AES_BLOCKS_IN_BATCH + 1);
+	Assert(start_offset % AES_BLOCK_SIZE == 0);
+	Assert(data_len % AES_BLOCK_SIZE == 0);
+	Assert(aes_end_block - aes_start_block <= NUM_AES_BLOCKS_IN_BATCH);
 
 	Aes128EncryptedZeroBlocks(ctxPtr, key->key, iv_prefix, aes_start_block, aes_end_block, enc_key);
 
@@ -53,32 +57,36 @@ pg_tde_crypt_simple(const char *iv_prefix, uint32 start_offset, const char *data
 
 		iv_prefix_debug(iv_prefix, ivp_debug);
 		ereport(LOG,
-				(errmsg("%s: Start offset: %lu Data_Len: %u, aes_start_block: %lu, aes_end_block: %lu, IV prefix: %s",
-						context ? context : "", start_offset, data_len, aes_start_block, aes_end_block, ivp_debug)));
+				(errmsg("%s: Data_Len: %u, aes_start_block: %lu, aes_end_block: %lu, IV prefix: %s",
+						context ? context : "", data_len, aes_start_block, aes_end_block, ivp_debug)));
 	}
 #endif
 
-	for (uint32 i = 0; i < data_len; ++i)
+	for (uint32 i = 0; i < data_len; i++)
 	{
-		out[i] = data[i] ^ enc_key[i + aes_block_no];
+		out[i] = data[i] ^ enc_key[i];
 	}
 }
 
 
 /*
- * pg_tde_crypt_complex:
  * Encrypts/decrypts `data` with a given `key`. The result is written to `out`.
+ *
  * start_offset: is the absolute location of start of data in the file.
- * This is a generic function intended for large data, that do not fit into a single block
+ *
+ * This is a generic function intended for large data that do not fit into a
+ * single block. We require data_len to be a multiple of 16 which XLOG_BLCKSZ
+ * is always a multiple of.
  */
 static void
 pg_tde_crypt_complex(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context)
 {
 	const uint64 aes_start_block = start_offset / AES_BLOCK_SIZE;
-	const uint64 aes_end_block = (start_offset + data_len + (AES_BLOCK_SIZE - 1)) / AES_BLOCK_SIZE;
-	const uint64 aes_block_no = start_offset % AES_BLOCK_SIZE;
-	uint32		batch_no = 0;
+	const uint64 aes_end_block = (start_offset + data_len) / AES_BLOCK_SIZE;
 	uint32		data_index = 0;
+
+	Assert(start_offset % AES_BLOCK_SIZE == 0);
+	Assert(data_len % AES_BLOCK_SIZE == 0);
 
 	/* do max NUM_AES_BLOCKS_IN_BATCH blocks at a time */
 	for (uint64 batch_start_block = aes_start_block; batch_start_block < aes_end_block; batch_start_block += NUM_AES_BLOCKS_IN_BATCH)
@@ -88,56 +96,35 @@ pg_tde_crypt_complex(const char *iv_prefix, uint32 start_offset, const char *dat
 		uint64		batch_end_block = Min(batch_start_block + NUM_AES_BLOCKS_IN_BATCH, aes_end_block);
 
 		Aes128EncryptedZeroBlocks(ctxPtr, key->key, iv_prefix, batch_start_block, batch_end_block, enc_key);
+
 #ifdef ENCRYPTION_DEBUG
 		{
 			char		ivp_debug[33];
 
 			iv_prefix_debug(iv_prefix, ivp_debug);
 			ereport(LOG,
-					(errmsg("%s: Batch-No:%d Start offset: %lu Data_Len: %u, batch_start_block: %lu, batch_end_block: %lu, IV prefix: %s",
-							context ? context : "", batch_no, start_offset, data_len, batch_start_block, batch_end_block, ivp_debug)));
+					(errmsg("%s: Data_Len: %u, batch_start_block: %lu, batch_end_block: %lu, IV prefix: %s",
+							context ? context : "", data_len, batch_start_block, batch_end_block, ivp_debug)));
 		}
 #endif
 
-		current_batch_bytes = ((batch_end_block - batch_start_block) * AES_BLOCK_SIZE)
-			- (batch_no > 0 ? 0 : aes_block_no);	/* first batch skips
-													 * `aes_block_no`-th bytes
-													 * of enc_key */
-		if ((data_index + current_batch_bytes) > data_len)
-			current_batch_bytes = data_len - data_index;
+		current_batch_bytes = (batch_end_block - batch_start_block) * AES_BLOCK_SIZE;
 
-		for (uint32 i = 0; i < current_batch_bytes; ++i)
+		for (uint32 i = 0; i < current_batch_bytes; i++, data_index++)
 		{
-			/*
-			 * As the size of enc_key always is a multiple of 16 we start from
-			 * `aes_block_no`-th index of the enc_key[] so N-th will be
-			 * crypted with the same enc_key byte despite what start_offset
-			 * the function was called with. For example start_offset = 10;
-			 * MAX_AES_ENC_BATCH_KEY_SIZE = 6: data:                 [10 11 12
-			 * 13 14 15 16] encKey: [...][0 1 2 3  4  5][0  1  2  3  4  5] so
-			 * the 10th data byte is encoded with the 4th byte of the 2nd
-			 * enc_key etc. We need this shift so each byte will be coded the
-			 * same despite the initial offset. Let's see the same data but
-			 * sent to the func starting from the offset 0: data:    [0 1 2 3
-			 * 4 5 6 7 8 9 10 11 12 13 14 15 16] encKey: [0 1 2 3 4 5][0 1 2 3
-			 * 4 5][ 0 1  2  3  4  5] again, the 10th data byte is encoded
-			 * with the 4th byte of the 2nd enc_key etc.
-			 */
-			uint32		enc_key_index = i + (batch_no > 0 ? 0 : aes_block_no);
-
-			out[data_index] = data[data_index] ^ enc_key[enc_key_index];
-
-			data_index++;
+			out[data_index] = data[data_index] ^ enc_key[i];
 		}
-		batch_no++;
 	}
 }
 
 /*
- * pg_tde_crypt:
  * Encrypts/decrypts `data` with a given `key`. The result is written to `out`.
+ *
  * start_offset: is the absolute location of start of data in the file.
- * This function simply selects between the two above variations based on the data length
+ *
+ * This function simply selects between the two above variations based on the
+ * data length. We require data_len to be a multiple of 16 which XLOG_BLCKSZ is
+ * always a multiple of.
  */
 void
 pg_tde_crypt(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context)
