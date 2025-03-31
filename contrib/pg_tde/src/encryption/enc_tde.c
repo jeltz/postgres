@@ -8,7 +8,7 @@
 #include "storage/bufmgr.h"
 
 #define AES_BLOCK_SIZE 		        16
-#define NUM_AES_BLOCKS_IN_BATCH     200
+#define NUM_AES_BLOCKS_IN_BATCH     64
 #define DATA_BYTES_PER_AES_BATCH    (NUM_AES_BLOCKS_IN_BATCH * AES_BLOCK_SIZE)
 
 #ifdef ENCRYPTION_DEBUG
@@ -39,14 +39,13 @@ pg_tde_crypt(const char *iv_prefix, uint32 start_offset, const char *data, uint3
 	uint32		data_index = 0;
 
 	Assert(start_offset % AES_BLOCK_SIZE == 0);
-	Assert(data_len % AES_BLOCK_SIZE == 0);
+	Assert(data_len % DATA_BYTES_PER_AES_BATCH == 0);
 
-	/* do max NUM_AES_BLOCKS_IN_BATCH blocks at a time */
+	/* do NUM_AES_BLOCKS_IN_BATCH blocks at a time */
 	for (uint64 batch_start_block = aes_start_block; batch_start_block < aes_end_block; batch_start_block += NUM_AES_BLOCKS_IN_BATCH)
 	{
 		unsigned char enc_key[DATA_BYTES_PER_AES_BATCH];
-		uint32		current_batch_bytes;
-		uint64		batch_end_block = Min(batch_start_block + NUM_AES_BLOCKS_IN_BATCH, aes_end_block);
+		uint64		batch_end_block = batch_start_block + NUM_AES_BLOCKS_IN_BATCH;
 
 		Aes128EncryptedZeroBlocks(ctxPtr, key->key, iv_prefix, batch_start_block, batch_end_block, enc_key);
 
@@ -61,9 +60,7 @@ pg_tde_crypt(const char *iv_prefix, uint32 start_offset, const char *data, uint3
 		}
 #endif
 
-		current_batch_bytes = (batch_end_block - batch_start_block) * AES_BLOCK_SIZE;
-
-		for (uint32 i = 0; i < current_batch_bytes; i++, data_index++)
+		for (uint32 i = 0; i < DATA_BYTES_PER_AES_BATCH; i++, data_index++)
 		{
 			out[data_index] = data[data_index] ^ enc_key[i];
 		}
