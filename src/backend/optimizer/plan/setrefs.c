@@ -1114,7 +1114,8 @@ set_plan_refs(PlannerInfo *root, Plan *plan, int rtoffset)
 				 * those are already used by RETURNING and it seems better to
 				 * be non-conflicting.
 				 */
-				if (splan->onConflictSet)
+				if (splan->onConflictAction == ONCONFLICT_UPDATE ||
+					splan->onConflictAction == ONCONFLICT_SELECT)
 				{
 					indexed_tlist *itlist;
 

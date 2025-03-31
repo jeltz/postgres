@@ -4651,7 +4651,7 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 
 	if (node->onConflictAction != ONCONFLICT_NONE)
 	{
-		const char *resolution;
+		const char *resolution = NULL;
 
 		if (node->onConflictAction == ONCONFLICT_NOTHING)
 			resolution = "NOTHING";
@@ -4659,6 +4659,7 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 			resolution = "UPDATE";
 		else
 		{
+			Assert(node->onConflictAction == ONCONFLICT_SELECT);
 			switch (node->onConflictLockingStrength)
 			{
 				case LCS_NONE:
@@ -4673,8 +4674,12 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 				case LCS_FORNOKEYUPDATE:
 					resolution = "SELECT FOR NO KEY UPDATE";
 					break;
-				default:		/* LCS_FORUPDATE */
+				case LCS_FORUPDATE:
 					resolution = "SELECT FOR UPDATE";
+					break;
+				default:
+					elog(ERROR, "unrecognized LockClauseStrength %d",
+						 (int) node->onConflictLockingStrength);
 					break;
 			}
 		}
@@ -4688,7 +4693,7 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
 		if (idxNames)
 			ExplainPropertyList("Conflict Arbiter Indexes", idxNames, es);
 
-		/* ON CONFLICT DO UPDATE WHERE qual is specially displayed */
+		/* ON CONFLICT DO UPDATE/SELECT WHERE qual is specially displayed */
 		if (node->onConflictWhere)
 		{
 			show_upper_qual((List *) node->onConflictWhere, "Conflict Filter",
