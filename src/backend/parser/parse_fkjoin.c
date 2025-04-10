@@ -249,8 +249,8 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 	 */
 	for (int i = 0; i < list_length(referenced_rte->functional_dependencies); i += 2)
 	{
-		RTEId	   *fd_dep = (RTEId *) list_nth(referenced_rte->functional_dependencies, i);
-		RTEId	   *fd_dcy = (RTEId *) list_nth(referenced_rte->functional_dependencies, i + 1);
+		RTEId	   *fd_dep = castNode(RTEId, list_nth(referenced_rte->functional_dependencies, i));
+		RTEId	   *fd_dcy = castNode(RTEId, list_nth(referenced_rte->functional_dependencies, i + 1));
 
 		if (equal(fd_dep, referenced_id) && equal(fd_dcy, referenced_id))
 		{
