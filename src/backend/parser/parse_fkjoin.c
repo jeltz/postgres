@@ -106,15 +106,15 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 
 	if (other_rel == NULL)
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_TABLE),
-				 errmsg("table reference \"%s\" not found", fkjn->refAlias),
-				 parser_errposition(pstate, fkjn->location)));
+				errcode(ERRCODE_UNDEFINED_TABLE),
+				errmsg("table reference \"%s\" not found", fkjn->refAlias),
+				parser_errposition(pstate, fkjn->location));
 
 	if (list_length(fkjn->refCols) != list_length(fkjn->localCols))
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("number of referencing and referenced columns must be the same"),
-				 parser_errposition(pstate, fkjn->location)));
+				errcode(ERRCODE_SYNTAX_ERROR),
+				errmsg("number of referencing and referenced columns must be the same"),
+				parser_errposition(pstate, fkjn->location));
 
 	if (fkjn->fkdir == FKDIR_FROM)
 	{
@@ -150,20 +150,20 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 			{
 				if (col_index >= 0)
 					ereport(ERROR,
-							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-							 errmsg("common column name \"%s\" appears more than once in referencing table",
-									ref_colname),
-							 parser_errposition(pstate, fkjn->location)));
+							errcode(ERRCODE_AMBIGUOUS_COLUMN),
+							errmsg("common column name \"%s\" appears more than once in referencing table",
+								   ref_colname),
+							parser_errposition(pstate, fkjn->location));
 				col_index = ndx;
 			}
 			ndx++;
 		}
 		if (col_index < 0)
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("column \"%s\" does not exist in referencing table",
-							ref_colname),
-					 parser_errposition(pstate, fkjn->location)));
+					errcode(ERRCODE_UNDEFINED_COLUMN),
+					errmsg("column \"%s\" does not exist in referencing table",
+						   ref_colname),
+					parser_errposition(pstate, fkjn->location));
 		referencing_attnums = lappend_int(referencing_attnums, col_index + 1);
 	}
 
@@ -183,20 +183,20 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 			{
 				if (col_index >= 0)
 					ereport(ERROR,
-							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
-							 errmsg("common column name \"%s\" appears more than once in referenced table",
-									ref_colname),
-							 parser_errposition(pstate, fkjn->location)));
+							errcode(ERRCODE_AMBIGUOUS_COLUMN),
+							errmsg("common column name \"%s\" appears more than once in referenced table",
+								   ref_colname),
+							parser_errposition(pstate, fkjn->location));
 				col_index = ndx;
 			}
 			ndx++;
 		}
 		if (col_index < 0)
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_COLUMN),
-					 errmsg("column \"%s\" does not exist in referenced table",
-							ref_colname),
-					 parser_errposition(pstate, fkjn->location)));
+					errcode(ERRCODE_UNDEFINED_COLUMN),
+					errmsg("column \"%s\" does not exist in referenced table",
+						   ref_colname),
+					parser_errposition(pstate, fkjn->location));
 		referenced_attnums = lappend_int(referenced_attnums, col_index + 1);
 	}
 
@@ -221,26 +221,26 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 
 	if (fkoid == InvalidOid)
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("there is no foreign key constraint on table \"%s\" (%s) referencing table \"%s\" (%s)",
-						referencing_rte->alias ? referencing_rte->alias->aliasname :
-						(referencing_rte->relid == InvalidOid) ? "<unnamed derived table>" :
-						get_rel_name(referencing_rte->relid),
-						column_list_to_string(referencing_cols),
-						referenced_rte->alias ? referenced_rte->alias->aliasname :
-						(referenced_rte->relid == InvalidOid) ? "<unnamed derived table>" :
-						get_rel_name(referenced_rte->relid),
-						column_list_to_string(referenced_cols)),
-				 parser_errposition(pstate, fkjn->location)));
+				errcode(ERRCODE_UNDEFINED_OBJECT),
+				errmsg("there is no foreign key constraint on table \"%s\" (%s) referencing table \"%s\" (%s)",
+					   referencing_rte->alias ? referencing_rte->alias->aliasname :
+					   (referencing_rte->relid == InvalidOid) ? "<unnamed derived table>" :
+					   get_rel_name(referencing_rte->relid),
+					   column_list_to_string(referencing_cols),
+					   referenced_rte->alias ? referenced_rte->alias->aliasname :
+					   (referenced_rte->relid == InvalidOid) ? "<unnamed derived table>" :
+					   get_rel_name(referenced_rte->relid),
+					   column_list_to_string(referenced_cols)),
+				parser_errposition(pstate, fkjn->location));
 
 	/* Check uniqueness preservation */
 	if (!list_member(referenced_rte->uniqueness_preservation, referenced_id))
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
-				 errmsg("foreign key join violation"),
-				 errdetail("referenced relation does not preserve uniqueness of keys"),
-				 parser_errposition(pstate, fkjn->location)));
+				errcode(ERRCODE_INVALID_FOREIGN_KEY),
+				errmsg("foreign key join violation"),
+				errdetail("referenced relation does not preserve uniqueness of keys"),
+				parser_errposition(pstate, fkjn->location));
 	}
 
 	/*
@@ -270,10 +270,10 @@ transformAndValidateForeignKeyJoin(ParseState *pstate, JoinExpr *join,
 		 * preservation property.
 		 */
 		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
-				 errmsg("foreign key join violation"),
-				 errdetail("referenced relation does not preserve all rows"),
-				 parser_errposition(pstate, fkjn->location)));
+				errcode(ERRCODE_INVALID_FOREIGN_KEY),
+				errmsg("foreign key join violation"),
+				errdetail("referenced relation does not preserve all rows"),
+				parser_errposition(pstate, fkjn->location));
 	}
 
 	fk_cols_unique = is_referencing_cols_unique(referencing_relid, referencing_base_attnums);
@@ -508,10 +508,10 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 
 					default:
 						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("foreign key joins involving this type of relation are not supported"),
-								 errdetail_relkind_not_supported(rel->rd_rel->relkind),
-								 parser_errposition(pstate, location)));
+								errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								errmsg("foreign key joins involving this type of relation are not supported"),
+								errdetail_relkind_not_supported(rel->rd_rel->relkind),
+								parser_errposition(pstate, location));
 				}
 
 				table_close(rel, AccessShareLock);
@@ -533,9 +533,9 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 
 				if (cte->cterecursive)
 					ereport(ERROR,
-							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-							 errmsg("foreign key joins involving this type of relation are not supported"),
-							 parser_errposition(pstate, location)));
+							errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							errmsg("foreign key joins involving this type of relation are not supported"),
+							parser_errposition(pstate, location));
 
 				base_rte = drill_down_to_base_rel_query(pstate,
 														castNode(Query, cte->ctequery),
@@ -560,9 +560,9 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 					node = list_nth(rte->joinaliasvars, attno - 1);
 					if (!IsA(node, Var))
 						ereport(ERROR,
-								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-								 errmsg("foreign key joins require direct column references, found expression"),
-								 parser_errposition(pstate, location)));
+								errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								errmsg("foreign key joins require direct column references, found expression"),
+								parser_errposition(pstate, location));
 
 					var = castNode(Var, node);
 
@@ -571,9 +571,9 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 						next_rtindex = var->varno;
 					else if (next_rtindex != var->varno)
 						ereport(ERROR,
-								(errcode(ERRCODE_UNDEFINED_TABLE),
-								 errmsg("key columns must all come from the same table"),
-								 parser_errposition(pstate, location)));
+								errcode(ERRCODE_UNDEFINED_TABLE),
+								errmsg("key columns must all come from the same table"),
+								parser_errposition(pstate, location));
 
 					next_attnums = lappend_int(next_attnums, var->varattno);
 				}
@@ -591,9 +591,9 @@ drill_down_to_base_rel(ParseState *pstate, RangeTblEntry *rte,
 
 		default:
 			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("foreign key joins involving this type of relation are not supported"),
-					 parser_errposition(pstate, location)));
+					errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					errmsg("foreign key joins involving this type of relation are not supported"),
+					parser_errposition(pstate, location));
 	}
 
 	return base_rte;
@@ -614,9 +614,9 @@ drill_down_to_base_rel_query(ParseState *pstate, Query *query,
 
 	if (query->setOperations != NULL)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("foreign key joins involving set operations are not supported"),
-				 parser_errposition(pstate, location)));
+				errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				errmsg("foreign key joins involving set operations are not supported"),
+				parser_errposition(pstate, location));
 
 	/* XXX: Overly aggressive disallowing */
 	if (query->commandType != CMD_SELECT ||
@@ -626,9 +626,9 @@ drill_down_to_base_rel_query(ParseState *pstate, Query *query,
 		query->hasTargetSRFs ||
 		query->havingQual)
 		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("foreign key joins not supported for these relations"),
-				 parser_errposition(pstate, location)));
+				errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				errmsg("foreign key joins not supported for these relations"),
+				parser_errposition(pstate, location));
 
 	foreach(lc, attnums)
 	{
@@ -640,10 +640,10 @@ drill_down_to_base_rel_query(ParseState *pstate, Query *query,
 
 		if (!IsA(matching_tle->expr, Var))
 			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("target entry \"%s\" is an expression, not a direct column reference",
-							matching_tle->resname),
-					 parser_errposition(pstate, location)));
+					errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					errmsg("target entry \"%s\" is an expression, not a direct column reference",
+						   matching_tle->resname),
+					parser_errposition(pstate, location));
 
 		var = castNode(Var, matching_tle->expr);
 
@@ -652,10 +652,10 @@ drill_down_to_base_rel_query(ParseState *pstate, Query *query,
 			next_rtindex = var->varno;
 		else if (next_rtindex != var->varno)
 			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_TABLE),
-					 errmsg("key columns must all come from the same table"),
-					 parser_errposition(pstate,
-										exprLocation((Node *) matching_tle->expr))));
+					errcode(ERRCODE_UNDEFINED_TABLE),
+					errmsg("key columns must all come from the same table"),
+					parser_errposition(pstate,
+									   exprLocation((Node *) matching_tle->expr)));
 
 		next_attnums = lappend_int(next_attnums, var->varattno);
 	}
