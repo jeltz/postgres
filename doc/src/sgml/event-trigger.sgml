@@ -1232,7 +1232,7 @@ noddl(PG_FUNCTION_ARGS)
              errmsg("command \"%s\" denied",
                     GetCommandTagName(trigdata->tag))));
 
-    PG_RETURN_NULL();
+    PG_RETURN_VOID();
 }
 ]]></programlisting>
    </para>
