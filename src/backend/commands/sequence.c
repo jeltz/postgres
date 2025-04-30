@@ -1299,7 +1299,6 @@ init_params(ParseState *pstate, List *options, bool for_identity,
 			if (start_value)
 				errorConflictingDefElem(defel, pstate);
 			start_value = defel;
-			*need_seq_rewrite = true;
 		}
 		else if (strcmp(defel->defname, "restart") == 0)
 		{
