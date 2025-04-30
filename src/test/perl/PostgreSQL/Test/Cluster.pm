@@ -1050,7 +1050,7 @@ sub start
 
 	if ($ret != 0)
 	{
-		print "# pg_ctl start failed; see logfile for details: "
+		diag "# pg_ctl start failed; see logfile for details: "
 		  . $self->logfile . "\n";
 
 		# pg_ctl could have timed out, so check to see if there's a pid file;
