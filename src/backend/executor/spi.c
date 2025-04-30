@@ -1975,8 +1975,6 @@ SPI_result_code_string(int code)
 
 	switch (code)
 	{
-		case SPI_ERROR_CONNECT:
-			return "SPI_ERROR_CONNECT";
 		case SPI_ERROR_COPY:
 			return "SPI_ERROR_COPY";
 		case SPI_ERROR_OPUNKNOWN:
