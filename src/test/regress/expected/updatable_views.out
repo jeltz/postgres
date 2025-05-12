@@ -3668,6 +3668,14 @@ select * from uv_iocu_tab;
  xyxyxy | 1
 (1 row)
 
+insert into uv_iocu_view as v (a, b) values ('xyxyxy', 2)
+   on conflict (a) do update set b = excluded.b where v.b > excluded.b;
+select * from uv_iocu_tab;
+   a    | b 
+--------+---
+ xyxyxy | 1
+(1 row)
+
 -- OK to access view columns that are not present in underlying base
 -- relation in the ON CONFLICT portion of the query
 insert into uv_iocu_view (a, b) values ('xyxyxy', 3)
@@ -3677,6 +3685,12 @@ select * from uv_iocu_tab;
 --------+---
  xyxyxy | 2
 (1 row)
+
+insert into uv_iocu_view as v (a, b) values ('xyxyxy', 1)
+   on conflict (a) do select where v.b = excluded.b returning *;
+ b | c | a | two 
+---+---+---+-----
+(0 rows)
 
 explain (costs off)
 insert into uv_iocu_view (a, b) values ('xyxyxy', 3)

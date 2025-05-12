@@ -3652,11 +3652,12 @@ rewriteTargetView(Query *parsetree, Relation view)
 	}
 
 	/*
-	 * For INSERT .. ON CONFLICT .. DO UPDATE, we must also update assorted
-	 * stuff in the onConflict data structure.
+	 * For INSERT .. ON CONFLICT .. DO UPDATE/SELECT, we must also update
+	 * assorted stuff in the onConflict data structure.
 	 */
 	if (parsetree->onConflict &&
-		parsetree->onConflict->action == ONCONFLICT_UPDATE)
+		(parsetree->onConflict->action == ONCONFLICT_UPDATE ||
+		 parsetree->onConflict->action == ONCONFLICT_SELECT))
 	{
 		Index		old_exclRelIndex,
 					new_exclRelIndex;
@@ -3668,6 +3669,8 @@ rewriteTargetView(Query *parsetree, Relation view)
 		 * Like the INSERT/UPDATE code above, update the resnos in the
 		 * auxiliary UPDATE targetlist to refer to columns of the base
 		 * relation.
+		 *
+		 * Does nothing for DO SELECT since the onCoflictSet is empty.
 		 */
 		foreach(lc, parsetree->onConflict->onConflictSet)
 		{
