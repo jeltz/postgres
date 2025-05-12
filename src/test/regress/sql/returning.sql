@@ -223,6 +223,19 @@ INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
             o.tableoid::regclass, o.ctid, o.*,
             n.tableoid::regclass, n.ctid, n.*, *;
 
+-- INSERT ... ON CONFLICT ... SELECT has OLD and NEW
+EXPLAIN (verbose, costs off)
+INSERT INTO foo VALUES (4, 'conflict'), (6, 'ok')
+  ON CONFLICT (f1) DO SELECT
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *;
+INSERT INTO foo VALUES (4, 'conflict'), (6, 'ok')
+  ON CONFLICT (f1) DO SELECT
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *;
+
 -- UPDATE has OLD and NEW
 EXPLAIN (verbose, costs off)
 UPDATE foo SET f4 = 100 WHERE f1 = 5

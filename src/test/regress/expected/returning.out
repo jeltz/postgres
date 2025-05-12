@@ -490,6 +490,34 @@ INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
           |       |    |    |    |    | foo      | (0,6) |  5 | ok         | 42 | 99 |  5 | ok         | 42 | 99
 (2 rows)
 
+-- INSERT ... ON CONFLICT ... SELECT has OLD and NEW
+EXPLAIN (verbose, costs off)
+INSERT INTO foo VALUES (4, 'conflict'), (6, 'ok')
+  ON CONFLICT (f1) DO SELECT
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *;
+                                                                        QUERY PLAN                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Insert on pg_temp.foo
+   Output: (o.tableoid)::regclass, o.ctid, o.f1, o.f2, o.f3, o.f4, (n.tableoid)::regclass, n.ctid, n.f1, n.f2, n.f3, n.f4, foo.f1, foo.f2, foo.f3, foo.f4
+   Conflict Resolution: SELECT
+   Conflict Arbiter Indexes: foo_f1_idx
+   ->  Values Scan on "*VALUES*"
+         Output: "*VALUES*".column1, "*VALUES*".column2, 42, '99'::bigint
+(6 rows)
+
+INSERT INTO foo VALUES (4, 'conflict'), (6, 'ok')
+  ON CONFLICT (f1) DO SELECT
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *;
+ tableoid | ctid  | f1 |     f2     | f3 | f4 | tableoid | ctid  | f1 |     f2     | f3 | f4 | f1 |     f2     | f3 | f4 
+----------+-------+----+------------+----+----+----------+-------+----+------------+----+----+----+------------+----+----
+ foo      | (0,5) |  4 | conflicted | -1 | 99 | foo      | (0,5) |  4 | conflicted | -1 | 99 |  4 | conflicted | -1 | 99
+          |       |    |            |    |    | foo      | (0,7) |  6 | ok         | 42 | 99 |  6 | ok         | 42 | 99
+(2 rows)
+
 -- UPDATE has OLD and NEW
 EXPLAIN (verbose, costs off)
 UPDATE foo SET f4 = 100 WHERE f1 = 5
@@ -514,7 +542,7 @@ UPDATE foo SET f4 = 100 WHERE f1 = 5
             old.f4::text||'->'||new.f4::text AS change;
  tableoid | ctid  | f1 | f2 | f3 | f4 |     old      | tableoid | ctid  | f1 | f2 | f3 | f4  |      new      | change  
 ----------+-------+----+----+----+----+--------------+----------+-------+----+----+----+-----+---------------+---------
- foo      | (0,6) |  5 | ok | 42 | 99 | (5,ok,42,99) | foo      | (0,7) |  5 | ok | 42 | 100 | (5,ok,42,100) | 99->100
+ foo      | (0,6) |  5 | ok | 42 | 99 | (5,ok,42,99) | foo      | (0,8) |  5 | ok | 42 | 100 | (5,ok,42,100) | 99->100
 (1 row)
 
 -- DELETE has OLD, but not NEW
@@ -537,7 +565,7 @@ DELETE FROM foo WHERE f1 = 5
             new.tableoid::regclass, new.ctid, new.*, *;
  tableoid | ctid  | f1 | f2 | f3 | f4  | tableoid | ctid | f1 | f2 | f3 | f4 | f1 | f2 | f3 | f4  
 ----------+-------+----+----+----+-----+----------+------+----+----+----+----+----+----+----+-----
- foo      | (0,7) |  5 | ok | 42 | 100 |          |      |    |    |    |    |  5 | ok | 42 | 100
+ foo      | (0,8) |  5 | ok | 42 | 100 |          |      |    |    |    |    |  5 | ok | 42 | 100
 (1 row)
 
 -- RETURNING OLD and NEW from subquery
@@ -797,9 +825,10 @@ UPDATE foo SET f4 = f4 + 1 RETURNING old, new;
 -------------------------------+------------------------------
  (1,xxx,20)                    | (1,xxx,21)
  (2,more,141)                  | (2,more,142)
+ (6,ok,99)                     | (6,ok,100)
  (4,"conflicted (deleted)",-1) | (4,"conflicted (deleted)",0)
  (3,zoo2,70)                   | (3,zoo2,71)
-(4 rows)
+(5 rows)
 
 -- INSERT/DELETE on zero column table
 CREATE TABLE zerocol();

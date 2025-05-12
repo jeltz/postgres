@@ -560,7 +560,8 @@ INSERT INTO atest5 VALUES (5,5,5); -- fail
 UPDATE atest5 SET three = 10; -- ok
 UPDATE atest5 SET one = 8; -- fail
 UPDATE atest5 SET three = 5, one = 2; -- fail
--- Check that column level privs are enforced in RETURNING
+
+-- Check that column level privs are enforced in ON CONFLICT DO UPDATE
 -- Ok.
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = 10;
 -- Error. No SELECT on column three.
@@ -572,8 +573,26 @@ INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = 10 RE
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLUDED.one;
 -- Error. No select rights on three
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLUDED.three;
-INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set one = 8; -- fails (due to UPDATE)
-INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10; -- fails (due to INSERT)
+-- Error. Due to UPDATE
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set one = 8;
+-- Error. Due to INSERT
+INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10;
+
+-- Check that column level privs are enforced in ON CONFLICT DO SELECT
+-- Ok.
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT RETURNING 42;
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT FOR UPDATE RETURNING 42;
+-- Error. No SELECT on column three.
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT RETURNING atest5.three;
+-- Ok.  May SELECT on column "one":
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT RETURNING atest5.one;
+-- Check that column level privileges are enforced for EXCLUDED
+-- Ok. we may select one
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT WHERE atest5.one = EXCLUDED.one RETURNING 42;
+---- Error. No select rights on three
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT WHERE atest5.one = EXCLUDED.three RETURNING 42;
+-- Error. Due to INSERT
+INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO SELECT RETURNING 42;
 
 -- Check that the columns in the inference require select privileges
 INSERT INTO atest5(four) VALUES (4); -- fail

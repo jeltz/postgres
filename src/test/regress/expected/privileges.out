@@ -921,7 +921,7 @@ UPDATE atest5 SET one = 8; -- fail
 ERROR:  permission denied for table atest5
 UPDATE atest5 SET three = 5, one = 2; -- fail
 ERROR:  permission denied for table atest5
--- Check that column level privs are enforced in RETURNING
+-- Check that column level privs are enforced in ON CONFLICT DO UPDATE
 -- Ok.
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = 10;
 -- Error. No SELECT on column three.
@@ -940,9 +940,48 @@ INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLU
 -- Error. No select rights on three
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLUDED.three;
 ERROR:  permission denied for table atest5
-INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set one = 8; -- fails (due to UPDATE)
+-- Error. Due to UPDATE
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set one = 8;
 ERROR:  permission denied for table atest5
-INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10; -- fails (due to INSERT)
+-- Error. Due to INSERT
+INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10;
+ERROR:  permission denied for table atest5
+-- Check that column level privs are enforced in ON CONFLICT DO SELECT
+-- Ok.
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT RETURNING 42;
+ ?column? 
+----------
+       42
+(1 row)
+
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT FOR UPDATE RETURNING 42;
+ ?column? 
+----------
+       42
+(1 row)
+
+-- Error. No SELECT on column three.
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT RETURNING atest5.three;
+ERROR:  permission denied for table atest5
+-- Ok.  May SELECT on column "one":
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT RETURNING atest5.one;
+ one 
+-----
+    
+(1 row)
+
+-- Check that column level privileges are enforced for EXCLUDED
+-- Ok. we may select one
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT WHERE atest5.one = EXCLUDED.one RETURNING 42;
+ ?column? 
+----------
+(0 rows)
+
+---- Error. No select rights on three
+INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO SELECT WHERE atest5.one = EXCLUDED.three RETURNING 42;
+ERROR:  permission denied for table atest5
+-- Error. Due to INSERT
+INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO SELECT RETURNING 42;
 ERROR:  permission denied for table atest5
 -- Check that the columns in the inference require select privileges
 INSERT INTO atest5(four) VALUES (4); -- fail
