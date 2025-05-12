@@ -2139,6 +2139,30 @@ select * from inhpar order by f1;  -- tuple order might be unstable here
  10 | 10-
 (10 rows)
 
+insert into inhpar as i values (3, '3-+'), (8, '8-+'), (11, '11-+') on conflict (f1)
+  do select where i.f2 = excluded.f2 returning *;
+ f1 |  f2  
+----+------
+  3 | 3-+
+ 11 | 11-+
+(2 rows)
+
+select * from inhpar order by f1;  -- tuple order might be unstable here
+ f1 |  f2  
+----+------
+  1 | 1-
+  2 | 2-
+  3 | 3-+
+  4 | 4-
+  5 | 5-
+  6 | 6-
+  7 | 7-+
+  8 | 8-
+  9 | 9-
+ 10 | 10-
+ 11 | 11-+
+(11 rows)
+
 drop table inhpar cascade;
 --
 -- Check handling of a constant-null CHECK constraint

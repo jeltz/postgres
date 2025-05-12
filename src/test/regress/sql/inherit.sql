@@ -808,6 +808,9 @@ select * from inhpar;
 insert into inhpar as i values (3), (7) on conflict (f1)
   do update set (f1, f2) = (select i.f1, i.f2 || '+');
 select * from inhpar order by f1;  -- tuple order might be unstable here
+insert into inhpar as i values (3, '3-+'), (8, '8-+'), (11, '11-+') on conflict (f1)
+  do select where i.f2 = excluded.f2 returning *;
+select * from inhpar order by f1;  -- tuple order might be unstable here
 
 drop table inhpar cascade;
 

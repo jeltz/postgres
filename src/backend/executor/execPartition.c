@@ -729,14 +729,14 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
 		/*
 		 * In the DO UPDATE case, we have some more state to initialize.
 		 */
-		if (node->onConflictAction == ONCONFLICT_UPDATE)
+		if (node->onConflictAction == ONCONFLICT_UPDATE ||
+			node->onConflictAction == ONCONFLICT_SELECT)
 		{
 			OnConflictSetState *onconfl = makeNode(OnConflictSetState);
 			TupleConversionMap *map;
 
 			map = ExecGetRootToChildMap(leaf_part_rri, estate);
 
-			Assert(node->onConflictSet != NIL);
 			Assert(rootResultRelInfo->ri_onConflict != NULL);
 
 			leaf_part_rri->ri_onConflict = onconfl;
@@ -749,6 +749,10 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
 			onconfl->oc_Existing =
 				table_slot_create(leaf_part_rri->ri_RelationDesc,
 								  &mtstate->ps.state->es_tupleTable);
+
+			/* We can always safely copy the lock strength from the root */
+			onconfl->oc_LockingStrength =
+				rootResultRelInfo->ri_onConflict->oc_LockingStrength;
 
 			/*
 			 * If the partition's tuple descriptor matches exactly the root
