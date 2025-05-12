@@ -5073,18 +5073,14 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	 * If needed, Initialize target list, projection and qual for ON CONFLICT
 	 * DO UPDATE.
 	 */
-	if (node->onConflictAction == ONCONFLICT_UPDATE)
+	if (node->onConflictAction == ONCONFLICT_UPDATE ||
+		node->onConflictAction == ONCONFLICT_SELECT)
 	{
 		OnConflictSetState *onconfl = makeNode(OnConflictSetState);
-		ExprContext *econtext;
-		TupleDesc	relationDesc;
 
 		/* already exists if created by RETURNING processing above */
 		if (mtstate->ps.ps_ExprContext == NULL)
 			ExecAssignExprContext(estate, &mtstate->ps);
-
-		econtext = mtstate->ps.ps_ExprContext;
-		relationDesc = resultRelInfo->ri_RelationDesc->rd_att;
 
 		/* create state for DO UPDATE SET operation */
 		resultRelInfo->ri_onConflict = onconfl;
@@ -5094,51 +5090,31 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			table_slot_create(resultRelInfo->ri_RelationDesc,
 							  &mtstate->ps.state->es_tupleTable);
 
-		/*
-		 * Create the tuple slot for the UPDATE SET projection. We want a slot
-		 * of the table's type here, because the slot will be used to insert
-		 * into the table, and for RETURNING processing - which may access
-		 * system attributes.
-		 */
-		onconfl->oc_ProjSlot =
-			table_slot_create(resultRelInfo->ri_RelationDesc,
-							  &mtstate->ps.state->es_tupleTable);
-
-		/* build UPDATE SET projection state */
-		onconfl->oc_ProjInfo =
-			ExecBuildUpdateProjection(node->onConflictSet,
-									  true,
-									  node->onConflictCols,
-									  relationDesc,
-									  econtext,
-									  onconfl->oc_ProjSlot,
-									  &mtstate->ps);
-
-		/* initialize state to evaluate the WHERE clause, if any */
-		if (node->onConflictWhere)
+		if (node->onConflictAction == ONCONFLICT_UPDATE)
 		{
-			ExprState  *qualexpr;
+			ExprContext *econtext = mtstate->ps.ps_ExprContext;
+			TupleDesc	relationDesc = resultRelInfo->ri_RelationDesc->rd_att;
 
-			qualexpr = ExecInitQual((List *) node->onConflictWhere,
-									&mtstate->ps);
-			onconfl->oc_WhereClause = qualexpr;
+			/*
+			 * Create the tuple slot for the UPDATE SET projection. We want a
+			 * slot of the table's type here, because the slot will be used to
+			 * insert into the table, and for RETURNING processing - which may
+			 * access system attributes.
+			 */
+			onconfl->oc_ProjSlot =
+				table_slot_create(resultRelInfo->ri_RelationDesc,
+								  &mtstate->ps.state->es_tupleTable);
+
+			/* build UPDATE SET projection state */
+			onconfl->oc_ProjInfo =
+				ExecBuildUpdateProjection(node->onConflictSet,
+										  true,
+										  node->onConflictCols,
+										  relationDesc,
+										  econtext,
+										  onconfl->oc_ProjSlot,
+										  &mtstate->ps);
 		}
-	}
-	else if (node->onConflictAction == ONCONFLICT_SELECT)
-	{
-		OnConflictSetState *onconfl = makeNode(OnConflictSetState);
-
-		/* already exists if created by RETURNING processing above */
-		if (mtstate->ps.ps_ExprContext == NULL)
-			ExecAssignExprContext(estate, &mtstate->ps);
-
-		/* create state for DO SELECT operation */
-		resultRelInfo->ri_onConflict = onconfl;
-
-		/* initialize slot for the existing tuple */
-		onconfl->oc_Existing =
-			table_slot_create(resultRelInfo->ri_RelationDesc,
-							  &mtstate->ps.state->es_tupleTable);
 
 		/* initialize state to evaluate the WHERE clause, if any */
 		if (node->onConflictWhere)

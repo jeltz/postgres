@@ -779,55 +779,58 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
 			}
 			else
 			{
-				List	   *onconflset;
-				List	   *onconflcols;
+				if (node->onConflictAction == ONCONFLICT_UPDATE)
+				{
+					List	   *onconflset;
+					List	   *onconflcols;
 
-				/*
-				 * Translate expressions in onConflictSet to account for
-				 * different attribute numbers.  For that, map partition
-				 * varattnos twice: first to catch the EXCLUDED
-				 * pseudo-relation (INNER_VAR), and second to handle the main
-				 * target relation (firstVarno).
-				 */
-				onconflset = copyObject(node->onConflictSet);
-				if (part_attmap == NULL)
-					part_attmap =
-						build_attrmap_by_name(RelationGetDescr(partrel),
-											  RelationGetDescr(firstResultRel),
-											  false);
-				onconflset = (List *)
-					map_variable_attnos((Node *) onconflset,
-										INNER_VAR, 0,
-										part_attmap,
-										RelationGetForm(partrel)->reltype,
-										&found_whole_row);
-				/* We ignore the value of found_whole_row. */
-				onconflset = (List *)
-					map_variable_attnos((Node *) onconflset,
-										firstVarno, 0,
-										part_attmap,
-										RelationGetForm(partrel)->reltype,
-										&found_whole_row);
-				/* We ignore the value of found_whole_row. */
+					/*
+					 * Translate expressions in onConflictSet to account for
+					 * different attribute numbers.  For that, map partition
+					 * varattnos twice: first to catch the EXCLUDED
+					 * pseudo-relation (INNER_VAR), and second to handle the
+					 * main target relation (firstVarno).
+					 */
+					onconflset = copyObject(node->onConflictSet);
+					if (part_attmap == NULL)
+						part_attmap =
+							build_attrmap_by_name(RelationGetDescr(partrel),
+												  RelationGetDescr(firstResultRel),
+												  false);
+					onconflset = (List *)
+						map_variable_attnos((Node *) onconflset,
+											INNER_VAR, 0,
+											part_attmap,
+											RelationGetForm(partrel)->reltype,
+											&found_whole_row);
+					/* We ignore the value of found_whole_row. */
+					onconflset = (List *)
+						map_variable_attnos((Node *) onconflset,
+											firstVarno, 0,
+											part_attmap,
+											RelationGetForm(partrel)->reltype,
+											&found_whole_row);
+					/* We ignore the value of found_whole_row. */
 
-				/* Finally, adjust the target colnos to match the partition. */
-				onconflcols = adjust_partition_colnos(node->onConflictCols,
-													  leaf_part_rri);
+					/* Finally, adjust the target colnos to match the partition. */
+					onconflcols = adjust_partition_colnos(node->onConflictCols,
+														  leaf_part_rri);
 
-				/* create the tuple slot for the UPDATE SET projection */
-				onconfl->oc_ProjSlot =
-					table_slot_create(partrel,
-									  &mtstate->ps.state->es_tupleTable);
+					/* create the tuple slot for the UPDATE SET projection */
+					onconfl->oc_ProjSlot =
+						table_slot_create(partrel,
+										  &mtstate->ps.state->es_tupleTable);
 
-				/* build UPDATE SET projection state */
-				onconfl->oc_ProjInfo =
-					ExecBuildUpdateProjection(onconflset,
-											  true,
-											  onconflcols,
-											  partrelDesc,
-											  econtext,
-											  onconfl->oc_ProjSlot,
-											  &mtstate->ps);
+					/* build UPDATE SET projection state */
+					onconfl->oc_ProjInfo =
+						ExecBuildUpdateProjection(onconflset,
+												  true,
+												  onconflcols,
+												  partrelDesc,
+												  econtext,
+												  onconfl->oc_ProjSlot,
+												  &mtstate->ps);
+				}
 
 				/*
 				 * If there is a WHERE clause, initialize state where it will
