@@ -872,7 +872,7 @@ u_strFoldCase_default(UChar *dest, int32_t destCapacity,
 					  UErrorCode *pErrorCode)
 {
 	uint32		options = U_FOLD_CASE_DEFAULT;
-	char		lang[3];
+	char		lang[ULOC_LANG_CAPACITY];
 	UErrorCode	status;
 
 	/*
@@ -882,7 +882,7 @@ u_strFoldCase_default(UChar *dest, int32_t destCapacity,
 	 * languages to enable the option.
 	 */
 	status = U_ZERO_ERROR;
-	uloc_getLanguage(locale, lang, 3, &status);
+	uloc_getLanguage(locale, lang, ULOC_LANG_CAPACITY, &status);
 	if (U_SUCCESS(status))
 	{
 		/*
