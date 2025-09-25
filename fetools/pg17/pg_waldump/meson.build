@@ -16,11 +16,21 @@ if host_system == 'windows'
     '--FILEDESC', 'pg_waldump - decode and display WA'])
 endif
 
+link_w  = []
+include_dirs = [postgres_inc]
+
+if percona_ext == true
+  link_w = [pg_tde_frontend]
+  include_dirs = [postgres_inc, pg_tde_inc]
+endif
+
 pg_waldump = executable('pg_waldump',
   pg_waldump_sources,
   dependencies: [frontend_code, lz4, zstd],
   c_args: ['-DFRONTEND'], # needed for xlogreader et al
   kwargs: default_bin_args,
+  include_directories: include_dirs,
+  link_with: link_w
 )
 bin_targets += pg_waldump
 
