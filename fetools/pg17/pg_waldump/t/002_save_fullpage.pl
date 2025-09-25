@@ -9,6 +9,9 @@ use PostgreSQL::Test::RecursiveCopy;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_wal
+	'pg_waldump needs extra options for encrypted WAL';
+
 my ($blocksize, $walfile_name);
 
 # Function to extract the LSN from the given block structure
