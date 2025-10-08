@@ -2796,11 +2796,13 @@ select tgrelid::regclass, rtrim(tgname, '0123456789') as tgname,
 ---------+-------------------------+------------------------+-----------
  child1  | RI_ConstraintTrigger_c_ | "RI_FKey_check_ins"    | O
  child1  | RI_ConstraintTrigger_c_ | "RI_FKey_check_upd"    | O
+ child1  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_del" | O
+ child1  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_upd" | O
  parent  | RI_ConstraintTrigger_c_ | "RI_FKey_check_ins"    | O
  parent  | RI_ConstraintTrigger_c_ | "RI_FKey_check_upd"    | O
  parent  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_del" | O
  parent  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_upd" | O
-(6 rows)
+(8 rows)
 
 alter table parent disable trigger all;
 select tgrelid::regclass, rtrim(tgname, '0123456789') as tgname,
@@ -2811,11 +2813,13 @@ select tgrelid::regclass, rtrim(tgname, '0123456789') as tgname,
 ---------+-------------------------+------------------------+-----------
  child1  | RI_ConstraintTrigger_c_ | "RI_FKey_check_ins"    | D
  child1  | RI_ConstraintTrigger_c_ | "RI_FKey_check_upd"    | D
+ child1  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_del" | D
+ child1  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_upd" | D
  parent  | RI_ConstraintTrigger_c_ | "RI_FKey_check_ins"    | D
  parent  | RI_ConstraintTrigger_c_ | "RI_FKey_check_upd"    | D
  parent  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_del" | D
  parent  | RI_ConstraintTrigger_a_ | "RI_FKey_noaction_upd" | D
-(6 rows)
+(8 rows)
 
 drop table parent, child1;
 -- Verify that firing state propagates correctly on creation, too
@@ -3012,6 +3016,10 @@ NOTICE:  trigger = child3_delete_trig, old table = (42,CCC)
 -- copy into parent sees parent-format tuples
 copy parent (a, b) from stdin;
 NOTICE:  trigger = parent_insert_trig, new table = (AAA,42), (BBB,42), (CCC,42)
+-- check detach/reattach behavior; statement triggers with transition tables
+-- should not prevent a table from becoming a partition again
+alter table parent detach partition child1;
+alter table parent attach partition child1 for values in ('AAA');
 -- DML affecting parent sees tuples collected from children even if
 -- there is no transition table trigger on the children
 drop trigger child1_insert_trig on child1;
@@ -3209,6 +3217,10 @@ NOTICE:  trigger = parent_insert_trig, new table = (AAA,42), (BBB,42), (CCC,42)
 create index on parent(b);
 copy parent (a, b) from stdin;
 NOTICE:  trigger = parent_insert_trig, new table = (DDD,42)
+-- check disinherit/reinherit behavior; statement triggers with transition
+-- tables should not prevent a table from becoming an inheritance child again
+alter table child1 no inherit parent;
+alter table child1 inherit parent;
 -- DML affecting parent sees tuples collected from children even if
 -- there is no transition table trigger on the children
 drop trigger child1_insert_trig on child1;

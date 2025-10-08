@@ -13,6 +13,9 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	'reads LSN directly from relation files';
+
 # Find the largest LSN in the set of pages part of the given relation
 # file.  This is used for offline checks of page consistency.  The LSN
 # is historically stored as a set of two numbers of 4 byte-length

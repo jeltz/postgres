@@ -8,7 +8,7 @@
 
 project('postgresql',
   ['c'],
-  version: '17.4',
+  version: '17.6',
   license: 'PostgreSQL',
 
   # We want < 0.56 for python 3.5 compatibility on old platforms. EPEL for
@@ -1059,7 +1059,7 @@ if not perlopt.disabled()
       if cc.get_id() == 'msvc'
         # prevent binary mismatch between MSVC built plperl and Strawberry or
         # msys ucrt perl libraries
-        perl_v = run_command(perl, '-V').stdout()
+        perl_v = run_command(perl, '-V', check: false).stdout()
         if not perl_v.contains('USE_THREAD_SAFE_LOCALE')
           perl_ccflags += ['-DNO_THREAD_SAFE_LOCALE']
         endif
@@ -1897,10 +1897,7 @@ if cc.links('''
   cdata.set('HAVE__BUILTIN_OP_OVERFLOW', 1)
 endif
 
-
-# XXX: The configure.ac check for __cpuid() is broken, we don't copy that
-# here. To prevent problems due to two detection methods working, stop
-# checking after one.
+# Check for __get_cpuid() and __cpuid().
 if cc.links('''
     #include <cpuid.h>
     int main(int arg, char **argv)
@@ -2478,6 +2475,8 @@ decl_checks = [
 decl_checks += [
   ['preadv', 'sys/uio.h'],
   ['pwritev', 'sys/uio.h'],
+  ['strchrnul', 'string.h'],
+  ['memset_s', 'string.h', '#define __STDC_WANT_LIB_EXT1__ 1'],
 ]
 
 # Check presence of some optional LLVM functions.
@@ -2491,11 +2490,28 @@ endif
 foreach c : decl_checks
   func = c.get(0)
   header = c.get(1)
-  args = c.get(2, {})
+  prologue = c.get(2, '')
+  args = c.get(3, {})
   varname = 'HAVE_DECL_' + func.underscorify().to_upper()
 
-  found = cc.has_header_symbol(header, func,
-    args: test_c_args, include_directories: postgres_inc,
+  found = cc.compiles('''
+@0@
+#include <@1@>
+
+int main()
+{
+#ifndef @2@
+    (void) @2@;
+#endif
+
+return 0;
+}
+'''.format(prologue, header, func),
+    name: 'test whether @0@ is declared'.format(func),
+    # need to add cflags_warn to get at least
+    # -Werror=unguarded-availability-new if applicable
+    args: test_c_args + cflags_warn,
+    include_directories: postgres_inc,
     kwargs: args)
   cdata.set10(varname, found, description:
 '''Define to 1 if you have the declaration of `@0@', and to 0 if you
@@ -2719,7 +2735,6 @@ func_checks = [
   ['inet_pton'],
   ['kqueue'],
   ['mbstowcs_l'],
-  ['memset_s'],
   ['mkdtemp'],
   ['posix_fadvise'],
   ['posix_fallocate'],
@@ -2733,7 +2748,6 @@ func_checks = [
   ['shm_unlink', {'dependencies': [rt_dep], 'define': false}],
   ['shmget', {'dependencies': [cygipc_dep], 'define': false}],
   ['socket', {'dependencies': [socket_dep], 'define': false}],
-  ['strchrnul'],
   ['strerror_r', {'dependencies': [thread_dep]}],
   ['strlcat'],
   ['strlcpy'],
@@ -3386,6 +3400,8 @@ test_initdb_template = meson.build_root() / 'tmp_install' / 'initdb-template'
 test_env.set('PG_REGRESS', pg_regress.full_path())
 test_env.set('REGRESS_SHLIB', regress_module.full_path())
 test_env.set('INITDB_TEMPLATE', test_initdb_template)
+# for Cluster.pm's portlock logic
+test_env.set('top_builddir', meson.build_root())
 
 # Test suites that are not safe by default but can be run if selected
 # by the user via the whitespace-separated list in variable PG_TEST_EXTRA.
@@ -3428,6 +3444,48 @@ sys.exit(sp.returncode)
      env: test_env,
      suite: ['setup'])
 
+test_tde_template_dir = test_install_destdir / 'pg_tde_template'
+test_env.set('TDE_TEMPLATE_DIR', test_tde_template_dir)
+
+test('init_tde_files',
+     find_program('sh', required: true, native: true),
+     args: [
+       '-c', '''
+set -e
+
+if [ -z "$TDE_MODE" ]; then
+	exit;
+fi
+
+set -e
+
+PATH="$1":$PATH
+TMP_DATA_DIR=$(mktemp -d)
+
+rm -rf "$2"
+mkdir "$2"
+
+pg_ctl -D "$TMP_DATA_DIR" init -o '--set shared_preload_libraries=pg_tde'
+
+postgres --single -F -j -D "$TMP_DATA_DIR" postgres << SQL
+	CREATE EXTENSION pg_tde;
+	SELECT pg_tde_add_global_key_provider_file('global_test_provider', '$2/pg_tde_test_keys');
+	SELECT pg_tde_create_key_using_global_key_provider('test_default_key', 'global_test_provider');
+	SELECT pg_tde_set_default_key_using_global_key_provider('test_default_key', 'global_test_provider');
+SQL
+
+cp -RPp "$TMP_DATA_DIR/pg_tde" "$2/pg_tde"
+rm -rf "$TMP_DATA_DIR"
+''',
+       'init_tde_files',
+       temp_install_bindir,
+       test_tde_template_dir
+     ],
+     priority: setup_tests_priority - 2,
+     timeout: 300,
+     is_parallel: false,
+     env: test_env,
+     suite: ['setup'])
 
 
 ###############################################################

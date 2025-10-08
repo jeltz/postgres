@@ -387,6 +387,11 @@ CREATE TABLE gtest24 (a int PRIMARY KEY, b gtestdomain1 GENERATED ALWAYS AS (a *
 INSERT INTO gtest24 (a) VALUES (4);  -- ok
 INSERT INTO gtest24 (a) VALUES (6);  -- error
 
+CREATE DOMAIN gtestdomainnn AS int CHECK (VALUE IS NOT NULL);
+CREATE TABLE gtest24nn (a int, b gtestdomainnn GENERATED ALWAYS AS (a * 2) STORED);
+INSERT INTO gtest24nn (a) VALUES (4);  -- ok
+INSERT INTO gtest24nn (a) VALUES (NULL);  -- error
+
 -- typed tables (currently not supported)
 CREATE TYPE gtest_type AS (f1 integer, f2 text, f3 bigint);
 CREATE TABLE gtest28 OF gtest_type (f1 WITH OPTIONS GENERATED ALWAYS AS (f2 *2) STORED);
@@ -544,6 +549,31 @@ ALTER TABLE ONLY gtest30 ALTER COLUMN b DROP EXPRESSION;  -- error
 \d gtest30
 \d gtest30_1
 ALTER TABLE gtest30_1 ALTER COLUMN b DROP EXPRESSION;  -- error
+
+-- composite type dependencies
+CREATE TABLE gtest31_1 (a int, b text GENERATED ALWAYS AS ('hello') STORED, c text);
+CREATE TABLE gtest31_2 (x int, y gtest31_1);
+ALTER TABLE gtest31_1 ALTER COLUMN b TYPE varchar;  -- fails
+
+-- bug #18970: these cases are unsupported, but make sure they fail cleanly
+ALTER TABLE gtest31_2 ADD CONSTRAINT cc CHECK ((y).b IS NOT NULL);
+ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello1');
+ALTER TABLE gtest31_2 DROP CONSTRAINT cc;
+
+CREATE STATISTICS gtest31_2_stat ON ((y).b is not null) FROM gtest31_2;
+ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello2');
+DROP STATISTICS gtest31_2_stat;
+
+CREATE INDEX gtest31_2_y_idx ON gtest31_2(((y).b));
+ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello3');
+
+DROP TABLE gtest31_1, gtest31_2;
+
+-- Check it for a partitioned table, too
+CREATE TABLE gtest31_1 (a int, b text GENERATED ALWAYS AS ('hello') STORED, c text) PARTITION BY LIST (a);
+CREATE TABLE gtest31_2 (x int, y gtest31_1);
+ALTER TABLE gtest31_1 ALTER COLUMN b TYPE varchar;  -- fails
+DROP TABLE gtest31_1, gtest31_2;
 
 -- triggers
 CREATE TABLE gtest26 (

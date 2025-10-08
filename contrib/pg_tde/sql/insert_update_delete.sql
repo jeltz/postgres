@@ -1,7 +1,10 @@
-CREATE EXTENSION IF NOT EXISTS pg_tde;
+\! rm -f '/tmp/pg_tde_test_keyring.per'
 
-SELECT pg_tde_add_key_provider_file('file-vault','/tmp/pg_tde_test_keyring.per');
-SELECT pg_tde_set_principal_key('test-db-principal-key','file-vault');
+CREATE EXTENSION pg_tde;
+
+SELECT pg_tde_add_database_key_provider_file('file-vault','/tmp/pg_tde_test_keyring.per');
+SELECT pg_tde_create_key_using_database_key_provider('test-db-key','file-vault');
+SELECT pg_tde_set_key_using_database_key_provider('test-db-key','file-vault');
 
 CREATE TABLE albums (
     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -38,4 +41,16 @@ UPDATE albums SET released='2020-04-01' WHERE id=2;
 SELECT * FROM albums;
 
 DROP TABLE albums;
+
+CREATE TEMPORARY TABLE animals (
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    type TEXT UNIQUE,
+    num INT
+) USING tde_heap;
+
+INSERT INTO animals (type, num) VALUES ('cows', 3), ('pigs', 11);
+SELECT * FROM animals ORDER BY id;
+
+DROP TABLE animals;
+
 DROP EXTENSION pg_tde;

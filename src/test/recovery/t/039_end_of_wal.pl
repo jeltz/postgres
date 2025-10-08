@@ -13,6 +13,9 @@ use Fcntl qw(SEEK_SET);
 
 use integer;    # causes / operator to use integer math
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_wal
+	'uses write_wal to hack wal directly';
+
 # Is this a big-endian system ("network" byte order)?  We can't use 'Q' in
 # pack() calls because it's not available in some perl builds, so we need to
 # break 64 bit LSN values into two 'I' values.  Fortunately we don't need to

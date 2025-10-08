@@ -7,6 +7,9 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_wal
+	'pg_basebackup without -E from server with encrypted WAL produces broken backups';
+
 # Can be changed to test the other modes.
 my $mode = $ENV{PG_TEST_PG_COMBINEBACKUP_MODE} || '--copy';
 

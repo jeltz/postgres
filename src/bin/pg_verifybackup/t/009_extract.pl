@@ -10,6 +10,10 @@ use File::Path qw(rmtree);
 use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
+
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_wal
+	'pg_basebackup without -E from server with encrypted WAL produces broken backups';
+
 my $primary = PostgreSQL::Test::Cluster->new('primary');
 $primary->init(allows_streaming => 1);
 $primary->start;

@@ -1,25 +1,26 @@
-/*-------------------------------------------------------------------------
- *
- * enc_tde.h
- *	  Encryption / Decryption of functions for TDE
- *
- * src/include/encryption/enc_tde.h
- *
- *-------------------------------------------------------------------------
+/*
+ * Encryption / Decryption of functions for TDE
  */
+
 #ifndef ENC_TDE_H
 #define ENC_TDE_H
 
-#include "access/pg_tde_tdemap.h"
+#define INTERNAL_KEY_LEN 16
+#define INTERNAL_KEY_IV_LEN 16
 
-extern void pg_tde_crypt(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context);
+typedef struct InternalKey
+{
+	uint8		key[INTERNAL_KEY_LEN];
+	uint8		base_iv[INTERNAL_KEY_IV_LEN];
+} InternalKey;
 
-/* Function Macros over crypt */
-
-#define PG_TDE_ENCRYPT_DATA(_iv_prefix, _start_offset, _data, _data_len, _out, _key, _ctxptr) \
-	pg_tde_crypt(_iv_prefix, _start_offset, _data, _data_len, _out, _key, _ctxptr, "ENCRYPT")
-
-#define PG_TDE_DECRYPT_DATA(_iv_prefix, _start_offset, _data, _data_len, _out, _key, _ctxptr) \
-	pg_tde_crypt(_iv_prefix, _start_offset, _data, _data_len, _out, _key, _ctxptr, "DECRYPT")
+extern void pg_tde_generate_internal_key(InternalKey *int_key);
+extern void pg_tde_stream_crypt(const char *iv_prefix,
+								uint32 start_offset,
+								const char *data,
+								uint32 data_len,
+								char *out,
+								const uint8 *key,
+								void **ctxPtr);
 
 #endif							/* ENC_TDE_H */

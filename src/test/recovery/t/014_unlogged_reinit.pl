@@ -12,6 +12,9 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	'invalid page in block';
+
 my $node = PostgreSQL::Test::Cluster->new('main');
 
 $node->init;

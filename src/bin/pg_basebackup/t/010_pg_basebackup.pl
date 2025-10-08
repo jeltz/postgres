@@ -10,6 +10,12 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_wal
+	'pg_basebackup without -E from server with encrypted WAL produces broken backups';
+
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	'uses corrupt_page_checksum to directly hack relation files';
+
 program_help_ok('pg_basebackup');
 program_version_ok('pg_basebackup');
 program_options_handling_ok('pg_basebackup');

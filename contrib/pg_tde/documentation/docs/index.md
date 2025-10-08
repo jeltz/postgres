@@ -1,51 +1,39 @@
-# `pg_tde` documentation
+# Percona Transparent Data Encryption for PostgreSQL documentation
 
-`pg_tde` is the open source PostgreSQL extension that provides Transparent Data Encryption (TDE) to protect data at rest. This ensures that the data stored on disk is encrypted, and no one can read it without the proper encryption keys, even if they gain access to the physical storage media. 
+Percona Transparent Data Encryption for PostgreSQL (`pg_tde`) is an open source, community driven and futureproof PostgreSQL extension that provides Transparent Data Encryption (TDE) to protect data at rest. `pg_tde` ensures that the data stored on disk is encrypted, and that no one can read it without the proper encryption keys, even if they gain access to the physical storage media.
 
-Learn more [what is Transparent Data Encryption](tde.md#how-does-it-work) and [why you need it](tde.md#why-do-you-need-tde).
+`pg_tde` is bundled as a component of Percona Server for PostgreSQL and requires its patches to function. It is packaged with Percona Distribution for PostgreSQL 17+ to ensure compatibility and proper operation. For more information, see the [Percona Distribution for PostgreSQL 17 documentation :octicons-link-external-16:](https://docs.percona.com/postgresql/17/).
 
-!!! important 
+<div data-grid markdown><div data-banner markdown>
 
-    This is the {{release}} version of the extension and it is not meant for production use yet. We encourage you to use it in testing environments and [provide your feedback](https://forums.percona.com/c/postgresql/pg-tde-transparent-data-encryption-tde/82). 
-    
-[Get started](install.md){.md-button}
-[What's new in pg_tde {{release}}](release-notes/release-notes.md){.md-button}
+### :material-progress-download: Installation guide { .title }
 
-## What's encrypted:
+Get started quickly with the step-by-step installation instructions.
 
-* User data in tables, including TOAST tables, that are created using the extension. Metadata of those tables is not encrypted. 
-* Temporary tables created during the database operation for data tables created using the extension
-* Write-Ahead Log (WAL) data for the entire database cluster. This includes WAL data in encrypted and non-encrypted tables
-* Indexes on encrypted tables 
-* Logical replication on encrypted tables
+[How to install `pg_tde` :material-arrow-right:](install.md){ .md-button }
 
-[Check the full feature list](features.md){.md-button}
+</div><div data-banner markdown>
 
-## Known limitations
+### :rocket: Features { .title }
 
-* Keys in the local keyfile are stored unencrypted. For better security we recommend using the Key management storage. 
-* System tables are currently not encrypted. This means that statistics data and database metadata are currently not encrypted.
-   
-* `pg_rewind` doesn't work with encrypted WAL for now. We plan to fix it in future releases.
-* `pb_tde` Release candidate is incompatible with `pg_tde`Beta2 due to significant changes in code. There is no direct upgrade flow from one version to another. You must [uninstall](uninstall.md) `pg_tde` Beta2 first and then [install](install.md) and configure the new Release Candidate version.
+Explore what features Percona's `pg_tde` extension brings to PostgreSQL.
 
+[Check what you can do with `pg_tde` :material-arrow-right:](features.md){ .md-button }
 
+</div><div data-banner markdown>
 
-## Versions and supported PostgreSQL deployments
+### :material-cog-refresh-outline: Architecture { .title }
 
-The `pg_tde` extension comes in two distinct versions with specific access methods to encrypt the data. These versions are database-specific and differ in terms of what they encrypt and with what access method. Each version is characterized by the database it supports, the access method it provides, and the scope of encryption it offers.
+Understand how `pg_tde` integrates into PostgreSQL with Percona's architecture. Learn how keys are managed, how encryption is applied, and how our design ensures performance and security.
 
-* **Version for Percona Server for PostgreSQL**
+[Check what’s under the hood for `pg_tde` :material-arrow-right:](architecture/architecture.md){.md-button}
 
-    This `pg_tde` version is based on and supported for [Percona Server for PostgreSQL 17.x :octicons-link-external-16:](https://docs.percona.com/postgresql/17/postgresql-server.html) - an open source binary drop-in replacement for PostgreSQL Community. It provides the `tde_heap` access method and offers [full encryption capabilities](features.md). 
+</div><div data-banner markdown>
 
-* **Community version** (deprecated)
+### :loudspeaker: What's new? { .title }
 
-    This version is available with PostgreSQL Community 16 and 17, and Percona Distribution for PostgreSQL 16. It provides the `tde_heap_basic` access method, offering limited encryption features. The limitations are in encrypting WAL data only for tables created using the extension and no support of index encryption nor logical replication.
+Learn about the releases and changes in `pg_tde`.
 
-### Which version to choose?
-
-Enjoy full encryption with the Percona Server for PostgreSQL version and the `tde_heap` access method. The Community version is deprecated and is planned to be removed in future releases. 
-
-Still not sure? [Contact our experts](https://www.percona.com/about/contact) to find the best solution for you.
-
+[Check what’s new in the latest version :material-arrow-right:](release-notes/{{latestreleasenotes}}.md){.md-button}
+</div>
+</div>

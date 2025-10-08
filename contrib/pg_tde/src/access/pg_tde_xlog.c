@@ -1,39 +1,32 @@
-/*-------------------------------------------------------------------------
- *
- * tdeheap_xlog.c
- *	  TDE XLog resource manager
- *
- *
- * IDENTIFICATION
- *	  src/access/pg_tde_xlog.c
- *
- *-------------------------------------------------------------------------
+/*
+ * TDE XLog resource manager
  */
 
 #include "postgres.h"
 
-#include "pg_tde.h"
-#include "pg_tde_defines.h"
 #include "access/xlog.h"
 #include "access/xlog_internal.h"
 #include "access/xloginsert.h"
-#include "catalog/tde_keyring.h"
 #include "storage/bufmgr.h"
 #include "storage/shmem.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
 
+#include "access/pg_tde_xlog_keys.h"
 #include "access/pg_tde_xlog.h"
+#include "catalog/tde_global_space.h"
+#include "catalog/tde_keyring.h"
 #include "encryption/enc_tde.h"
+#include "pg_tde.h"
+#include "pg_tde_defines.h"
+#include "smgr/pg_tde_smgr.h"
 
 static void tdeheap_rmgr_redo(XLogReaderState *record);
 static void tdeheap_rmgr_desc(StringInfo buf, XLogReaderState *record);
 static const char *tdeheap_rmgr_identify(uint8 info);
 
-#define RM_TDERMGR_NAME	"test_tdeheap_custom_rmgr"
-
 static const RmgrData tdeheap_rmgr = {
-	.rm_name = RM_TDERMGR_NAME,
+	.rm_name = "pg_tde",
 	.rm_redo = tdeheap_rmgr_redo,
 	.rm_desc = tdeheap_rmgr_desc,
 	.rm_identify = tdeheap_rmgr_identify,
@@ -45,52 +38,55 @@ RegisterTdeRmgr(void)
 	RegisterCustomRmgr(RM_TDERMGR_ID, &tdeheap_rmgr);
 }
 
-/*
- * TDE fork XLog
- */
 static void
 tdeheap_rmgr_redo(XLogReaderState *record)
 {
 	uint8		info = XLogRecGetInfo(record) & ~XLR_INFO_MASK;
 
-	if (info == XLOG_TDE_ADD_RELATION_KEY)
+	if (info == XLOG_TDE_CREATE_RELATION_KEY)
 	{
 		XLogRelKey *xlrec = (XLogRelKey *) XLogRecGetData(record);
 
-		pg_tde_write_key_map_entry_redo(&xlrec->mapEntry, &xlrec->pkInfo);
+		tde_smgr_create_key_redo(&xlrec->rlocator);
 	}
 	else if (info == XLOG_TDE_ADD_PRINCIPAL_KEY)
 	{
-		TDEPrincipalKeyInfo *mkey = (TDEPrincipalKeyInfo *) XLogRecGetData(record);
+		TDESignedPrincipalKeyInfo *mkey = (TDESignedPrincipalKeyInfo *) XLogRecGetData(record);
 
-		pg_tde_save_principal_key_redo(mkey);
+		if (mkey->data.databaseId == GLOBAL_DATA_TDE_OID)
+			pg_tde_save_server_key_redo(mkey);
+		else
+			pg_tde_save_principal_key_redo(mkey);
 	}
-	else if (info == XLOG_TDE_EXTENSION_INSTALL_KEY)
+	else if (info == XLOG_TDE_DELETE_RELATION_KEY)
 	{
-		XLogExtensionInstall *xlrec = (XLogExtensionInstall *) XLogRecGetData(record);
+		XLogRelKey *xlrec = (XLogRelKey *) XLogRecGetData(record);
 
-		extension_install_redo(xlrec);
+		tde_smgr_delete_leftover_key_redo(&xlrec->rlocator);
 	}
-
-	else if (info == XLOG_TDE_ADD_KEY_PROVIDER_KEY)
-	{
-		KeyringProviderXLRecord *xlrec = (KeyringProviderXLRecord *) XLogRecGetData(record);
-
-		redo_key_provider_info(xlrec);
-	}
-
-	else if (info == XLOG_TDE_ROTATE_KEY)
+	else if (info == XLOG_TDE_ROTATE_PRINCIPAL_KEY)
 	{
 		XLogPrincipalKeyRotate *xlrec = (XLogPrincipalKeyRotate *) XLogRecGetData(record);
 
 		xl_tde_perform_rotate_key(xlrec);
 	}
-
-	else if (info == XLOG_TDE_FREE_MAP_ENTRY)
+	else if (info == XLOG_TDE_DELETE_PRINCIPAL_KEY)
 	{
-		RelFileLocator *xlrec = (RelFileLocator *) XLogRecGetData(record);
+		Oid			dbOid = *((Oid *) XLogRecGetData(record));
 
-		pg_tde_free_key_map_entry(xlrec, 0);
+		pg_tde_delete_principal_key_redo(dbOid);
+	}
+	else if (info == XLOG_TDE_WRITE_KEY_PROVIDER)
+	{
+		KeyringProviderRecordInFile *xlrec = (KeyringProviderRecordInFile *) XLogRecGetData(record);
+
+		redo_key_provider_info(xlrec);
+	}
+	else if (info == XLOG_TDE_INSTALL_EXTENSION)
+	{
+		XLogExtensionInstall *xlrec = (XLogExtensionInstall *) XLogRecGetData(record);
+
+		extension_install_redo(xlrec);
 	}
 	else
 	{
@@ -103,49 +99,70 @@ tdeheap_rmgr_desc(StringInfo buf, XLogReaderState *record)
 {
 	uint8		info = XLogRecGetInfo(record) & ~XLR_INFO_MASK;
 
-	if (info == XLOG_TDE_ADD_RELATION_KEY)
+	if (info == XLOG_TDE_CREATE_RELATION_KEY)
 	{
 		XLogRelKey *xlrec = (XLogRelKey *) XLogRecGetData(record);
 
-		appendStringInfo(buf, "add tde internal key for relation %u/%u", xlrec->pkInfo.databaseId, xlrec->mapEntry.relNumber);
+		appendStringInfo(buf, "rel: %u/%u/%u", xlrec->rlocator.spcOid, xlrec->rlocator.dbOid, xlrec->rlocator.relNumber);
 	}
-	if (info == XLOG_TDE_ADD_PRINCIPAL_KEY)
+	else if (info == XLOG_TDE_ADD_PRINCIPAL_KEY)
 	{
 		TDEPrincipalKeyInfo *xlrec = (TDEPrincipalKeyInfo *) XLogRecGetData(record);
 
-		appendStringInfo(buf, "add tde principal key for db %u", xlrec->databaseId);
+		appendStringInfo(buf, "db: %u", xlrec->databaseId);
 	}
-	if (info == XLOG_TDE_EXTENSION_INSTALL_KEY)
-	{
-		XLogExtensionInstall *xlrec = (XLogExtensionInstall *) XLogRecGetData(record);
-
-		appendStringInfo(buf, "tde extension install for db %u", xlrec->database_id);
-	}
-	if (info == XLOG_TDE_ROTATE_KEY)
+	else if (info == XLOG_TDE_ROTATE_PRINCIPAL_KEY)
 	{
 		XLogPrincipalKeyRotate *xlrec = (XLogPrincipalKeyRotate *) XLogRecGetData(record);
 
-		appendStringInfo(buf, "rotate principal key for %u", xlrec->databaseId);
+		appendStringInfo(buf, "db: %u", xlrec->databaseId);
 	}
-	if (info == XLOG_TDE_ADD_KEY_PROVIDER_KEY)
+	else if (info == XLOG_TDE_DELETE_PRINCIPAL_KEY)
 	{
-		KeyringProviderXLRecord *xlrec = (KeyringProviderXLRecord *) XLogRecGetData(record);
+		Oid			dbOid = *((Oid *) XLogRecGetData(record));
 
-		appendStringInfo(buf, "add key provider %s for %u", xlrec->provider.provider_name, xlrec->database_id);
+		appendStringInfo(buf, "db: %u", dbOid);
+	}
+	else if (info == XLOG_TDE_DELETE_RELATION_KEY)
+	{
+		XLogRelKey *xlrec = (XLogRelKey *) XLogRecGetData(record);
+
+		appendStringInfo(buf, "rel: %u/%u/%u", xlrec->rlocator.spcOid, xlrec->rlocator.dbOid, xlrec->rlocator.relNumber);
+	}
+	else if (info == XLOG_TDE_WRITE_KEY_PROVIDER)
+	{
+		KeyringProviderRecordInFile *xlrec = (KeyringProviderRecordInFile *) XLogRecGetData(record);
+
+		appendStringInfo(buf, "db: %u, provider id: %d", xlrec->database_id, xlrec->provider.provider_id);
+	}
+	else if (info == XLOG_TDE_INSTALL_EXTENSION)
+	{
+		XLogExtensionInstall *xlrec = (XLogExtensionInstall *) XLogRecGetData(record);
+
+		appendStringInfo(buf, "db: %u", xlrec->database_id);
 	}
 }
 
 static const char *
 tdeheap_rmgr_identify(uint8 info)
 {
-	if ((info & ~XLR_INFO_MASK) == XLOG_TDE_ADD_RELATION_KEY)
-		return "XLOG_TDE_ADD_RELATION_KEY";
-
-	if ((info & ~XLR_INFO_MASK) == XLOG_TDE_ADD_PRINCIPAL_KEY)
-		return "XLOG_TDE_ADD_PRINCIPAL_KEY";
-
-	if ((info & ~XLR_INFO_MASK) == XLOG_TDE_EXTENSION_INSTALL_KEY)
-		return "XLOG_TDE_EXTENSION_INSTALL_KEY";
-
-	return NULL;
+	switch (info & ~XLR_INFO_MASK)
+	{
+		case XLOG_TDE_CREATE_RELATION_KEY:
+			return "CREATE_RELATION_KEY";
+		case XLOG_TDE_ADD_PRINCIPAL_KEY:
+			return "ADD_PRINCIPAL_KEY";
+		case XLOG_TDE_ROTATE_PRINCIPAL_KEY:
+			return "ROTATE_PRINCIPAL_KEY";
+		case XLOG_TDE_DELETE_RELATION_KEY:
+			return "DELETE_RELATION_KEY";
+		case XLOG_TDE_DELETE_PRINCIPAL_KEY:
+			return "DELETE_PRINCIPAL_KEY";
+		case XLOG_TDE_WRITE_KEY_PROVIDER:
+			return "WRITE_KEY_PROVIDER";
+		case XLOG_TDE_INSTALL_EXTENSION:
+			return "INSTALL_EXTENSION";
+		default:
+			return NULL;
+	}
 }

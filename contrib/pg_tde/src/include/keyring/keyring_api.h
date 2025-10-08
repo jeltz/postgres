@@ -1,11 +1,3 @@
-/*-------------------------------------------------------------------------
- *
- * keyring_api.h
- * src/include/keyring/keyring_api.h
- *
- *-------------------------------------------------------------------------
- */
-
 #ifndef KEYRING_API_H
 #define KEYRING_API_H
 
@@ -22,8 +14,9 @@ typedef enum ProviderType
 } ProviderType;
 
 #define TDE_KEY_NAME_LEN 256
-#define MAX_KEY_DATA_SIZE 32	/* maximum 256 bit encryption */
-#define INTERNAL_KEY_LEN 16
+#define KEY_DATA_SIZE_128 16	/* 128 bit encryption */
+#define KEY_DATA_SIZE_256 32	/* 256 bit encryption, not yet supported */
+#define MAX_KEY_DATA_SIZE KEY_DATA_SIZE_256 /* maximum 256 bit encryption */
 
 typedef struct KeyData
 {
@@ -37,15 +30,15 @@ typedef struct KeyInfo
 	KeyData		data;
 } KeyInfo;
 
-typedef enum KeyringReturnCodes
+typedef enum KeyringReturnCode
 {
 	KEYRING_CODE_SUCCESS = 0,
 	KEYRING_CODE_INVALID_PROVIDER = 1,
 	KEYRING_CODE_RESOURCE_NOT_AVAILABLE = 2,
 	KEYRING_CODE_INVALID_RESPONSE = 5,
-	KEYRING_CODE_INVALID_KEY_SIZE = 6,
+	KEYRING_CODE_INVALID_KEY = 6,
 	KEYRING_CODE_DATA_CORRUPTED = 7,
-} KeyringReturnCodes;
+} KeyringReturnCode;
 
 /* Base type for all keyring */
 typedef struct GenericKeyring
@@ -59,8 +52,9 @@ typedef struct GenericKeyring
 
 typedef struct TDEKeyringRoutine
 {
-	KeyInfo    *(*keyring_get_key) (GenericKeyring *keyring, const char *key_name, KeyringReturnCodes *returnCode);
+	KeyInfo    *(*keyring_get_key) (GenericKeyring *keyring, const char *key_name, KeyringReturnCode *returnCode);
 	void		(*keyring_store_key) (GenericKeyring *keyring, KeyInfo *key);
+	void		(*keyring_validate) (GenericKeyring *keyring);
 } TDEKeyringRoutine;
 
 typedef struct FileKeyring
@@ -73,6 +67,7 @@ typedef struct VaultV2Keyring
 {
 	GenericKeyring keyring;		/* Must be the first field */
 	char	   *vault_token;
+	char	   *vault_token_path;
 	char	   *vault_url;
 	char	   *vault_ca_path;
 	char	   *vault_mount_path;
@@ -85,11 +80,15 @@ typedef struct KmipKeyring
 	char	   *kmip_port;
 	char	   *kmip_ca_path;
 	char	   *kmip_cert_path;
+	char	   *kmip_key_path;
 } KmipKeyring;
 
-extern void RegisterKeyProvider(const TDEKeyringRoutine *routine, ProviderType type);
+extern void RegisterKeyProviderType(const TDEKeyringRoutine *routine, ProviderType type);
 
-extern KeyInfo *KeyringGetKey(GenericKeyring *keyring, const char *key_name, KeyringReturnCodes *returnCode);
+extern KeyInfo *KeyringGetKey(GenericKeyring *keyring, const char *key_name, KeyringReturnCode *returnCode);
 extern KeyInfo *KeyringGenerateNewKeyAndStore(GenericKeyring *keyring, const char *key_name, unsigned key_len);
+extern void KeyringValidate(GenericKeyring *keyring);
+extern bool ValidateKey(KeyInfo *key);
+extern char *KeyringErrorCodeToString(KeyringReturnCode code);
 
 #endif							/* KEYRING_API_H */

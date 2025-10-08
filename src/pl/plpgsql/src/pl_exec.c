@@ -5711,7 +5711,7 @@ exec_eval_expr(PLpgSQL_execstate *estate,
 	/*
 	 * Else do it the hard way via exec_run_select
 	 */
-	rc = exec_run_select(estate, expr, 2, NULL);
+	rc = exec_run_select(estate, expr, 0, NULL);
 	if (rc != SPI_OK_SELECT)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -5765,6 +5765,10 @@ exec_eval_expr(PLpgSQL_execstate *estate,
 
 /* ----------
  * exec_run_select			Execute a select query
+ *
+ * Note: passing maxtuples different from 0 ("return all tuples") is
+ * deprecated because it will prevent parallel execution of the query.
+ * However, we retain the parameter in case we need it someday.
  * ----------
  */
 static int
@@ -8141,10 +8145,12 @@ exec_save_simple_expr(PLpgSQL_expr *expr, CachedPlan *cplan)
 	/*
 	 * Ordinarily, the plan node should be a simple Result.  However, if
 	 * debug_parallel_query is on, the planner might've stuck a Gather node
-	 * atop that.  The simplest way to deal with this is to look through the
-	 * Gather node.  The Gather node's tlist would normally contain a Var
-	 * referencing the child node's output, but it could also be a Param, or
-	 * it could be a Const that setrefs.c copied as-is.
+	 * atop that; and/or if this plan is for a scrollable cursor, the planner
+	 * might've stuck a Material node atop it.  The simplest way to deal with
+	 * this is to look through the Gather and/or Material nodes.  The upper
+	 * node's tlist would normally contain a Var referencing the child node's
+	 * output, but it could also be a Param, or it could be a Const that
+	 * setrefs.c copied as-is.
 	 */
 	plan = stmt->planTree;
 	for (;;)
@@ -8162,7 +8168,7 @@ exec_save_simple_expr(PLpgSQL_expr *expr, CachedPlan *cplan)
 				   ((Result *) plan)->resconstantqual == NULL);
 			break;
 		}
-		else if (IsA(plan, Gather))
+		else if (IsA(plan, Gather) || IsA(plan, Material))
 		{
 			Assert(plan->lefttree != NULL &&
 				   plan->righttree == NULL &&

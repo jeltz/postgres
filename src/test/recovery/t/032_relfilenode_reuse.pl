@@ -8,6 +8,8 @@ use PostgreSQL::Test::Utils;
 use Test::More;
 use File::Basename;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	'invalid page in block';
 
 my $node_primary = PostgreSQL::Test::Cluster->new('primary');
 $node_primary->init(allows_streaming => 1);

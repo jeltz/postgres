@@ -1,11 +1,14 @@
-#include "pg_tde_defines.h"
-
 #include "postgres.h"
 
-#include "access/pg_tde_tdemap.h"
+#include <openssl/err.h>
+#include <openssl/rand.h>
+
 #include "encryption/enc_tde.h"
 #include "encryption/enc_aes.h"
-#include "storage/bufmgr.h"
+
+#ifdef FRONTEND
+#include "pg_tde_fe.h"
+#endif
 
 #define AES_BLOCK_SIZE 		        16
 #define NUM_AES_BLOCKS_IN_BATCH     200
@@ -23,56 +26,34 @@ iv_prefix_debug(const char *iv_prefix, char *out_hex)
 }
 #endif
 
-/*
- * ================================================================
- * ACTUAL ENCRYPTION/DECRYPTION FUNCTIONS
- * ================================================================
- */
-
-/*
- * pg_tde_crypt_simple:
- * Encrypts/decrypts `data` with a given `key`. The result is written to `out`.
- * start_offset: is the absolute location of start of data in the file.
- * This function assumes that everything is in a single block, and has an assertion ensuring this
- */
-static void
-pg_tde_crypt_simple(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context)
+void
+pg_tde_generate_internal_key(InternalKey *int_key)
 {
-	const uint64 aes_start_block = start_offset / AES_BLOCK_SIZE;
-	const uint64 aes_end_block = (start_offset + data_len + (AES_BLOCK_SIZE - 1)) / AES_BLOCK_SIZE;
-	const uint64 aes_block_no = start_offset % AES_BLOCK_SIZE;
-	unsigned char enc_key[DATA_BYTES_PER_AES_BATCH + AES_BLOCK_SIZE];
-
-	Assert(aes_end_block - aes_start_block <= NUM_AES_BLOCKS_IN_BATCH + 1);
-
-	Aes128EncryptedZeroBlocks(ctxPtr, key->key, iv_prefix, aes_start_block, aes_end_block, enc_key);
-
-#ifdef ENCRYPTION_DEBUG
-	{
-		char		ivp_debug[33];
-
-		iv_prefix_debug(iv_prefix, ivp_debug);
-		ereport(LOG,
-				(errmsg("%s: Start offset: %lu Data_Len: %u, aes_start_block: %lu, aes_end_block: %lu, IV prefix: %s",
-						context ? context : "", start_offset, data_len, aes_start_block, aes_end_block, ivp_debug)));
-	}
-#endif
-
-	for (uint32 i = 0; i < data_len; ++i)
-	{
-		out[i] = data[i] ^ enc_key[i + aes_block_no];
-	}
+	if (!RAND_bytes(int_key->key, INTERNAL_KEY_LEN))
+		ereport(ERROR,
+				errcode(ERRCODE_INTERNAL_ERROR),
+				errmsg("could not generate internal key: %s",
+					   ERR_error_string(ERR_get_error(), NULL)));
+	if (!RAND_bytes(int_key->base_iv, INTERNAL_KEY_IV_LEN))
+		ereport(ERROR,
+				errcode(ERRCODE_INTERNAL_ERROR),
+				errmsg("could not generate IV: %s",
+					   ERR_error_string(ERR_get_error(), NULL)));
 }
 
-
 /*
- * pg_tde_crypt_complex:
  * Encrypts/decrypts `data` with a given `key`. The result is written to `out`.
+ *
  * start_offset: is the absolute location of start of data in the file.
- * This is a generic function intended for large data, that do not fit into a single block
  */
-static void
-pg_tde_crypt_complex(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context)
+void
+pg_tde_stream_crypt(const char *iv_prefix,
+					uint32 start_offset,
+					const char *data,
+					uint32 data_len,
+					char *out,
+					const uint8 *key,
+					void **ctxPtr)
 {
 	const uint64 aes_start_block = start_offset / AES_BLOCK_SIZE;
 	const uint64 aes_end_block = (start_offset + data_len + (AES_BLOCK_SIZE - 1)) / AES_BLOCK_SIZE;
@@ -87,15 +68,16 @@ pg_tde_crypt_complex(const char *iv_prefix, uint32 start_offset, const char *dat
 		uint32		current_batch_bytes;
 		uint64		batch_end_block = Min(batch_start_block + NUM_AES_BLOCKS_IN_BATCH, aes_end_block);
 
-		Aes128EncryptedZeroBlocks(ctxPtr, key->key, iv_prefix, batch_start_block, batch_end_block, enc_key);
+		AesCtrEncryptedZeroBlocks(ctxPtr, key, iv_prefix, batch_start_block, batch_end_block, enc_key);
+
 #ifdef ENCRYPTION_DEBUG
 		{
 			char		ivp_debug[33];
 
 			iv_prefix_debug(iv_prefix, ivp_debug);
 			ereport(LOG,
-					(errmsg("%s: Batch-No:%d Start offset: %lu Data_Len: %u, batch_start_block: %lu, batch_end_block: %lu, IV prefix: %s",
-							context ? context : "", batch_no, start_offset, data_len, batch_start_block, batch_end_block, ivp_debug)));
+					errmsg("pg_tde_stream_crypt batch_no: %d start_offset: %lu data_len: %u, batch_start_block: %lu, batch_end_block: %lu, iv_prefix: %s",
+						   batch_no, start_offset, data_len, batch_start_block, batch_end_block, ivp_debug));
 		}
 #endif
 
@@ -130,24 +112,5 @@ pg_tde_crypt_complex(const char *iv_prefix, uint32 start_offset, const char *dat
 			data_index++;
 		}
 		batch_no++;
-	}
-}
-
-/*
- * pg_tde_crypt:
- * Encrypts/decrypts `data` with a given `key`. The result is written to `out`.
- * start_offset: is the absolute location of start of data in the file.
- * This function simply selects between the two above variations based on the data length
- */
-void
-pg_tde_crypt(const char *iv_prefix, uint32 start_offset, const char *data, uint32 data_len, char *out, InternalKey *key, void **ctxPtr, const char *context)
-{
-	if (data_len >= DATA_BYTES_PER_AES_BATCH)
-	{
-		pg_tde_crypt_complex(iv_prefix, start_offset, data, data_len, out, key, ctxPtr, context);
-	}
-	else
-	{
-		pg_tde_crypt_simple(iv_prefix, start_offset, data, data_len, out, key, ctxPtr, context);
 	}
 }

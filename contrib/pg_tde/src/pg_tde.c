@@ -1,64 +1,39 @@
-/*-------------------------------------------------------------------------
- *
- * pg_tde.c
- *      Main file: setup GUCs, shared memory, hooks and other general-purpose
- *      routines.
- *
- * IDENTIFICATION
- *    contrib/pg_tde/src/pg_tde.c
- *
- *-------------------------------------------------------------------------
+/*
+ * Main file: setup GUCs, shared memory, hooks and other general-purpose
+ * routines.
  */
 
 #include "postgres.h"
+
+#include "access/tableam.h"
+#include "access/xlog.h"
+#include "access/xloginsert.h"
 #include "funcapi.h"
-#include "pg_tde.h"
-#include "transam/pg_tde_xact_handler.h"
 #include "miscadmin.h"
 #include "storage/ipc.h"
 #include "storage/lwlock.h"
 #include "storage/shmem.h"
-#include "access/pg_tde_xlog.h"
-#include "access/pg_tde_xlog_encrypt.h"
-#include "encryption/enc_aes.h"
-#include "access/pg_tde_tdemap.h"
-#include "access/xlog.h"
-#include "access/xloginsert.h"
-#include "keyring/keyring_api.h"
-#include "common/pg_tde_shmem.h"
-#include "common/pg_tde_utils.h"
-#include "catalog/tde_principal_key.h"
-#include "keyring/keyring_file.h"
-#include "keyring/keyring_vault.h"
-#include "keyring/keyring_kmip.h"
 #include "utils/builtins.h"
-#include "pg_tde_defs.h"
-#include "smgr/pg_tde_smgr.h"
-#include "catalog/tde_global_space.h"
 #include "utils/percona.h"
+
+#include "access/pg_tde_tdemap.h"
+#include "access/pg_tde_xlog.h"
+#include "access/pg_tde_xlog_smgr.h"
+#include "catalog/tde_global_space.h"
+#include "catalog/tde_principal_key.h"
+#include "encryption/enc_aes.h"
+#include "keyring/keyring_api.h"
+#include "keyring/keyring_file.h"
+#include "keyring/keyring_kmip.h"
+#include "keyring/keyring_vault.h"
+#include "pg_tde.h"
+#include "pg_tde_event_capture.h"
 #include "pg_tde_guc.h"
-#include "access/tableam.h"
-
-#include <sys/stat.h>
-
-#define MAX_ON_INSTALLS 5
+#include "smgr/pg_tde_smgr.h"
 
 PG_MODULE_MAGIC;
 
-struct OnExtInstall
-{
-	pg_tde_on_ext_install_callback function;
-	void	   *arg;
-};
-
-static struct OnExtInstall on_ext_install_list[MAX_ON_INSTALLS];
-static int	on_ext_install_index = 0;
 static void pg_tde_init_data_dir(void);
-static void run_extension_install_callbacks(XLogExtensionInstall *xlrec, bool redo);
-void		_PG_init(void);
-Datum		pg_tde_extension_initialize(PG_FUNCTION_ARGS);
-Datum		pg_tde_version(PG_FUNCTION_ARGS);
-Datum		pg_tdeam_handler(PG_FUNCTION_ARGS);
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 static shmem_request_hook_type prev_shmem_request_hook = NULL;
@@ -70,16 +45,17 @@ PG_FUNCTION_INFO_V1(pg_tdeam_handler);
 static void
 tde_shmem_request(void)
 {
-	Size		sz = TdeRequiredSharedMemorySize();
-	int			required_locks = TdeRequiredLocksCount();
+	Size		sz = 0;
 
+	sz = add_size(sz, PrincipalKeyShmemSize());
 	sz = add_size(sz, TDEXLogEncryptStateSize());
 
 	if (prev_shmem_request_hook)
 		prev_shmem_request_hook();
+
 	RequestAddinShmemSpace(sz);
-	RequestNamedLWLockTranche(TDE_TRANCHE_NAME, required_locks);
-	ereport(LOG, (errmsg("tde_shmem_request: requested %ld bytes", sz)));
+	RequestNamedLWLockTranche(TDE_TRANCHE_NAME, TDE_LWLOCK_COUNT);
+	ereport(LOG, errmsg("tde_shmem_request: requested %ld bytes", sz));
 }
 
 static void
@@ -88,11 +64,15 @@ tde_shmem_startup(void)
 	if (prev_shmem_startup_hook)
 		prev_shmem_startup_hook();
 
-	TdeShmemInit();
-	AesInit();
+	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
+	KeyProviderShmemInit();
+	PrincipalKeyShmemInit();
 	TDEXLogShmemInit();
 	TDEXLogSmgrInit();
+	TDEXLogSmgrInitWrite(EncryptXLog);
+
+	LWLockRelease(AddinShmemInitLock);
 }
 
 void
@@ -112,35 +92,36 @@ _PG_init(void)
 
 	check_percona_api_version();
 
+	pg_tde_init_data_dir();
+	AesInit();
 	TdeGucInit();
-
-	InitializePrincipalKeyInfo();
-	InitializeKeyProviderInfo();
+	TdeEventCaptureInit();
+	InstallFileKeyring();
+	InstallVaultV2Keyring();
+	InstallKmipKeyring();
+	RegisterTdeRmgr();
+	RegisterStorageMgr();
 
 	prev_shmem_request_hook = shmem_request_hook;
 	shmem_request_hook = tde_shmem_request;
 	prev_shmem_startup_hook = shmem_startup_hook;
 	shmem_startup_hook = tde_shmem_startup;
+}
 
-	RegisterTdeXactCallbacks();
-	InstallFileKeyring();
-	InstallVaultV2Keyring();
-	InstallKmipKeyring();
-	RegisterTdeRmgr();
-
-	RegisterStorageMgr();
+static void
+extension_install(Oid databaseId)
+{
+	key_provider_startup_cleanup(databaseId);
+	principal_key_startup_cleanup(databaseId);
 }
 
 Datum
 pg_tde_extension_initialize(PG_FUNCTION_ARGS)
 {
-	/* Initialize the TDE map */
 	XLogExtensionInstall xlrec;
 
-	pg_tde_init_data_dir();
-
 	xlrec.database_id = MyDatabaseId;
-	run_extension_install_callbacks(&xlrec, false);
+	extension_install(xlrec.database_id);
 
 	/*
 	 * Also put this info in xlog, so we can replicate the same on the other
@@ -148,81 +129,36 @@ pg_tde_extension_initialize(PG_FUNCTION_ARGS)
 	 */
 	XLogBeginInsert();
 	XLogRegisterData((char *) &xlrec, sizeof(XLogExtensionInstall));
-	XLogInsert(RM_TDERMGR_ID, XLOG_TDE_EXTENSION_INSTALL_KEY);
+	XLogInsert(RM_TDERMGR_ID, XLOG_TDE_INSTALL_EXTENSION);
 
-	PG_RETURN_NULL();
+	PG_RETURN_VOID();
 }
+
 void
 extension_install_redo(XLogExtensionInstall *xlrec)
 {
-	pg_tde_init_data_dir();
-	run_extension_install_callbacks(xlrec, true);
-}
-
-/* ----------------------------------------------------------------
- *		on_ext_install
- *
- *		Register ordinary callback to perform initializations
- *		run at the time of pg_tde extension installs.
- * ----------------------------------------------------------------
- */
-void
-on_ext_install(pg_tde_on_ext_install_callback function, void *arg)
-{
-	if (on_ext_install_index >= MAX_ON_INSTALLS)
-		ereport(FATAL,
-				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg_internal("out of on extension install slots")));
-
-	on_ext_install_list[on_ext_install_index].function = function;
-	on_ext_install_list[on_ext_install_index].arg = arg;
-
-	++on_ext_install_index;
+	extension_install(xlrec->database_id);
 }
 
 /* Creates a tde directory for internal files if not exists */
 static void
 pg_tde_init_data_dir(void)
 {
-	struct stat st;
-
-	if (stat(PG_TDE_DATA_DIR, &st) < 0)
+	if (access(PG_TDE_DATA_DIR, F_OK) == -1)
 	{
 		if (MakePGDirectory(PG_TDE_DATA_DIR) < 0)
 			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not create tde directory \"%s\": %m",
-							PG_TDE_DATA_DIR)));
+					errcode_for_file_access(),
+					errmsg("could not create tde directory \"%s\": %m",
+						   PG_TDE_DATA_DIR));
 	}
-}
-
-/* ------------------
- * Run all of the on_ext_install routines and execute those one by one
- * ------------------
- */
-static void
-run_extension_install_callbacks(XLogExtensionInstall *xlrec, bool redo)
-{
-	int			i;
-	int			tde_table_count = 0;
-
-	/*
-	 * Get the number of tde tables in this database should always be zero.
-	 * But still, it prevents the cleanup if someone explicitly calls this
-	 * function.
-	 */
-	if (!redo)
-		tde_table_count = get_tde_tables_count();
-	for (i = 0; i < on_ext_install_index; i++)
-		on_ext_install_list[i]
-			.function(tde_table_count, xlrec, redo, on_ext_install_list[i].arg);
 }
 
 /* Returns package version */
 Datum
 pg_tde_version(PG_FUNCTION_ARGS)
 {
-	PG_RETURN_TEXT_P(cstring_to_text(pg_tde_package_string()));
+	PG_RETURN_TEXT_P(cstring_to_text(PG_TDE_VERSION_STRING));
 }
 
 Datum

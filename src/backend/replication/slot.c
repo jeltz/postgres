@@ -1671,14 +1671,6 @@ InvalidatePossiblyObsoleteSlot(ReplicationSlotInvalidationCause cause,
 
 		SpinLockRelease(&s->mutex);
 
-		/*
-		 * The logical replication slots shouldn't be invalidated as GUC
-		 * max_slot_wal_keep_size is set to -1 during the binary upgrade. See
-		 * check_old_cluster_for_valid_slots() where we ensure that no
-		 * invalidated before the upgrade.
-		 */
-		Assert(!(*invalidated && SlotIsLogical(s) && IsBinaryUpgrade));
-
 		if (active_pid != 0)
 		{
 			/*
@@ -1803,6 +1795,10 @@ restart:
 		ReplicationSlot *s = &ReplicationSlotCtl->replication_slots[i];
 
 		if (!s->in_use)
+			continue;
+
+		/* Prevent invalidation of logical slots during binary upgrade. */
+		if (SlotIsLogical(s) && IsBinaryUpgrade)
 			continue;
 
 		if (InvalidatePossiblyObsoleteSlot(cause, s, oldestLSN, dboid,
@@ -2327,12 +2323,29 @@ RestoreSlotFromDisk(const char *name)
 	 * NB: Changing the requirements here also requires adapting
 	 * CheckSlotRequirements() and CheckLogicalDecodingRequirements().
 	 */
-	if (cp.slotdata.database != InvalidOid && wal_level < WAL_LEVEL_LOGICAL)
-		ereport(FATAL,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("logical replication slot \"%s\" exists, but \"wal_level\" < \"logical\"",
-						NameStr(cp.slotdata.name)),
-				 errhint("Change \"wal_level\" to be \"logical\" or higher.")));
+	if (cp.slotdata.database != InvalidOid)
+	{
+		if (wal_level < WAL_LEVEL_LOGICAL)
+			ereport(FATAL,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("logical replication slot \"%s\" exists, but \"wal_level\" < \"logical\"",
+							NameStr(cp.slotdata.name)),
+					 errhint("Change \"wal_level\" to be \"logical\" or higher.")));
+
+		/*
+		 * In standby mode, the hot standby must be enabled. This check is
+		 * necessary to ensure logical slots are invalidated when they become
+		 * incompatible due to insufficient wal_level. Otherwise, if the
+		 * primary reduces wal_level < logical while hot standby is disabled,
+		 * logical slots would remain valid even after promotion.
+		 */
+		if (StandbyMode && !EnableHotStandby)
+			ereport(FATAL,
+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+					 errmsg("logical replication slot \"%s\" exists on the standby, but \"hot_standby\" = \"off\"",
+							NameStr(cp.slotdata.name)),
+					 errhint("Change \"hot_standby\" to be \"on\".")));
+	}
 	else if (wal_level < WAL_LEVEL_REPLICA)
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -2504,6 +2517,8 @@ check_synchronized_standby_slots(char **newval, void **extra, GucSource source)
 
 	/* GUC extra value must be guc_malloc'd, not palloc'd */
 	config = (SyncStandbySlotsConfigData *) guc_malloc(LOG, size);
+	if (!config)
+		return false;
 
 	/* Transform the data into SyncStandbySlotsConfigData */
 	config->nslotnames = list_length(elemlist);

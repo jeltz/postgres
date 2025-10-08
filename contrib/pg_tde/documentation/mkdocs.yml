@@ -1,12 +1,11 @@
 # MkDocs general configuration
 
-site_name: pg_tde documentation
+site_name: Percona Transparent Data Encryption for PostgreSQL
 site_description: Documentation
 site_author: Percona LLC
 copyright: >
   <a href="https://www.percona.com/about">Percona LLC</a> and/or its affiliates © 2025 — <a href="#__consent">Cookie Consent</a>
 
- 
 repo_name: percona/postgres
 repo_url: https://github.com/percona/postgres
 edit_uri: edit/TDE_REL_17_STABLE/contrib/pg_tde/documentation/docs
@@ -18,7 +17,7 @@ theme:
   name: material
   logo: _images/postgresql-mark.svg
   favicon: _images/postgresql-fav.svg
-  custom_dir: _resource/overrides
+  custom_dir: _resourcepdf/overrides
   font:
     text: Roboto
   palette:
@@ -52,8 +51,7 @@ theme:
     - content.tabs.link
     - navigation.top
     - navigation.tracking
-
-
+    - navigation.indexes
 
 extra_css:
   - https://unicons.iconscout.com/release/v3.0.3/css/line.css
@@ -92,15 +90,12 @@ markdown_extensions:
       linenums: false
   - pymdownx.snippets:
       base_path: ["snippets"]
-#      auto_append:
-#        - services-banner.md
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
       options:
         custom_icons:
          - _resource/.icons
-
 
 plugins:
   - search:
@@ -121,16 +116,24 @@ plugins:
   - macros:
       include_yaml:
         - 'variables.yml' # Use in markdown as '{{ VAR }}'
-  - with-pdf: # https://github.com/orzih/mkdocs-with-pdf
-          output_path: '_pdf/PerconaTDE.pdf'
-          cover_title: 'Percona Transparent Data Encryption'
-          cover_subtitle: Release Candidate (2025-03-27)
-          author: 'Percona Technical Documentation Team'
-          cover_logo: docs/_images/Percona_Logo_Color.png
-          debug_html: false
-#          two_columns_level: 3
-          custom_template_path: _resource/templates
-          enabled_if_env: ENABLE_PDF_EXPORT   
+  - print-site:
+      add_to_navigation: false
+      print_page_title: 'Percona Transparent Data Encryption documentation'
+      add_print_site_banner: false
+      # Table of contents
+      add_table_of_contents: true
+      toc_title: 'Table of Contents'
+      toc_depth: 2
+      # Content-related
+      add_full_urls: false
+      enumerate_headings: false
+      enumerate_headings_depth: 1
+      enumerate_figures: true
+      add_cover_page: true
+      cover_page_template: "docs/templates/pdf_cover_page.tpl"
+      path_to_pdf: ""
+      include_css: true
+      enabled: true
 
 extra:
   version:
@@ -149,41 +152,71 @@ extra:
         - icon: material/emoticon-sad-outline
           name: This page could be improved
           data: 0
-          note: >- 
-            Thank you for your feedback! Help us improve by using our 
+          note: >-
+            Thank you for your feedback! Help us improve by using our
             <a href="https://docs.google.com/forms/d/1bkWACehjqlwA0AKf-qTJcXvYbOSYgze8iTPXjntqmNo/edit" target="_blank" rel="noopener">
             feedback form</a>.
 
 nav:
-  - Home: index.md
+  - "Home": index.md
   - get-help.md
-  - features.md
-  - Get started:
-    - "1. Install": "install.md"
-    - "Via apt": apt.md
-    - "Via yum": yum.md   
-    - "2. Set up": "setup.md"
-    - "3. Configure WAL encryption (tech preview)": wal-encryption.md
-    - "4. Test TDE": "test.md"
-  - functions.md
-  - command-line-tools.md
-  - variables.md
-  - Concepts:
-    - "What is TDE": tde.md
-    - table-access-method.md
-  - How to:
-    - Set up multi-tenancy: multi-tenant-setup.md
-    - Use reference to external parameters: external-parameters.md
-    - Decrypt an encrypted table: decrypt.md
+  - "Features": features.md 
+  - "Overview":
+    - "About Transparent Data Encryption": index/about-tde.md
+    - "About pg_tde": 
+      - "Benefits of pg_tde": index/how-tde-helps.md
+      - "How pg_tde works": index/how-does-tde-work.md
+      - "Encrypted data scope": index/tde-encrypts.md
+      - "Table access methods and pg_tde": index/table-access-method.md
+    - "Limitations of pg_tde": index/tde-limitations.md
+    - "Versions and supported PostgreSQL deployments": index/supported-versions.md
+  - "Get started":
+    - "1. Install pg_tde": install.md
+    - "1.1 Via apt": apt.md
+    - "1.2 Via yum": yum.md   
+    - "2. Configure pg_tde": setup.md
+    - "2.1 Configure Key Management (KMS)": 
+      - "Key management overview": global-key-provider-configuration/overview.md
+      - "KMIP configuration": global-key-provider-configuration/kmip-server.md
+      - "Fortanix configuration": global-key-provider-configuration/kmip-fortanix.md  
+      - "Vault configuration": global-key-provider-configuration/vault.md
+      - "Thales configuration": global-key-provider-configuration/kmip-thales.md
+      - "Using OpenBao as a key provider": global-key-provider-configuration/kmip-openbao.md
+      - "Keyring file configuration": global-key-provider-configuration/keyring.md
+    - "2.2 Global Principal Key configuration": global-key-provider-configuration/set-principal-key.md
+    - "3. Validate encryption with pg_tde": test.md
+    - "4. Configure WAL encryption": wal-encryption.md
+  - "Technical reference":
+    - "Overview": advanced-topics/tech-reference.md
+    - "Architecture": architecture/architecture.md
+    - "GUC variables": variables.md
+    - "Functions": functions.md
+    - "Streaming Replication with tde_heap": replication.md
+  - "TDE operations":
+    - "pg_tde CLI tools":
+      - "Overview": command-line-tools/cli-tools.md
+      - "pg_tde_change_key_provider": command-line-tools/pg-tde-change-key-provider.md
+      - "pg_tde_archive_decrypt": command-line-tools/pg-tde-archive-decrypt.md
+      - "pg_tde_restore_encrypt": command-line-tools/pg-tde-restore-encrypt.md
+      - "pg_checksums": command-line-tools/pg-tde-checksums.md 
+      - "pg_waldump": command-line-tools/pg-waldump.md
+    - "Uninstall pg_tde": how-to/uninstall.md
+    - "Configure Multi-tenancy": how-to/multi-tenant-setup.md
+    - "Encryption Enforcement": how-to/enforcement.md
+    - "Decrypt an Encrypted Table": how-to/decrypt.md
+    - "Backup with WAL encryption enabled": how-to/backup-wal-enabled.md
+    - "Restore an encrypted pg_tde backup": how-to/restore-backups.md
   - faq.md
-  - Release notes:
-    - "pg_tde release notes": release-notes/release-notes.md
-    - release-notes/rc.md
-    - release-notes/beta2.md
-    - release-notes/beta.md
-    - release-notes/alpha1.md
-    - release-notes/mvp.md
-  - uninstall.md
+  - "Release notes":
+    - "Release notes index": release-notes/release-notes.md
+    - "2.0": release-notes/release-notes-v2.0.md
+    - "1.0": release-notes/release-notes-v1.0.md
+    - "Release Candidate 2": release-notes/rc2.md
+    - "Release Candidate 1": release-notes/rc.md
+    - "2024 (Alpha 1 - Beta 2)":
+      - "Beta 2": release-notes/beta2.md
+      - "Beta": release-notes/beta.md
+      - "Alpha 1": release-notes/alpha1.md
+    - "2023 (MVP)":
+      - "MVP": release-notes/mvp.md
   - contribute.md
-
-

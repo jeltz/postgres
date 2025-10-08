@@ -15,10 +15,8 @@ use PostgreSQL::Test::Utils;
 use PostgreSQL::Test::AdjustUpgrade;
 use Test::More;
 
-if (defined($ENV{TDE_MODE}))
-{
-    plan skip_all => "Running with TDE doesn't support special server starts yet";
-}
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	 'pg_restore fail to restore _pg_tde schema on cluster which already has it';
 
 # Can be changed to test the other modes.
 my $mode = $ENV{PG_TEST_PG_UPGRADE_MODE} || '--copy';
@@ -320,6 +318,7 @@ if (defined($ENV{oldinstall}))
 # that we need to use pg_dumpall from the new node here.
 my @dump_command = (
 	'pg_dumpall', '--no-sync', '-d', $oldnode->connstr('postgres'),
+	'--restrict-key=test',
 	'-f', $dump1_file);
 # --extra-float-digits is needed when upgrading from a version older than 11.
 push(@dump_command, '--extra-float-digits', '0')
@@ -505,6 +504,7 @@ is( $result,
 # Second dump from the upgraded instance.
 @dump_command = (
 	'pg_dumpall', '--no-sync', '-d', $newnode->connstr('postgres'),
+	'--restrict-key=test',
 	'-f', $dump2_file);
 # --extra-float-digits is needed when upgrading from a version older than 11.
 push(@dump_command, '--extra-float-digits', '0')

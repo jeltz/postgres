@@ -12,6 +12,9 @@ use Fcntl qw(SEEK_SET);
 
 use integer;    # causes / operator to use integer math
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	'uses write_wal to hack wal directly';
+
 # Values queried from the server
 my $WAL_SEGMENT_SIZE;
 my $WAL_BLOCK_SIZE;

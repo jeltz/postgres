@@ -1,21 +1,18 @@
-name: PgIndent
+name: Format
 on:
   pull_request:
+    paths-ignore:
+      - contrib/pg_tde/documentation/**
   workflow_dispatch:
-
-defaults:
-  run:
-    working-directory: ./src
 
 jobs:
   check:
     name: Check
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
         with:
-          path: 'src'
           submodules: recursive
 
       - name: Install dependencies
@@ -26,6 +23,9 @@ jobs:
 
       - name: Update typedefs
         run: ci_scripts/dump-typedefs.sh
-    
+
       - name: Run pgindent
         run: ci_scripts/run-pgindent.sh --check --diff
+
+      - name: Run pgperltidy
+        run: ci_scripts/run-pgperltidy.sh --assert-tidy --standard-error-output

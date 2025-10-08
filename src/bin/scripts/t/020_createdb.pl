@@ -8,6 +8,9 @@ use PostgreSQL::Test::Cluster;
 use PostgreSQL::Test::Utils;
 use Test::More;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_smgr
+	'tries to use FILE_COPY strategy for database creation with encrypted objects in the template';
+
 program_help_ok('createdb');
 program_version_ok('createdb');
 program_options_handling_ok('createdb');

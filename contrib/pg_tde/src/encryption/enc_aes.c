@@ -1,22 +1,13 @@
 #include "postgres.h"
 
-#ifdef FRONTEND
-#include "pg_tde_fe.h"
-#endif
+#include <openssl/err.h>
+#include <openssl/evp.h>
 
 #include "encryption/enc_aes.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-#include <openssl/ssl.h>
-#include <openssl/crypto.h>
-#include <openssl/evp.h>
-#include <openssl/err.h>
+#ifdef FRONTEND
+#include "pg_tde_fe.h"
+#endif
 
 /* Implementation notes
  * =====================
@@ -41,48 +32,43 @@
  * 16 byte blocks.
  */
 
-static const EVP_CIPHER *cipher_cbc;
-static const EVP_CIPHER *cipher_gcm;
-static const EVP_CIPHER *cipher_ctr_ecb;
+static const EVP_CIPHER *cipher_cbc = NULL;
+static const EVP_CIPHER *cipher_gcm = NULL;
+static const EVP_CIPHER *cipher_ctr_ecb = NULL;
 
 void
 AesInit(void)
 {
-	static int	initialized = 0;
+	OpenSSL_add_all_algorithms();
+	ERR_load_crypto_strings();
 
-	if (!initialized)
-	{
-		OpenSSL_add_all_algorithms();
-		ERR_load_crypto_strings();
-
-		cipher_cbc = EVP_aes_128_cbc();
-		cipher_gcm = EVP_aes_128_gcm();
-		cipher_ctr_ecb = EVP_aes_128_ecb();
-
-		initialized = 1;
-	}
+	cipher_cbc = EVP_aes_128_cbc();
+	cipher_gcm = EVP_aes_128_gcm();
+	cipher_ctr_ecb = EVP_aes_128_ecb();
 }
 
 static void
-AesRunCtr(EVP_CIPHER_CTX **ctxPtr, int enc, const unsigned char *key, const unsigned char *iv, const unsigned char *in, int in_len, unsigned char *out)
+AesEcbEncrypt(EVP_CIPHER_CTX **ctxPtr, const unsigned char *key, const unsigned char *in, int in_len, unsigned char *out)
 {
 	int			out_len;
 
 	if (*ctxPtr == NULL)
 	{
+		Assert(cipher_ctr_ecb != NULL);
+
 		*ctxPtr = EVP_CIPHER_CTX_new();
 		EVP_CIPHER_CTX_init(*ctxPtr);
 
-		if (EVP_CipherInit_ex(*ctxPtr, cipher_ctr_ecb, NULL, key, iv, enc) == 0)
+		if (EVP_CipherInit_ex(*ctxPtr, cipher_ctr_ecb, NULL, key, NULL, 1) == 0)
 			ereport(ERROR,
-					(errmsg("EVP_CipherInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+					errmsg("EVP_CipherInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 		EVP_CIPHER_CTX_set_padding(*ctxPtr, 0);
 	}
 
 	if (EVP_CipherUpdate(*ctxPtr, out, &out_len, in, in_len) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	Assert(out_len == in_len);
 }
@@ -94,6 +80,7 @@ AesRunCbc(int enc, const unsigned char *key, const unsigned char *iv, const unsi
 	int			out_len_final;
 	EVP_CIPHER_CTX *ctx = NULL;
 
+	Assert(cipher_cbc != NULL);
 	Assert(in_len % EVP_CIPHER_block_size(cipher_cbc) == 0);
 
 	ctx = EVP_CIPHER_CTX_new();
@@ -101,17 +88,17 @@ AesRunCbc(int enc, const unsigned char *key, const unsigned char *iv, const unsi
 
 	if (EVP_CipherInit_ex(ctx, cipher_cbc, NULL, key, iv, enc) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	EVP_CIPHER_CTX_set_padding(ctx, 0);
 
 	if (EVP_CipherUpdate(ctx, out, &out_len, in, in_len) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_CipherFinal_ex(ctx, out + out_len, &out_len_final) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherFinal_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherFinal_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	/*
 	 * We encrypt one block (16 bytes) Our expectation is that the result
@@ -137,12 +124,13 @@ AesDecrypt(const unsigned char *key, const unsigned char *iv, const unsigned cha
 }
 
 void
-AesGcmEncrypt(const unsigned char *key, const unsigned char *iv, const unsigned char *aad, int aad_len, const unsigned char *in, int in_len, unsigned char *out, unsigned char *tag)
+AesGcmEncrypt(const unsigned char *key, const unsigned char *iv, int iv_len, const unsigned char *aad, int aad_len, const unsigned char *in, int in_len, unsigned char *out, unsigned char *tag, int tag_len)
 {
 	int			out_len;
 	int			out_len_final;
 	EVP_CIPHER_CTX *ctx;
 
+	Assert(cipher_gcm != NULL);
 	Assert(in_len % EVP_CIPHER_block_size(cipher_gcm) == 0);
 
 	ctx = EVP_CIPHER_CTX_new();
@@ -150,35 +138,35 @@ AesGcmEncrypt(const unsigned char *key, const unsigned char *iv, const unsigned 
 
 	if (EVP_EncryptInit_ex(ctx, cipher_gcm, NULL, NULL, NULL) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_CIPHER_CTX_set_padding(ctx, 0) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CIPHER_CTX_set_padding failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CIPHER_CTX_set_padding failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
-	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) == 0)
+	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CTRL_GCM_SET_IVLEN failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CTRL_GCM_SET_IVLEN failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_EncryptUpdate(ctx, NULL, &out_len, (unsigned char *) aad, aad_len) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_EncryptUpdate(ctx, out, &out_len, in, in_len) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_EncryptFinal_ex(ctx, out + out_len, &out_len_final) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherFinal_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherFinal_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
-	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag) == 0)
+	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, tag_len, tag) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CTRL_GCM_GET_TAG failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CTRL_GCM_GET_TAG failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	/*
 	 * We encrypt one block (16 bytes) Our expectation is that the result
@@ -192,7 +180,7 @@ AesGcmEncrypt(const unsigned char *key, const unsigned char *iv, const unsigned 
 }
 
 bool
-AesGcmDecrypt(const unsigned char *key, const unsigned char *iv, const unsigned char *aad, int aad_len, const unsigned char *in, int in_len, unsigned char *out, unsigned char *tag)
+AesGcmDecrypt(const unsigned char *key, const unsigned char *iv, int iv_len, const unsigned char *aad, int aad_len, const unsigned char *in, int in_len, unsigned char *out, unsigned char *tag, int tag_len)
 {
 	int			out_len;
 	int			out_len_final;
@@ -205,31 +193,31 @@ AesGcmDecrypt(const unsigned char *key, const unsigned char *iv, const unsigned 
 
 	if (EVP_DecryptInit_ex(ctx, cipher_gcm, NULL, NULL, NULL) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_CIPHER_CTX_set_padding(ctx, 0) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CIPHER_CTX_set_padding failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CIPHER_CTX_set_padding failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
-	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) == 0)
+	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CTRL_GCM_SET_IVLEN failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CTRL_GCM_SET_IVLEN failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_EncryptInit_ex failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
-	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag) == 0)
+	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, tag_len, tag) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CTRL_GCM_SET_TAG failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CTRL_GCM_SET_TAG failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_DecryptUpdate(ctx, NULL, &out_len, aad, aad_len) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_DecryptUpdate(ctx, out, &out_len, in, in_len) == 0)
 		ereport(ERROR,
-				(errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL))));
+				errmsg("EVP_CipherUpdate failed. OpenSSL error: %s", ERR_error_string(ERR_get_error(), NULL)));
 
 	if (EVP_DecryptFinal_ex(ctx, out + out_len, &out_len_final) == 0)
 	{
@@ -251,12 +239,12 @@ AesGcmDecrypt(const unsigned char *key, const unsigned char *iv, const unsigned 
 	return true;
 }
 
-/* This function assumes that the out buffer is big enough: at least (blockNumber2 - blockNumber1) * 16 bytes
+/*
+ * This function assumes that the out buffer is big enough: at least (blockNumber2 - blockNumber1) * 16 bytes
  */
 void
-Aes128EncryptedZeroBlocks(void *ctxPtr, const unsigned char *key, const char *iv_prefix, uint64_t blockNumber1, uint64_t blockNumber2, unsigned char *out)
+AesCtrEncryptedZeroBlocks(void *ctxPtr, const unsigned char *key, const char *iv_prefix, uint64_t blockNumber1, uint64_t blockNumber2, unsigned char *out)
 {
-	const unsigned char iv[16] = {0,};
 	unsigned char *p;
 
 	Assert(blockNumber2 >= blockNumber1);
@@ -277,5 +265,5 @@ Aes128EncryptedZeroBlocks(void *ctxPtr, const unsigned char *key, const char *iv
 		p += sizeof(j);
 	}
 
-	AesRunCtr(ctxPtr, 1, key, iv, out, p - out, out);
+	AesEcbEncrypt(ctxPtr, key, out, p - out, out);
 }

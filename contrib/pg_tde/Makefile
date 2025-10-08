@@ -1,79 +1,106 @@
-# contrib/pg_tde/Makefile
-
 PGFILEDESC = "pg_tde access method"
 MODULE_big = pg_tde
 EXTENSION = pg_tde
-DATA = pg_tde--1.0-rc.sql
+DATA = pg_tde--1.0--2.0.sql pg_tde--1.0.sql
 
+# Since meson supports skipping test suites this is a make only feature
+ifndef TDE_MODE
 REGRESS_OPTS = --temp-config $(top_srcdir)/contrib/pg_tde/pg_tde.conf
-# toast_descrypt needs to be the first test when running with pg_tde
-# preinstalled and default_principal_key needs to run after key_provider.
-REGRESS = toast_decrypt \
-access_control \
-alter_index \
-cache_alloc \
-change_access_method \
-insert_update_delete \
-key_provider \
-keyprovider_dependency \
-kmip_test \
-pg_tde_is_encrypted \
-recreate_storage \
-relocate \
-subtransaction \
-tablespace \
-vault_v2_test \
-default_principal_key
+REGRESS = \
+	access_control \
+	alter_index \
+	cache_alloc \
+	change_access_method \
+	create_database \
+	default_principal_key \
+	delete_principal_key \
+	insert_update_delete \
+	key_provider \
+	kmip_test \
+	partition_table \
+	pg_tde_is_encrypted \
+	recreate_storage \
+	relocate \
+	tablespace \
+	toast_decrypt \
+	vault_v2_test \
+	version
 TAP_TESTS = 1
+endif
 
-OBJS = src/encryption/enc_tde.o \
-src/encryption/enc_aes.o \
-src/access/pg_tde_tdemap.o \
-src/access/pg_tde_xlog.o \
-src/access/pg_tde_xlog_encrypt.o \
-src/transam/pg_tde_xact_handler.o \
-src/keyring/keyring_curl.o \
-src/keyring/keyring_file.o \
-src/keyring/keyring_vault.o \
-src/keyring/keyring_kmip.o \
-src/keyring/keyring_kmip_impl.o \
-src/keyring/keyring_api.o \
-src/catalog/tde_keyring.o \
-src/catalog/tde_keyring_parse_opts.o \
-src/catalog/tde_principal_key.o \
-src/common/pg_tde_shmem.o \
-src/common/pg_tde_utils.o \
-src/smgr/pg_tde_smgr.o \
-src/pg_tde_defs.o \
-src/pg_tde_event_capture.o \
-src/pg_tde_guc.o \
-src/pg_tde.o \
-src/libkmip/libkmip/src/kmip.o \
-src/libkmip/libkmip/src/kmip_bio.o \
-src/libkmip/libkmip/src/kmip_locate.o \
-src/libkmip/libkmip/src/kmip_memset.o
+KMIP_OBJS = \
+	src/libkmip/libkmip/src/kmip.o \
+	src/libkmip/libkmip/src/kmip_bio.o \
+	src/libkmip/libkmip/src/kmip_locate.o \
+	src/libkmip/libkmip/src/kmip_memset.o
 
-SCRIPTS_built = src/pg_tde_change_key_provider
+OBJS = \
+	src/encryption/enc_tde.o \
+	src/encryption/enc_aes.o \
+	src/access/pg_tde_tdemap.o \
+	src/access/pg_tde_xlog.o \
+	src/access/pg_tde_xlog_keys.o \
+	src/access/pg_tde_xlog_smgr.o \
+	src/keyring/keyring_curl.o \
+	src/keyring/keyring_file.o \
+	src/keyring/keyring_vault.o \
+	src/keyring/keyring_kmip.o \
+	src/keyring/keyring_kmip_impl.o \
+	src/keyring/keyring_api.o \
+	src/catalog/tde_keyring.o \
+	src/catalog/tde_keyring_parse_opts.o \
+	src/catalog/tde_principal_key.o \
+	src/common/pg_tde_utils.o \
+	src/smgr/pg_tde_smgr.o \
+	src/pg_tde_event_capture.o \
+	src/pg_tde_guc.o \
+	src/pg_tde.o \
+	$(KMIP_OBJS)
 
-EXTRA_CLEAN += src/pg_tde_change_key_provider.o
+SCRIPTS_built = \
+	src/bin/pg_tde_archive_decrypt \
+	src/bin/pg_tde_change_key_provider \
+	src/bin/pg_tde_restore_encrypt
+
+EXTRA_INSTALL = contrib/pg_buffercache contrib/test_decoding
+EXTRA_CLEAN = \
+	src/bin/pg_tde_archive_decrypt.o \
+	src/bin/pg_tde_change_key_provider.o \
+	src/bin/pg_tde_restore_encrypt.o \
+	xlogreader.c \
+	xlogreader.o
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
-override PG_CPPFLAGS += -I$(CURDIR)/src/include -I$(CURDIR)/src/libkmip/libkmip/include
+PG_CPPFLAGS = -I$(CURDIR)/src/include -I$(CURDIR)/src/libkmip/libkmip/include
 include $(PGXS)
 else
 subdir = contrib/pg_tde
 top_builddir = ../..
-override PG_CPPFLAGS += -I$(top_srcdir)/$(subdir)/src/include  -I$(top_srcdir)/$(subdir)/src/libkmip/libkmip/include
+PG_CPPFLAGS = -I$(top_srcdir)/$(subdir)/src/include -I$(top_srcdir)/$(subdir)/src/libkmip/libkmip/include
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
 
-override SHLIB_LINK += -lcurl -lcrypto -lssl
+SHLIB_LINK = -lcurl -lcrypto -lssl
+LDFLAGS_EX = -L$(top_builddir)/src/fe_utils -lcurl -lcrypto -lssl -lpgfeutils
 
-src/pg_tde_change_key_provider: src/pg_tde_change_key_provider.o $(top_srcdir)/src/fe_utils/simple_list.o $(top_builddir)/src/libtde/libtde.a
-	$(CC) -DFRONTEND $(CFLAGS) $^ $(LDFLAGS) $(LDFLAGS_EX) $(LIBS) -o $@$(X)
+$(KMIP_OBJS): CFLAGS += -w # This is a 3rd party, disable warnings completely
+
+src/bin/pg_tde_change_key_provider: src/bin/pg_tde_change_key_provider.o $(top_builddir)/src/libtde/libtde.a | submake-libpgfeutils
+	$(CC) $(CFLAGS) $^ $(PG_LIBS_INTERNAL) $(LDFLAGS) $(LDFLAGS_EX) $(PG_LIBS) $(LIBS) -o $@$(X)
+
+src/bin/pg_tde_archive_decrypt: src/bin/pg_tde_archive_decrypt.o xlogreader.o $(top_builddir)/src/libtde/libtdexlog.a $(top_builddir)/src/libtde/libtde.a | submake-libpgfeutils
+	$(CC) $(CFLAGS) $^ $(PG_LIBS_INTERNAL) $(LDFLAGS) $(LDFLAGS_EX) $(PG_LIBS) $(LIBS) -o $@$(X)
+
+src/bin/pg_tde_restore_encrypt: src/bin/pg_tde_restore_encrypt.o xlogreader.o $(top_builddir)/src/libtde/libtdexlog.a $(top_builddir)/src/libtde/libtde.a | submake-libpgfeutils
+	$(CC) $(CFLAGS) $^ $(PG_LIBS_INTERNAL) $(LDFLAGS) $(LDFLAGS_EX) $(PG_LIBS) $(LIBS) -o $@$(X)
+
+xlogreader.c: % : $(top_srcdir)/src/backend/access/transam/%
+	rm -f $@ && $(LN_S) $< .
+
+xlogreader.o: CFLAGS += -DFRONTEND
 
 # Fetches typedefs list for PostgreSQL core and merges it with typedefs defined in this project.
 # https://wiki.postgresql.org/wiki/Running_pgindent_on_non-core_code_or_development_code

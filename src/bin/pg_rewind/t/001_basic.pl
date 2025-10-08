@@ -11,6 +11,9 @@ use lib $FindBin::RealBin;
 
 use RewindTest;
 
+PostgreSQL::Test::TdeCluster::skip_if_tde_mode_wal
+	'copies WAL directly to archive without using archive_command';
+
 sub run_test
 {
 	my $test_mode = shift;

@@ -1,36 +1,54 @@
-CREATE EXTENSION IF NOT EXISTS pg_tde;
+\! rm -f '/tmp/pg_tde_test_keyring.per'
+
+CREATE EXTENSION pg_tde;
+
+SELECT pg_tde_add_database_key_provider_file('local-file-provider', '/tmp/pg_tde_test_keyring.per');
 
 CREATE USER regress_pg_tde_access_control;
 
 SET ROLE regress_pg_tde_access_control;
 
 -- should throw access denied
-SELECT pg_tde_add_key_provider_file('file-vault', '/tmp/pg_tde_test_keyring.per');
-SELECT pg_tde_set_principal_key('test-db-principal-key', 'file-vault');
+SELECT pg_tde_create_key_using_database_key_provider('test-db-key', 'local-file-provider');
+SELECT pg_tde_set_key_using_database_key_provider('test-db-key', 'local-file-provider');
+SELECT pg_tde_delete_key();
+SELECT pg_tde_list_all_database_key_providers();
+SELECT pg_tde_list_all_global_key_providers();
+SELECT pg_tde_key_info();
+SELECT pg_tde_server_key_info();
+SELECT pg_tde_default_key_info();
+SELECT pg_tde_verify_key();
+SELECT pg_tde_verify_server_key();
+SELECT pg_tde_verify_default_key();
 
 RESET ROLE;
 
-SELECT pg_tde_grant_local_key_management_to_role('regress_pg_tde_access_control');
-SELECT pg_tde_grant_key_viewer_to_role('regress_pg_tde_access_control');
+-- Only superusers can execute key management functions, regardless of role grants
+GRANT EXECUTE ON FUNCTION pg_tde_add_database_key_provider(TEXT, TEXT, JSON) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_add_global_key_provider(TEXT, TEXT, JSON) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_change_database_key_provider(TEXT, TEXT, JSON) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_change_global_key_provider(TEXT, TEXT, JSON) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_create_key_using_global_key_provider(TEXT, TEXT) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_delete_database_key_provider(TEXT) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_delete_global_key_provider(TEXT) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_set_default_key_using_global_key_provider(TEXT, TEXT) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_set_key_using_global_key_provider(TEXT, TEXT) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_set_server_key_using_global_key_provider(TEXT, TEXT) TO regress_pg_tde_access_control;
+GRANT EXECUTE ON FUNCTION pg_tde_delete_default_key() TO regress_pg_tde_access_control;
 
 SET ROLE regress_pg_tde_access_control;
 
--- should now be allowed
-SELECT pg_tde_add_key_provider_file('file-vault', '/tmp/pg_tde_test_keyring.per');
-SELECT pg_tde_add_key_provider_file('file-2', '/tmp/pg_tde_test_keyring_2.per');
-SELECT pg_tde_set_principal_key('test-db-principal-key', 'file-vault');
-SELECT * FROM pg_tde_list_all_key_providers();
-SELECT principal_key_name, key_provider_name, key_provider_id FROM pg_tde_principal_key_info();
-
-RESET ROLE;
-
-SELECT pg_tde_revoke_key_viewer_from_role('regress_pg_tde_access_control');
-
-SET ROLE regress_pg_tde_access_control;
-
--- verify the view access is revoked
-SELECT * FROM pg_tde_list_all_key_providers();
-SELECT principal_key_name, key_provider_name, key_provider_id FROM pg_tde_principal_key_info();
+SELECT pg_tde_add_database_key_provider_file('local-file-provider', '/tmp/pg_tde_test_keyring.per');
+SELECT pg_tde_change_global_key_provider_file('local-file-provider', '/tmp/pg_tde_test_keyring.per');
+SELECT pg_tde_delete_database_key_provider('local-file-provider');
+SELECT pg_tde_add_global_key_provider_file('global-file-provider', '/tmp/pg_tde_test_keyring.per');
+SELECT pg_tde_change_global_key_provider_file('global-file-provider', '/tmp/pg_tde_test_keyring.per');
+SELECT pg_tde_delete_global_key_provider('global-file-provider');
+SELECT pg_tde_create_key_using_global_key_provider('key1', 'global-file-provider');
+SELECT pg_tde_set_key_using_global_key_provider('key1', 'global-file-provider');
+SELECT pg_tde_set_default_key_using_global_key_provider('key1', 'global-file-provider');
+SELECT pg_tde_set_server_key_using_global_key_provider('key1', 'global-file-provider');
+SELECT pg_tde_delete_default_key();
 
 RESET ROLE;
 

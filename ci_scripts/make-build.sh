@@ -1,16 +1,47 @@
 #!/bin/bash
 
-export TDE_MODE=1
+set -e
+
+ARGS=
+
+for arg in "$@"
+do
+    case "$arg" in
+        --enable-coverage)
+            ARGS+=" --enable-coverage"
+            ;;
+    esac
+done
 
 SCRIPT_DIR="$(cd -- "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
 INSTALL_DIR="$SCRIPT_DIR/../../pginst"
+source "$SCRIPT_DIR/env.sh"
 
 cd "$SCRIPT_DIR/.."
 
-if [ "$1" = "debugoptimized" ]; then
-    export CFLAGS="-O2"
-    export CXXFLAGS="-O2"
-fi
+case "$1" in
+    debug)
+        echo "Building with debug option"
+        ARGS+=" --enable-cassert"
+        ;;
 
-./configure --enable-debug --enable-cassert --enable-tap-tests --prefix=$INSTALL_DIR
-make install-world -j
+    debugoptimized)
+        echo "Building with debugoptimized option"
+        export CFLAGS="-O2"
+        ARGS+=" --enable-cassert"
+        ;;
+
+    sanitize)
+        echo "Building with sanitize option"
+        export CFLAGS="-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -fno-inline-functions"
+        ;;
+
+    *)
+        echo "Unknown build type: $1"
+        echo "Please use one of the following: debug, debugoptimized, sanitize"
+        exit 1
+        ;;
+esac
+
+./configure --prefix="$INSTALL_DIR" --enable-debug --enable-tap-tests $ARGS 
+make install-world -j -s
