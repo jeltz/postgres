@@ -13,7 +13,6 @@
 #ifndef PG_OAUTH_H
 #define PG_OAUTH_H
 
-#include "libpq/libpq-be.h"
 #include "libpq/sasl.h"
 
 extern PGDLLIMPORT char *oauth_validator_libraries_string;
