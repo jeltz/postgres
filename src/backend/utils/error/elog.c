@@ -1090,7 +1090,7 @@ errcode_for_socket_access(void)
  * ereport will provide one for the output methods that need it.
  */
 int
-errmsg(const char *fmt,...)
+errmsg(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1345,7 +1345,7 @@ backtrace_cleanup(int code, Datum arg)
  * error recursion.
  */
 int
-errmsg_internal(const char *fmt,...)
+errmsg_internal(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1369,7 +1369,7 @@ errmsg_internal(const char *fmt,...)
  */
 int
 errmsg_plural(const char *fmt_singular, const char *fmt_plural,
-			  unsigned long n,...)
+			  unsigned long n, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1391,7 +1391,7 @@ errmsg_plural(const char *fmt_singular, const char *fmt_plural,
  * errdetail --- add a detail error message text to the current error
  */
 int
-errdetail(const char *fmt,...)
+errdetail(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1418,7 +1418,7 @@ errdetail(const char *fmt,...)
  * (typically, that they don't seem to be useful to average users).
  */
 int
-errdetail_internal(const char *fmt,...)
+errdetail_internal(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1439,7 +1439,7 @@ errdetail_internal(const char *fmt,...)
  * errdetail_log --- add a detail_log error message text to the current error
  */
 int
-errdetail_log(const char *fmt,...)
+errdetail_log(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1461,7 +1461,7 @@ errdetail_log(const char *fmt,...)
  */
 int
 errdetail_log_plural(const char *fmt_singular, const char *fmt_plural,
-					 unsigned long n,...)
+					 unsigned long n, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1484,7 +1484,7 @@ errdetail_log_plural(const char *fmt_singular, const char *fmt_plural,
  */
 int
 errdetail_plural(const char *fmt_singular, const char *fmt_plural,
-				 unsigned long n,...)
+				 unsigned long n, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1505,7 +1505,7 @@ errdetail_plural(const char *fmt_singular, const char *fmt_plural,
  * errhint --- add a hint error message text to the current error
  */
 int
-errhint(const char *fmt,...)
+errhint(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1527,7 +1527,7 @@ errhint(const char *fmt,...)
  * Non-translated version of errhint(), see also errmsg_internal().
  */
 int
-errhint_internal(const char *fmt,...)
+errhint_internal(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1549,7 +1549,7 @@ errhint_internal(const char *fmt,...)
  */
 int
 errhint_plural(const char *fmt_singular, const char *fmt_plural,
-			   unsigned long n,...)
+			   unsigned long n, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1574,7 +1574,7 @@ errhint_plural(const char *fmt_singular, const char *fmt_plural,
  * states.
  */
 int
-errcontext_msg(const char *fmt,...)
+errcontext_msg(const char *fmt, ...)
 {
 	ErrorData  *edata = &errordata[errordata_stack_depth];
 	MemoryContext oldcontext;
@@ -1846,7 +1846,7 @@ pre_format_elog_string(int errnumber, const char *domain)
 }
 
 char *
-format_elog_string(const char *fmt,...)
+format_elog_string(const char *fmt, ...)
 {
 	ErrorData	errdata;
 	ErrorData  *edata;
@@ -4225,7 +4225,7 @@ append_with_tabs(StringInfo buf, const char *str)
  * safely (memory context, GUC load etc)
  */
 void
-write_stderr(const char *fmt,...)
+write_stderr(const char *fmt, ...)
 {
 	va_list		ap;
 

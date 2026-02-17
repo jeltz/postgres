@@ -123,8 +123,8 @@ extern int	link(const char *target, const char *linkname);
 #endif
 
 static void verror(const char *const string, va_list args) pg_attribute_printf(1, 0);
-static void error(const char *const string,...) pg_attribute_printf(1, 2);
-static void warning(const char *const string,...) pg_attribute_printf(1, 2);
+static void error(const char *const string, ...) pg_attribute_printf(1, 2);
+static void warning(const char *const string, ...) pg_attribute_printf(1, 2);
 static void addtt(zic_t starttime, int type);
 static int	addtype(zic_t utoff, char const *abbr,
 					bool isdst, bool ttisstd, bool ttisut);
@@ -515,7 +515,7 @@ verror(const char *const string, va_list args)
 }
 
 static void
-error(const char *const string,...)
+error(const char *const string, ...)
 {
 	va_list		args;
 
@@ -526,7 +526,7 @@ error(const char *const string,...)
 }
 
 static void
-warning(const char *const string,...)
+warning(const char *const string, ...)
 {
 	va_list		args;
 

@@ -2289,7 +2289,7 @@ fail:
  * The input/output parameters are passed as variable-length argument list.
  */
 bool
-ECPGdo(const int lineno, const int compat, const int force_indicator, const char *connection_name, const bool questionmarks, const int st, const char *query,...)
+ECPGdo(const int lineno, const int compat, const int force_indicator, const char *connection_name, const bool questionmarks, const int st, const char *query, ...)
 {
 	va_list		args;
 	bool		ret;

@@ -231,7 +231,7 @@ get_char_item(int lineno, void *var, enum ECPGttype vartype, char *value, int va
 				}
 
 bool
-ECPGget_desc(int lineno, const char *desc_name, int index,...)
+ECPGget_desc(int lineno, const char *desc_name, int index, ...)
 {
 	va_list		args;
 	PGresult   *ECPGresult;
@@ -610,7 +610,7 @@ set_desc_attr(struct descriptor_item *desc_item, struct variable *var,
 
 
 bool
-ECPGset_desc(int lineno, const char *desc_name, int index,...)
+ECPGset_desc(int lineno, const char *desc_name, int index, ...)
 {
 	va_list		args;
 	struct descriptor *desc;
@@ -852,7 +852,7 @@ ecpg_find_desc(int line, const char *name)
 }
 
 bool
-ECPGdescribe(int line, int compat, bool input, const char *connection_name, const char *stmt_name,...)
+ECPGdescribe(int line, int compat, bool input, const char *connection_name, const char *stmt_name, ...)
 {
 	bool		ret = false;
 	struct connection *con;

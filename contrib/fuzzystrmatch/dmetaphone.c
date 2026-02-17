@@ -350,7 +350,7 @@ SetAt(metastring *s, int pos, char c)
    Caveats: the START value is 0 based
 */
 static int
-StringAt(metastring *s, int start, int length,...)
+StringAt(metastring *s, int start, int length, ...)
 {
 	char	   *test;
 	char	   *pos;

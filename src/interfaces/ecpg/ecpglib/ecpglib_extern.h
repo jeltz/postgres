@@ -214,7 +214,7 @@ void		ecpg_raise(int line, int code, const char *sqlstate, const char *str);
 void		ecpg_raise_backend(int line, PGresult *result, PGconn *conn, int compat);
 char	   *ecpg_prepared(const char *name, struct connection *con);
 bool		ecpg_deallocate_all_conn(int lineno, enum COMPAT_MODE c, struct connection *con);
-void		ecpg_log(const char *format,...) pg_attribute_printf(1, 2);
+void		ecpg_log(const char *format, ...) pg_attribute_printf(1, 2);
 bool		ecpg_auto_prepare(int lineno, const char *connection_name,
 							  const int compat, char **name, const char *query);
 bool		ecpg_register_prepared_stmt(struct statement *stmt);

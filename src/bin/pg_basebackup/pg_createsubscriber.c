@@ -152,12 +152,12 @@ static void drop_existing_subscription(PGconn *conn, const char *subname,
 static void get_publisher_databases(struct CreateSubscriberOptions *opt,
 									bool dbnamespecified);
 static void report_createsub_log(enum pg_log_level, enum pg_log_part,
-								 const char *pg_restrict fmt,...)
+								 const char *pg_restrict fmt, ...)
 			pg_attribute_printf(3, 4);
 static void report_createsub_log_v(enum pg_log_level level, enum pg_log_part part,
 								   const char *pg_restrict fmt, va_list args)
 			pg_attribute_printf(3, 0);
-pg_noreturn static void report_createsub_fatal(const char *pg_restrict fmt,...)
+pg_noreturn static void report_createsub_fatal(const char *pg_restrict fmt, ...)
 			pg_attribute_printf(1, 2);
 static void internal_log_file_write(enum pg_log_level level,
 									enum pg_log_part part,
@@ -224,7 +224,7 @@ report_createsub_log_v(enum pg_log_level level, enum pg_log_part part,
 
 static void
 report_createsub_log(enum pg_log_level level, enum pg_log_part part,
-					 const char *pg_restrict fmt,...)
+					 const char *pg_restrict fmt, ...)
 {
 	va_list		args;
 
@@ -239,7 +239,7 @@ report_createsub_log(enum pg_log_level level, enum pg_log_part part,
  * Report a fatal error and exit
  */
 static void
-report_createsub_fatal(const char *pg_restrict fmt,...)
+report_createsub_fatal(const char *pg_restrict fmt, ...)
 {
 	va_list		args;
 

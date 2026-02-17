@@ -753,7 +753,7 @@ extern char *pqResultStrdup(PGresult *res, const char *str);
 extern void pqClearAsyncResult(PGconn *conn);
 extern void pqSaveErrorResult(PGconn *conn);
 extern PGresult *pqPrepareAsyncResult(PGconn *conn);
-extern void pqInternalNotice(const PGNoticeHooks *hooks, const char *fmt,...) pg_attribute_printf(2, 3);
+extern void pqInternalNotice(const PGNoticeHooks *hooks, const char *fmt, ...) pg_attribute_printf(2, 3);
 extern void pqSaveMessageField(PGresult *res, char code,
 							   const char *value);
 extern int	pqSaveParameterStatus(PGconn *conn, const char *name,
@@ -957,8 +957,8 @@ extern char *libpq_ngettext(const char *msgid, const char *msgid_plural, unsigne
  */
 #undef _
 
-extern void libpq_append_error(PQExpBuffer errorMessage, const char *fmt,...) pg_attribute_printf(2, 3);
-extern void libpq_append_conn_error(PGconn *conn, const char *fmt,...) pg_attribute_printf(2, 3);
+extern void libpq_append_error(PQExpBuffer errorMessage, const char *fmt, ...) pg_attribute_printf(2, 3);
+extern void libpq_append_conn_error(PGconn *conn, const char *fmt, ...) pg_attribute_printf(2, 3);
 extern void libpq_append_grease_info(PGconn *conn);
 
 /*
