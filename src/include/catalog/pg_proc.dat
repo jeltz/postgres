@@ -12725,6 +12725,12 @@
 { oid => '8488', descr => 'check if input is the null value',
   proname => 'error_on_null', proisstrict => 'f', prorettype => 'anyelement',
   proargtypes => 'anyelement', prosrc => 'pg_error_on_null' },
+{ oid => '8489', descr => 'report message or raise an error',
+  proname => 'pg_raise', proisstrict => 'f', prorettype => 'void',
+  proargtypes => 'text text text text text text text text text text',
+  proargnames => '{level,message,sqlstate,detail,hint,column,constraint,datatype,table,schema}',
+  proargdefaults => '{NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL}',
+  prosrc => 'pg_raise' },
 
 { oid => '6321', descr => 'list of available WAL summary files',
   proname => 'pg_available_wal_summaries', prorows => '100', proretset => 't',

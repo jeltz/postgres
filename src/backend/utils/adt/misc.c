@@ -204,6 +204,76 @@ pg_error_on_null(PG_FUNCTION_ARGS)
 }
 
 /*
+ * pg_raise()
+ *	Report message or raise an error
+ */
+Datum
+pg_raise(PG_FUNCTION_ARGS)
+{
+	char	   *level = text_to_cstring(PG_GETARG_TEXT_PP(0));
+	char	   *err_message = text_to_cstring(PG_GETARG_TEXT_PP(1));
+	char	   *sqlstate = PG_ARGISNULL(2) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(2));
+	char	   *err_detail = PG_ARGISNULL(3) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(3));
+	char	   *err_hint = PG_ARGISNULL(4) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(4));
+	char	   *err_column = PG_ARGISNULL(5) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(5));
+	char	   *err_constraint = PG_ARGISNULL(6) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(6));
+	char	   *err_datatype = PG_ARGISNULL(7) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(7));
+	char	   *err_table = PG_ARGISNULL(8) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(8));
+	char	   *err_schema = PG_ARGISNULL(9) ? NULL : text_to_cstring(PG_GETARG_TEXT_PP(9));
+	int			elevel;
+	int			err_code = 0;
+
+	if (strcmp(level, "DEBUG") == 0)
+		elevel = DEBUG1;
+	else if (strcmp(level, "LOG") == 0)
+		elevel = LOG;
+	else if (strcmp(level, "INFO") == 0)
+		elevel = INFO;
+	else if (strcmp(level, "NOTICE") == 0)
+		elevel = NOTICE;
+	else if (strcmp(level, "WARNING") == 0)
+		elevel = WARNING;
+	else if (strcmp(level, "ERROR") == 0)
+		elevel = ERROR;
+	else
+		ereport(ERROR,
+				errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				errmsg("unknown error severity \"%s\"", level),
+				errhint("Valid levels are \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", and \"%s\".",
+						"DEBUG", "LOG", "INFO", "NOTICE", "WARNING", "ERROR"));
+
+	if (sqlstate)
+	{
+
+		if (strlen(sqlstate) != 5 ||
+			strspn(sqlstate, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") != 5)
+			ereport(ERROR,
+					errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					errmsg("invalid sqlstate \"%s\"", sqlstate));
+
+		err_code = MAKE_SQLSTATE(sqlstate[0], sqlstate[1], sqlstate[2], sqlstate[3], sqlstate[4]);
+	}
+
+	ereport(elevel,
+			err_code ? errcode(err_code) : 0,
+			errmsg_internal("%s", err_message),
+			(err_detail != NULL) ? errdetail_internal("%s", err_detail) : 0,
+			(err_hint != NULL) ? errhint("%s", err_hint) : 0,
+			(err_column != NULL) ?
+			err_generic_string(PG_DIAG_COLUMN_NAME, err_column) : 0,
+			(err_constraint != NULL) ?
+			err_generic_string(PG_DIAG_CONSTRAINT_NAME, err_constraint) : 0,
+			(err_datatype != NULL) ?
+			err_generic_string(PG_DIAG_DATATYPE_NAME, err_datatype) : 0,
+			(err_table != NULL) ?
+			err_generic_string(PG_DIAG_TABLE_NAME, err_table) : 0,
+			(err_schema != NULL) ?
+			err_generic_string(PG_DIAG_SCHEMA_NAME, err_schema) : 0);
+
+	PG_RETURN_VOID();
+}
+
+/*
  * current_database()
  *	Expose the current database to the user
  */

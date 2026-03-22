@@ -169,6 +169,65 @@ SELECT error_on_null(ROW(NULL,NULL));
 (1 row)
 
 --
+-- pg_raise()
+--
+SELECT pg_raise('ERROR', 'message text',
+                sqlstate => '23505',
+                detail => 'detail text',
+                hint => 'hint text',
+                "column" => 'column text',
+                "constraint" => 'constraint text',
+                datatype => 'datatype text',
+                "table" => 'table text',
+                schema => 'schema text');
+ERROR:  message text
+DETAIL:  detail text
+HINT:  hint text
+\set VERBOSITY sqlstate
+SELECT pg_raise('DEBUG', 'Message debug');
+ pg_raise 
+----------
+ 
+(1 row)
+
+SELECT pg_raise('LOG', 'Message log');
+ pg_raise 
+----------
+ 
+(1 row)
+
+SELECT pg_raise('INFO', 'Message info');
+INFO:  00000
+ pg_raise 
+----------
+ 
+(1 row)
+
+SELECT pg_raise('NOTICE', 'Message notice');
+NOTICE:  00000
+ pg_raise 
+----------
+ 
+(1 row)
+
+SELECT pg_raise('WARNING', 'Message warning');
+WARNING:  01000
+ pg_raise 
+----------
+ 
+(1 row)
+
+SELECT pg_raise('ERROR', 'Message error');
+ERROR:  XX000
+SELECT pg_raise('ERROR', 'Message error', sqlstate => '23505');
+ERROR:  23505
+\set VERBOSITY default
+SELECT pg_raise('ERROR', 'Message error', sqlstate => 'FOO');
+ERROR:  invalid sqlstate "FOO"
+SELECT pg_raise('FATAL', 'Message fatal');
+ERROR:  unknown error severity "FATAL"
+HINT:  Valid levels are "DEBUG", "LOG", "INFO", "NOTICE", "WARNING", and "ERROR".
+--
 -- canonicalize_path()
 --
 CREATE FUNCTION test_canonicalize_path(text)

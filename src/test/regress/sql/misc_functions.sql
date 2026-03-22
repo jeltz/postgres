@@ -48,6 +48,32 @@ SELECT error_on_null(ROW(1,NULL::int));
 SELECT error_on_null(ROW(NULL,NULL));
 
 --
+-- pg_raise()
+--
+
+SELECT pg_raise('ERROR', 'message text',
+                sqlstate => '23505',
+                detail => 'detail text',
+                hint => 'hint text',
+                "column" => 'column text',
+                "constraint" => 'constraint text',
+                datatype => 'datatype text',
+                "table" => 'table text',
+                schema => 'schema text');
+
+\set VERBOSITY sqlstate
+SELECT pg_raise('DEBUG', 'Message debug');
+SELECT pg_raise('LOG', 'Message log');
+SELECT pg_raise('INFO', 'Message info');
+SELECT pg_raise('NOTICE', 'Message notice');
+SELECT pg_raise('WARNING', 'Message warning');
+SELECT pg_raise('ERROR', 'Message error');
+SELECT pg_raise('ERROR', 'Message error', sqlstate => '23505');
+\set VERBOSITY default
+SELECT pg_raise('ERROR', 'Message error', sqlstate => 'FOO');
+SELECT pg_raise('FATAL', 'Message fatal');
+
+--
 -- canonicalize_path()
 --
 
