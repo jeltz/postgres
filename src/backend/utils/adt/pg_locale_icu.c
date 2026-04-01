@@ -989,10 +989,10 @@ static int32_t
 foldcase_options(const char *locale)
 {
 	uint32		options = U_FOLD_CASE_DEFAULT;
-	char		lang[3];
+	char		lang[ULOC_LANG_CAPACITY];
 	UErrorCode	status = U_ZERO_ERROR;
 
-	uloc_getLanguage(locale, lang, 3, &status);
+	uloc_getLanguage(locale, lang, ULOC_LANG_CAPACITY, &status);
 	if (U_SUCCESS(status))
 	{
 		/*
