@@ -2946,6 +2946,19 @@ SELECT count(*) AS func_filter_rows
 FROM filter_func_parent_v p
 JOIN filter_func_child_v c FOR KEY (parent_id) -> p (id);
 DROP VIEW filter_func_child_v, filter_func_parent_v;
+
+CREATE VIEW filter_func_arg_parent_v AS
+SELECT id FROM filter_func_parent
+WHERE id = filter_stable_identity(LEAST(1, 2));
+CREATE VIEW filter_func_arg_child_v AS
+SELECT parent_id FROM filter_func_child
+WHERE parent_id = filter_stable_identity(LEAST(1, 2));
+SELECT count(*) AS func_arg_filter_rows
+FROM filter_func_arg_parent_v p
+-- rejected, reason: function arguments must be proof-filter terms
+JOIN filter_func_arg_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_func_arg_child_v, filter_func_arg_parent_v;
+
 DROP TABLE filter_func_child, filter_func_parent;
 DROP FUNCTION filter_stable_identity(int);
 
