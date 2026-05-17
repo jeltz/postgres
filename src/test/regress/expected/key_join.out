@@ -3539,7 +3539,31 @@ JOIN filter_sqlvalue_child_v c FOR KEY (parent_id) -> p (id);
 
 DROP VIEW filter_sqlvalue_child_v, filter_sqlvalue_parent_v;
 DROP TABLE filter_sqlvalue_child, filter_sqlvalue_parent;
--- FILTER1d: strict proof-filter value allowlist accepts stable functions
+-- FILTER1d: strict proof-filter value allowlist accepts relabel casts
+CREATE TABLE filter_relabel_parent (id text PRIMARY KEY);
+CREATE TABLE filter_relabel_child
+(
+    parent_id text NOT NULL REFERENCES filter_relabel_parent (id)
+);
+INSERT INTO filter_relabel_parent VALUES ('a'), ('b');
+INSERT INTO filter_relabel_child VALUES ('a');
+CREATE VIEW filter_relabel_parent_v AS
+SELECT id FROM filter_relabel_parent
+WHERE id = ('a'::varchar)::text;
+CREATE VIEW filter_relabel_child_v AS
+SELECT parent_id FROM filter_relabel_child
+WHERE parent_id = ('a'::varchar)::text;
+SELECT count(*) AS relabel_filter_rows
+FROM filter_relabel_parent_v p
+JOIN filter_relabel_child_v c FOR KEY (parent_id) -> p (id);
+ relabel_filter_rows 
+---------------------
+                   1
+(1 row)
+
+DROP VIEW filter_relabel_child_v, filter_relabel_parent_v;
+DROP TABLE filter_relabel_child, filter_relabel_parent;
+-- FILTER1e: strict proof-filter value allowlist accepts stable functions
 CREATE FUNCTION filter_stable_identity(v int) RETURNS int
 LANGUAGE sql STABLE AS $$ SELECT v $$;
 CREATE TABLE filter_func_parent (id int PRIMARY KEY);
@@ -3578,7 +3602,7 @@ LINE 4: JOIN filter_func_arg_child_v c FOR KEY (parent_id) -> p (id)...
 DROP VIEW filter_func_arg_child_v, filter_func_arg_parent_v;
 DROP TABLE filter_func_child, filter_func_parent;
 DROP FUNCTION filter_stable_identity(int);
--- FILTER1e: strict proof-filter value allowlist rejects volatile functions
+-- FILTER1f: strict proof-filter value allowlist rejects volatile functions
 CREATE FUNCTION filter_volatile_identity(v int) RETURNS int
 LANGUAGE sql VOLATILE AS $$ SELECT v $$;
 CREATE TABLE filter_volatile_parent (id int PRIMARY KEY);
