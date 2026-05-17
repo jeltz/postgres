@@ -2414,18 +2414,7 @@ expression_tree_walker_impl(Node *node,
 		case T_BooleanTest:
 			return WALK(((BooleanTest *) node)->arg);
 		case T_KeyJoinProofDependency:
-		case T_KeyJoinKeyPosition:
 			break;
-		case T_KeyJoinFact:
-			{
-				KeyJoinFact *fact = (KeyJoinFact *) node;
-
-				if (WALK(fact->filterConjuncts))
-					return true;
-				return WALK(fact->dependencies);
-			}
-		case T_KeyJoinSurfaceFacts:
-			return WALK(((KeyJoinSurfaceFacts *) node)->facts);
 		case T_KeyJoinNode:
 			break;
 		case T_KeyJoinClause:
@@ -2967,8 +2956,6 @@ range_table_entry_walker_impl(RangeTblEntry *rte,
 	}
 
 	if (WALK(rte->securityQuals))
-		return true;
-	if (WALK(rte->keyJoinFacts))
 		return true;
 
 	if (flags & QTW_EXAMINE_RTES_AFTER)
@@ -3555,30 +3542,7 @@ expression_tree_mutator_impl(Node *node,
 			}
 			break;
 		case T_KeyJoinProofDependency:
-		case T_KeyJoinKeyPosition:
 			return copyObject(node);
-		case T_KeyJoinFact:
-			{
-				KeyJoinFact *fact = (KeyJoinFact *) node;
-				KeyJoinFact *newnode;
-
-				FLATCOPY(newnode, fact, KeyJoinFact);
-				newnode->keyPositions = copyObject(fact->keyPositions);
-				newnode->baseAttnums = copyObject(fact->baseAttnums);
-				newnode->referencedAttnums = copyObject(fact->referencedAttnums);
-				MUTATE(newnode->filterConjuncts, fact->filterConjuncts, List *);
-				MUTATE(newnode->dependencies, fact->dependencies, List *);
-				return (Node *) newnode;
-			}
-		case T_KeyJoinSurfaceFacts:
-			{
-				KeyJoinSurfaceFacts *set = (KeyJoinSurfaceFacts *) node;
-				KeyJoinSurfaceFacts *newnode;
-
-				FLATCOPY(newnode, set, KeyJoinSurfaceFacts);
-				MUTATE(newnode->facts, set->facts, List *);
-				return (Node *) newnode;
-			}
 		case T_KeyJoinNode:
 			{
 				KeyJoinNode *key_join = (KeyJoinNode *) node;
@@ -4129,8 +4093,6 @@ range_table_mutator_impl(List *rtable,
 				break;
 		}
 		MUTATE(newrte->securityQuals, rte->securityQuals, List *);
-		MUTATE(newrte->keyJoinFacts, rte->keyJoinFacts,
-			   KeyJoinSurfaceFacts *);
 		newrt = lappend(newrt, newrte);
 	}
 	return newrt;
@@ -4414,18 +4376,7 @@ raw_expression_tree_walker_impl(Node *node,
 		case T_BooleanTest:
 			return WALK(((BooleanTest *) node)->arg);
 		case T_KeyJoinProofDependency:
-		case T_KeyJoinKeyPosition:
 			break;
-		case T_KeyJoinFact:
-			{
-				KeyJoinFact *fact = (KeyJoinFact *) node;
-
-				if (WALK(fact->filterConjuncts))
-					return true;
-				return WALK(fact->dependencies);
-			}
-		case T_KeyJoinSurfaceFacts:
-			return WALK(((KeyJoinSurfaceFacts *) node)->facts);
 		case T_KeyJoinNode:
 			{
 				KeyJoinNode *key_join = (KeyJoinNode *) node;

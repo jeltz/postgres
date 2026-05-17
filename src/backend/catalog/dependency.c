@@ -2406,17 +2406,6 @@ find_expr_references_walker(Node *node,
 			return true;
 		return false;
 	}
-	else if (IsA(node, KeyJoinSurfaceFacts))
-	{
-		/*
-		 * Key-join surface facts are parser-analysis scratch
-		 * summaries.  If one leaks into a tree being dependency-scanned, do
-		 * not make its proof provenance into stored dependencies.  Accepted
-		 * stored key joins carry the facts they actually consumed in
-		 * KeyJoinNode proof lists, which are walked normally.
-		 */
-		return false;
-	}
 	else if (IsA(node, KeyJoinProofDependency))
 	{
 		KeyJoinProofDependency *dep = (KeyJoinProofDependency *) node;

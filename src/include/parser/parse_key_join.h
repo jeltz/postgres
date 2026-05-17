@@ -19,8 +19,6 @@ extern void transformAndValidateKeyJoin(ParseState *pstate, JoinExpr *j,
 										ParseNamespaceItem *l_nsitem,
 										ParseNamespaceItem *r_nsitem,
 										List *l_namespace);
-extern void ensureKeyJoinSurfaceFacts(ParseState *pstate,
-									  RangeTblEntry *rte);
 extern bool storedNodeContainsKeyJoin(Node *node);
 extern void revalidateStoredKeyJoinProofsInNode(Node *node);
 extern void revalidateStoredKeyJoinProofsInQuery(Query *query);

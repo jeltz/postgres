@@ -142,6 +142,8 @@ static bool filter_conjunct_can_remap(Node *conjunct, List *position_map);
 static bool filter_conjunct_matches_key_positions(Node *conjunct,
 												  List *keyPositions);
 static bool filter_value_allowed(Node *node);
+static void ensure_key_join_surface_facts(ParseState *pstate,
+										  RangeTblEntry *rte);
 static void ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 												   RangeTblEntry *rte);
 static void compute_key_join_relation_facts(KeyJoinFactContext *context,
@@ -368,8 +370,8 @@ transformAndValidateKeyJoin(ParseState *pstate, JoinExpr *j,
 								  local_is_referencing ? refvar : localvar);
 	}
 
-	ensureKeyJoinSurfaceFacts(pstate, fk_surface->p_rte);
-	ensureKeyJoinSurfaceFacts(pstate, pk_surface->p_rte);
+	ensure_key_join_surface_facts(pstate, fk_surface->p_rte);
+	ensure_key_join_surface_facts(pstate, pk_surface->p_rte);
 
 	/*
 	 * Deliberately ignore j->joinFilter here: the proof is about the two
@@ -1460,15 +1462,15 @@ make_dependency(Oid classId, Oid objectId)
 }
 
 /*
- * ensureKeyJoinSurfaceFacts
+ * ensure_key_join_surface_facts
  *
- *		Public entry point for live parse analysis.
+ *		Entry point for live parse analysis.
  *
  * Called by:
  *		transformAndValidateKeyJoin
  */
-void
-ensureKeyJoinSurfaceFacts(ParseState *pstate, RangeTblEntry *rte)
+static void
+ensure_key_join_surface_facts(ParseState *pstate, RangeTblEntry *rte)
 {
 	KeyJoinFactContext context;
 
@@ -1483,7 +1485,7 @@ ensureKeyJoinSurfaceFacts(ParseState *pstate, RangeTblEntry *rte)
  *		Ensure that an RTE exposes key-join surface facts when possible.
  *
  * Called by:
- *		ensureKeyJoinSurfaceFacts
+ *		ensure_key_join_surface_facts
  *		project_key_join_query_facts
  *		compute_join_output_facts
  *		revalidate_query_jointree_proofs
