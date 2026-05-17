@@ -1240,8 +1240,7 @@ filter_conjunct_unremappable_param_walker(Node *node, void *context_arg)
 {
 	FKFilterRemapContext *context = (FKFilterRemapContext *) context_arg;
 
-	if (node == NULL)
-		return false;
+	Assert(node != NULL);
 
 	if (IsA(node, Param))
 	{
