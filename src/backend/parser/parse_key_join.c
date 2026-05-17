@@ -2867,7 +2867,8 @@ add_filter_conjuncts(List **dst, List *keyPositions,
 					LockDatabaseObject(dep->classId, dep->objectId,
 									   dep->objectSubId, AccessShareLock);
 			}
-			if (contain_volatile_functions(canon) || contain_subplans(canon))
+			Assert(!contain_subplans(canon));
+			if (contain_volatile_functions(canon))
 			{
 				if (strict)
 					return false;
