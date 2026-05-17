@@ -216,7 +216,6 @@ static List *make_filter_position_map(List *src_base_attnums,
 static Node *remap_filter_param_mutator(Node *node, void *context_arg);
 static bool filter_conjunct_unremappable_param_walker(Node *node,
 													  void *context_arg);
-static bool filter_value_contains_disallowed_node(Node *node, void *context);
 static bool list_contains_equal_node(List *list, Node *node);
 static List *append_dependencies_unique(List *dst, List *src);
 static bool dependency_member(List *deps, Oid classId, Oid objectId,
@@ -1324,6 +1323,9 @@ filter_conjunct_matches_key_positions(Node *conjunct, List *keyPositions)
  * filter_value_allowed
  *
  *		Return true if a filter value can be stored in proof-filter form.
+ *		Proof filters use a strict allowlist: constants, SQL value functions,
+ *		non-volatile scalar functions, and transparent type/collation wrappers
+ *		whose arguments are also allowed.
  *
  * Called by:
  *		filter_conjunct_matches_key_positions
@@ -1332,33 +1334,41 @@ filter_conjunct_matches_key_positions(Node *conjunct, List *keyPositions)
 static bool
 filter_value_allowed(Node *node)
 {
-	return !filter_value_contains_disallowed_node(node, NULL);
-}
-
-/*
- * filter_value_contains_disallowed_node
- *
- *		Walker callback to reject nodes that cannot appear in stored
- *		key-join proof filters.
- *
- * Called by:
- *		filter_value_allowed
- */
-static bool
-filter_value_contains_disallowed_node(Node *node, void *context)
-{
-	(void) context;
-
 	if (node == NULL)
 		return false;
-	if (IsA(node, BoolExpr))
+
+	if (IsA(node, Const))
 		return true;
-	if (IsA(node, BooleanTest))
+
+	if (IsA(node, SQLValueFunction))
 		return true;
-	if (IsA(node, Param))
+
+	if (IsA(node, FuncExpr))
+	{
+		FuncExpr   *expr = castNode(FuncExpr, node);
+
+		if (expr->funcretset)
+			return false;
+		if (func_volatile(expr->funcid) == PROVOLATILE_VOLATILE)
+			return false;
+		foreach_ptr(Node, arg, expr->args)
+		{
+			if (!filter_value_allowed(arg))
+				return false;
+		}
 		return true;
-	return expression_tree_walker(node, filter_value_contains_disallowed_node,
-								  context);
+	}
+
+	if (IsA(node, RelabelType))
+		return filter_value_allowed((Node *) castNode(RelabelType, node)->arg);
+
+	if (IsA(node, CoerceViaIO))
+		return filter_value_allowed((Node *) castNode(CoerceViaIO, node)->arg);
+
+	if (IsA(node, CollateExpr))
+		return filter_value_allowed((Node *) castNode(CollateExpr, node)->arg);
+
+	return false;
 }
 
 /*
@@ -3190,19 +3200,6 @@ filter_dependency_walker(Node *node, void *context_arg)
 
 		*dependencies = add_op_function_deps(*dependencies, expr->opno,
 											 expr->opfuncid);
-	}
-	else if (IsA(node, ScalarArrayOpExpr))
-	{
-		ScalarArrayOpExpr *expr = castNode(ScalarArrayOpExpr, node);
-
-		*dependencies = add_op_function_deps(*dependencies, expr->opno,
-											 expr->opfuncid);
-		*dependencies = append_filter_dependency(*dependencies,
-												 ProcedureRelationId,
-												 expr->hashfuncid);
-		*dependencies = append_filter_dependency(*dependencies,
-												 ProcedureRelationId,
-												 expr->negfuncid);
 	}
 	return expression_tree_walker(node, filter_dependency_walker, context_arg);
 }

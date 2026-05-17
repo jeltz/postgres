@@ -2886,11 +2886,90 @@ WHERE parent_id = (true = ANY (ARRAY[false, length('x') = 1]));
 
 SELECT count(*) AS scalar_array_filter_rows
 FROM scalar_array_filter_parent_v p
--- accepted, reason: proof-filter dependencies include ScalarArrayOpExpr functions
+-- rejected, reason: ScalarArrayOpExpr filter values are not proof-filter terms
 JOIN scalar_array_filter_child_v c FOR KEY (parent_id) -> p (id);
 
 DROP VIEW scalar_array_filter_child_v, scalar_array_filter_parent_v;
 DROP TABLE scalar_array_filter_child, scalar_array_filter_parent;
+
+-- FILTER1b: strict proof-filter value allowlist accepts constants
+CREATE TABLE filter_const_parent (id int PRIMARY KEY);
+CREATE TABLE filter_const_child
+(
+    parent_id int NOT NULL REFERENCES filter_const_parent (id)
+);
+INSERT INTO filter_const_parent VALUES (1), (2);
+INSERT INTO filter_const_child VALUES (1);
+CREATE VIEW filter_const_parent_v AS
+SELECT id FROM filter_const_parent WHERE id = 1::integer;
+CREATE VIEW filter_const_child_v AS
+SELECT parent_id FROM filter_const_child WHERE parent_id = 1::integer;
+SELECT count(*) AS const_filter_rows
+FROM filter_const_parent_v p
+JOIN filter_const_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_const_child_v, filter_const_parent_v;
+DROP TABLE filter_const_child, filter_const_parent;
+
+-- FILTER1c: strict proof-filter value allowlist accepts SQL value functions
+CREATE TABLE filter_sqlvalue_parent (id name PRIMARY KEY);
+CREATE TABLE filter_sqlvalue_child
+(
+    parent_id name NOT NULL REFERENCES filter_sqlvalue_parent (id)
+);
+INSERT INTO filter_sqlvalue_parent VALUES (CURRENT_USER);
+INSERT INTO filter_sqlvalue_child VALUES (CURRENT_USER);
+CREATE VIEW filter_sqlvalue_parent_v AS
+SELECT id FROM filter_sqlvalue_parent WHERE id = CURRENT_USER;
+CREATE VIEW filter_sqlvalue_child_v AS
+SELECT parent_id FROM filter_sqlvalue_child WHERE parent_id = CURRENT_USER;
+SELECT count(*) AS sqlvalue_filter_rows
+FROM filter_sqlvalue_parent_v p
+JOIN filter_sqlvalue_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_sqlvalue_child_v, filter_sqlvalue_parent_v;
+DROP TABLE filter_sqlvalue_child, filter_sqlvalue_parent;
+
+-- FILTER1d: strict proof-filter value allowlist accepts stable functions
+CREATE FUNCTION filter_stable_identity(v int) RETURNS int
+LANGUAGE sql STABLE AS $$ SELECT v $$;
+CREATE TABLE filter_func_parent (id int PRIMARY KEY);
+CREATE TABLE filter_func_child
+(
+    parent_id int NOT NULL REFERENCES filter_func_parent (id)
+);
+INSERT INTO filter_func_parent VALUES (1), (2);
+INSERT INTO filter_func_child VALUES (1);
+CREATE VIEW filter_func_parent_v AS
+SELECT id FROM filter_func_parent WHERE id = filter_stable_identity(1);
+CREATE VIEW filter_func_child_v AS
+SELECT parent_id FROM filter_func_child WHERE parent_id = filter_stable_identity(1);
+SELECT count(*) AS func_filter_rows
+FROM filter_func_parent_v p
+JOIN filter_func_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_func_child_v, filter_func_parent_v;
+DROP TABLE filter_func_child, filter_func_parent;
+DROP FUNCTION filter_stable_identity(int);
+
+-- FILTER1e: strict proof-filter value allowlist rejects volatile functions
+CREATE FUNCTION filter_volatile_identity(v int) RETURNS int
+LANGUAGE sql VOLATILE AS $$ SELECT v $$;
+CREATE TABLE filter_volatile_parent (id int PRIMARY KEY);
+CREATE TABLE filter_volatile_child
+(
+    parent_id int NOT NULL REFERENCES filter_volatile_parent (id)
+);
+INSERT INTO filter_volatile_parent VALUES (1), (2);
+INSERT INTO filter_volatile_child VALUES (1);
+CREATE VIEW filter_volatile_parent_v AS
+SELECT id FROM filter_volatile_parent WHERE id = filter_volatile_identity(1);
+CREATE VIEW filter_volatile_child_v AS
+SELECT parent_id FROM filter_volatile_child WHERE parent_id = filter_volatile_identity(1);
+SELECT count(*) AS volatile_filter_rows
+FROM filter_volatile_parent_v p
+-- rejected, reason: volatile function filter values are not proof-filter terms
+JOIN filter_volatile_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_volatile_child_v, filter_volatile_parent_v;
+DROP TABLE filter_volatile_child, filter_volatile_parent;
+DROP FUNCTION filter_volatile_identity(int);
 
 -- FILTER2: FK left join with FILTER — outer join rows still present
 SELECT * FROM t1
@@ -3257,26 +3336,59 @@ DROP VIEW filter_bool_child_test, filter_bool_parent_test,
           filter_bool_child_or, filter_bool_parent_or;
 DROP TABLE filter_bool_child, filter_bool_parent;
 
--- FILTER5d: proof-filter walkers must tolerate nullable expression fields
-CREATE TABLE filter_case_parent (id int PRIMARY KEY);
-CREATE TABLE filter_case_child
+-- FILTER5d: pseudo-function filter values are not proof-filter terms
+CREATE TABLE filter_pseudo_parent (id int PRIMARY KEY);
+CREATE TABLE filter_pseudo_child
 (
-    parent_id int NOT NULL REFERENCES filter_case_parent (id)
+    parent_id int NOT NULL REFERENCES filter_pseudo_parent (id)
 );
-INSERT INTO filter_case_parent VALUES (1), (2);
-INSERT INTO filter_case_child VALUES (1);
+INSERT INTO filter_pseudo_parent VALUES (1), (2);
+INSERT INTO filter_pseudo_child VALUES (1);
+
 CREATE VIEW filter_case_parent_v AS
-SELECT id FROM filter_case_parent
+SELECT id FROM filter_pseudo_parent
 WHERE id = CASE WHEN true THEN 1 ELSE 2 END;
 CREATE VIEW filter_case_child_v AS
-SELECT parent_id FROM filter_case_child
+SELECT parent_id FROM filter_pseudo_child
 WHERE parent_id = CASE WHEN true THEN 1 ELSE 2 END;
 SELECT *
 FROM filter_case_parent_v p
+-- rejected, reason: CaseExpr filter values are not proof-filter terms
 JOIN filter_case_child_v c FOR KEY (parent_id) -> p (id)
 ORDER BY p.id;
 DROP VIEW filter_case_child_v, filter_case_parent_v;
-DROP TABLE filter_case_child, filter_case_parent;
+
+CREATE VIEW filter_minmax_parent_v AS
+SELECT id FROM filter_pseudo_parent WHERE id = LEAST(1, 2);
+CREATE VIEW filter_minmax_child_v AS
+SELECT parent_id FROM filter_pseudo_child WHERE parent_id = LEAST(1, 2);
+SELECT count(*) AS minmax_filter_rows
+FROM filter_minmax_parent_v p
+-- rejected, reason: MinMaxExpr filter values are not proof-filter terms
+JOIN filter_minmax_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_minmax_child_v, filter_minmax_parent_v;
+
+CREATE VIEW filter_coalesce_parent_v AS
+SELECT id FROM filter_pseudo_parent WHERE id = COALESCE(1, 2);
+CREATE VIEW filter_coalesce_child_v AS
+SELECT parent_id FROM filter_pseudo_child WHERE parent_id = COALESCE(1, 2);
+SELECT count(*) AS coalesce_filter_rows
+FROM filter_coalesce_parent_v p
+-- rejected, reason: CoalesceExpr filter values are not proof-filter terms
+JOIN filter_coalesce_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_coalesce_child_v, filter_coalesce_parent_v;
+
+CREATE VIEW filter_nullif_parent_v AS
+SELECT id FROM filter_pseudo_parent WHERE id = NULLIF(1, 2);
+CREATE VIEW filter_nullif_child_v AS
+SELECT parent_id FROM filter_pseudo_child WHERE parent_id = NULLIF(1, 2);
+SELECT count(*) AS nullif_filter_rows
+FROM filter_nullif_parent_v p
+-- rejected, reason: NullIfExpr filter values are not proof-filter terms
+JOIN filter_nullif_child_v c FOR KEY (parent_id) -> p (id);
+DROP VIEW filter_nullif_child_v, filter_nullif_parent_v;
+
+DROP TABLE filter_pseudo_child, filter_pseudo_parent;
 
 -- FILTER5e: matched-filter propagation skips other same-relation keys
 CREATE TABLE filter_self_rowcov
