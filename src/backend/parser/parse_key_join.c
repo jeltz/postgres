@@ -1345,8 +1345,7 @@ filter_value_allowed(Node *node)
 	{
 		FuncExpr   *expr = castNode(FuncExpr, node);
 
-		if (expr->funcretset)
-			return false;
+		Assert(!expr->funcretset);
 		if (func_volatile(expr->funcid) == PROVOLATILE_VOLATILE)
 			return false;
 		foreach_ptr(Node, arg, expr->args)
