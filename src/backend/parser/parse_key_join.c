@@ -2870,8 +2870,7 @@ add_filter_conjuncts(List **dst, List *keyPositions,
 			Assert(!contain_subplans(canon));
 			if (contain_volatile_functions(canon))
 			{
-				if (strict)
-					return false;
+				Assert(!strict);
 				continue;
 			}
 			Assert(dependencies != NULL);
