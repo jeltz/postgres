@@ -3230,8 +3230,8 @@ add_op_function_deps(List *deps, Oid opno, Oid opfuncid)
 static List *
 append_filter_dependency(List *dependencies, Oid classId, Oid objectId)
 {
-	if (!OidIsValid(objectId) ||
-		dependency_member(dependencies, classId, objectId, 0))
+	Assert(OidIsValid(objectId));
+	if (dependency_member(dependencies, classId, objectId, 0))
 		return dependencies;
 	return lappend(dependencies, make_dependency(classId, objectId));
 }
