@@ -5277,6 +5277,52 @@ DROP OPERATOR =# (int, int);
 DROP FUNCTION key_join_refuniq_bucket_cmp(int, int);
 DROP FUNCTION key_join_refuniq_bucket_eq(int, int);
 
+-- Set-returning equality operator functions are not usable proof operators.
+CREATE FUNCTION key_join_srf_eq(a int, b int) RETURNS SETOF boolean
+LANGUAGE sql IMMUTABLE STRICT AS $$ SELECT a = b $$;
+CREATE FUNCTION key_join_srf_cmp(a int, b int) RETURNS int
+LANGUAGE sql IMMUTABLE STRICT AS $$ SELECT btint4cmp(a, b) $$;
+CREATE OPERATOR =# (
+    LEFTARG = int,
+    RIGHTARG = int,
+    FUNCTION = key_join_srf_eq,
+    COMMUTATOR = =#,
+    RESTRICT = eqsel,
+    JOIN = eqjoinsel,
+    MERGES
+);
+CREATE OPERATOR CLASS key_join_srf_int4_ops
+FOR TYPE int USING btree AS
+    OPERATOR 1 < (int, int),
+    OPERATOR 2 <= (int, int),
+    OPERATOR 3 =# (int, int),
+    OPERATOR 4 >= (int, int),
+    OPERATOR 5 > (int, int),
+    FUNCTION 1 key_join_srf_cmp(int, int);
+
+CREATE TABLE key_join_srf_parent
+(
+    id int NOT NULL
+);
+CREATE UNIQUE INDEX key_join_srf_parent_idx
+    ON key_join_srf_parent USING btree (id key_join_srf_int4_ops);
+CREATE TABLE key_join_srf_child
+(
+    parent_id int NOT NULL REFERENCES key_join_srf_parent (id)
+);
+
+SELECT *
+FROM key_join_srf_parent p
+JOIN key_join_srf_child c FOR KEY (parent_id) -> p (id);
+
+DROP TABLE key_join_srf_child,
+           key_join_srf_parent;
+DROP OPERATOR CLASS key_join_srf_int4_ops USING btree;
+DROP OPERATOR FAMILY key_join_srf_int4_ops USING btree;
+DROP OPERATOR =# (int, int);
+DROP FUNCTION key_join_srf_eq(int, int);
+DROP FUNCTION key_join_srf_cmp(int, int);
+
 -- Final cleanup: drop all remaining objects
 DROP VIEW v1, v2;
 DROP TABLE shipments, orders, order_items, packages CASCADE;

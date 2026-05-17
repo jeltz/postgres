@@ -4312,7 +4312,8 @@ key_join_equality_operator_is_usable(Oid opno, Oid typeOid, List **dependencies)
 	Assert(RegProcedureIsValid(funcid));
 
 	LockDatabaseObject(ProcedureRelationId, (Oid) funcid, 0, AccessShareLock);
-	Assert(!get_func_retset((Oid) funcid));
+	if (get_func_retset((Oid) funcid))
+		return false;
 	if (func_volatile((Oid) funcid) != PROVOLATILE_IMMUTABLE)
 		return false;
 	if (!func_strict((Oid) funcid))
