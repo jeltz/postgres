@@ -3184,8 +3184,7 @@ filter_dependency_walker(Node *node, void *context_arg)
 {
 	List	  **dependencies = (List **) context_arg;
 
-	if (node == NULL)
-		return false;
+	Assert(node != NULL);
 
 	if (IsA(node, FuncExpr))
 		*dependencies =
