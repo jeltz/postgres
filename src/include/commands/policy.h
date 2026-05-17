@@ -27,6 +27,7 @@ extern bool RemoveRoleFromObjectPolicy(Oid roleid, Oid classid, Oid policy_id);
 
 extern ObjectAddress CreatePolicy(CreatePolicyStmt *stmt);
 extern ObjectAddress AlterPolicy(AlterPolicyStmt *stmt);
+extern void RevalidateDependentKeyJoinPolicy(Oid policy_id);
 
 extern Oid	get_relation_policy_oid(Oid relid, const char *policy_name,
 									bool missing_ok);

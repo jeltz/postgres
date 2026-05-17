@@ -2413,6 +2413,27 @@ expression_tree_walker_impl(Node *node,
 			return WALK(((NullTest *) node)->arg);
 		case T_BooleanTest:
 			return WALK(((BooleanTest *) node)->arg);
+		case T_KeyJoinProofDependency:
+		case T_KeyJoinKeyPosition:
+			break;
+		case T_KeyJoinFact:
+			{
+				KeyJoinFact *fact = (KeyJoinFact *) node;
+
+				if (WALK(fact->filterConjuncts))
+					return true;
+				return WALK(fact->dependencies);
+			}
+		case T_KeyJoinSurfaceFacts:
+			return WALK(((KeyJoinSurfaceFacts *) node)->facts);
+		case T_KeyJoinNode:
+			break;
+		case T_KeyJoinClause:
+			{
+				KeyJoinClause *key_join = (KeyJoinClause *) node;
+
+				return WALK(key_join->filter);
+			}
 		case T_CoerceToDomain:
 			return WALK(((CoerceToDomain *) node)->arg);
 		case T_TargetEntry:
@@ -2630,9 +2651,13 @@ expression_tree_walker_impl(Node *node,
 					return true;
 				if (WALK(join->quals))
 					return true;
+				if (WALK(join->joinFilter))
+					return true;
 
 				/*
-				 * alias clause, using list are deemed uninteresting.
+				 * Key-join proof metadata is not expression semantics, but the
+				 * join-local filter is.  Alias clause, using list are deemed
+				 * uninteresting.
 				 */
 			}
 			break;
@@ -2942,6 +2967,8 @@ range_table_entry_walker_impl(RangeTblEntry *rte,
 	}
 
 	if (WALK(rte->securityQuals))
+		return true;
+	if (WALK(rte->keyJoinFacts))
 		return true;
 
 	if (flags & QTW_EXAMINE_RTES_AFTER)
@@ -3527,6 +3554,62 @@ expression_tree_mutator_impl(Node *node,
 				return (Node *) newnode;
 			}
 			break;
+		case T_KeyJoinProofDependency:
+		case T_KeyJoinKeyPosition:
+			return copyObject(node);
+		case T_KeyJoinFact:
+			{
+				KeyJoinFact *fact = (KeyJoinFact *) node;
+				KeyJoinFact *newnode;
+
+				FLATCOPY(newnode, fact, KeyJoinFact);
+				newnode->keyPositions = copyObject(fact->keyPositions);
+				newnode->baseAttnums = copyObject(fact->baseAttnums);
+				newnode->referencedAttnums = copyObject(fact->referencedAttnums);
+				MUTATE(newnode->filterConjuncts, fact->filterConjuncts, List *);
+				MUTATE(newnode->dependencies, fact->dependencies, List *);
+				return (Node *) newnode;
+			}
+		case T_KeyJoinSurfaceFacts:
+			{
+				KeyJoinSurfaceFacts *set = (KeyJoinSurfaceFacts *) node;
+				KeyJoinSurfaceFacts *newnode;
+
+				FLATCOPY(newnode, set, KeyJoinSurfaceFacts);
+				MUTATE(newnode->facts, set->facts, List *);
+				return (Node *) newnode;
+			}
+		case T_KeyJoinNode:
+			{
+				KeyJoinNode *key_join = (KeyJoinNode *) node;
+				KeyJoinNode *newnode;
+
+				FLATCOPY(newnode, key_join, KeyJoinNode);
+				newnode->referencingAttnums =
+					copyObject(key_join->referencingAttnums);
+				newnode->referencedAttnums =
+					copyObject(key_join->referencedAttnums);
+				newnode->refAliasAttnums =
+					copyObject(key_join->refAliasAttnums);
+				newnode->notNullConstraints =
+					copyObject(key_join->notNullConstraints);
+				newnode->proofDependencies =
+					copyObject(key_join->proofDependencies);
+				return (Node *) newnode;
+			}
+		case T_KeyJoinClause:
+			{
+				KeyJoinClause *key_join = (KeyJoinClause *) node;
+				KeyJoinClause *newnode;
+
+				FLATCOPY(newnode, key_join, KeyJoinClause);
+				newnode->localCols = copyObject(key_join->localCols);
+				newnode->refAlias = key_join->refAlias ?
+					pstrdup(key_join->refAlias) : NULL;
+				newnode->refCols = copyObject(key_join->refCols);
+				MUTATE(newnode->filter, key_join->filter, Node *);
+				return (Node *) newnode;
+			}
 		case T_CoerceToDomain:
 			{
 				CoerceToDomain *ctest = (CoerceToDomain *) node;
@@ -3722,6 +3805,8 @@ expression_tree_mutator_impl(Node *node,
 				MUTATE(newnode->larg, join->larg, Node *);
 				MUTATE(newnode->rarg, join->rarg, Node *);
 				MUTATE(newnode->quals, join->quals, Node *);
+				newnode->keyJoin = copyObject(join->keyJoin);
+				MUTATE(newnode->joinFilter, join->joinFilter, Node *);
 				/* We do not mutate alias or using by default */
 				return (Node *) newnode;
 			}
@@ -4044,6 +4129,8 @@ range_table_mutator_impl(List *rtable,
 				break;
 		}
 		MUTATE(newrte->securityQuals, rte->securityQuals, List *);
+		MUTATE(newrte->keyJoinFacts, rte->keyJoinFacts,
+			   KeyJoinSurfaceFacts *);
 		newrt = lappend(newrt, newrte);
 	}
 	return newrt;
@@ -4326,6 +4413,37 @@ raw_expression_tree_walker_impl(Node *node,
 			return WALK(((NullTest *) node)->arg);
 		case T_BooleanTest:
 			return WALK(((BooleanTest *) node)->arg);
+		case T_KeyJoinProofDependency:
+		case T_KeyJoinKeyPosition:
+			break;
+		case T_KeyJoinFact:
+			{
+				KeyJoinFact *fact = (KeyJoinFact *) node;
+
+				if (WALK(fact->filterConjuncts))
+					return true;
+				return WALK(fact->dependencies);
+			}
+		case T_KeyJoinSurfaceFacts:
+			return WALK(((KeyJoinSurfaceFacts *) node)->facts);
+		case T_KeyJoinNode:
+			{
+				KeyJoinNode *key_join = (KeyJoinNode *) node;
+
+				if (WALK(key_join->notNullConstraints))
+					return true;
+				return WALK(key_join->proofDependencies);
+			}
+		case T_KeyJoinClause:
+			{
+				KeyJoinClause *kjc = (KeyJoinClause *) node;
+
+				if (WALK(kjc->localCols))
+					return true;
+				if (WALK(kjc->refCols))
+					return true;
+				return WALK(kjc->filter);
+			}
 		case T_JoinExpr:
 			{
 				JoinExpr   *join = (JoinExpr *) node;
@@ -4335,6 +4453,10 @@ raw_expression_tree_walker_impl(Node *node,
 				if (WALK(join->rarg))
 					return true;
 				if (WALK(join->quals))
+					return true;
+				if (WALK(join->keyJoin))
+					return true;
+				if (WALK(join->joinFilter))
 					return true;
 				if (WALK(join->alias))
 					return true;

@@ -14,22 +14,46 @@
  */
 #include "postgres.h"
 
+#include "access/genam.h"
+#include "access/htup_details.h"
 #include "access/relation.h"
+#include "access/skey.h"
+#include "access/table.h"
 #include "access/xact.h"
+#include "catalog/indexing.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_class.h"
+#include "catalog/pg_constraint.h"
+#include "catalog/pg_depend.h"
+#include "catalog/pg_policy.h"
+#include "catalog/pg_proc.h"
+#include "catalog/pg_rewrite.h"
+#include "commands/policy.h"
 #include "commands/tablecmds.h"
 #include "commands/view.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/analyze.h"
+#include "parser/parse_key_join.h"
 #include "rewrite/rewriteDefine.h"
 #include "rewrite/rewriteHandler.h"
 #include "rewrite/rewriteSupport.h"
 #include "utils/builtins.h"
+#include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
+#include "utils/syscache.h"
 
 static void checkViewColumns(TupleDesc newdesc, TupleDesc olddesc);
+static void revalidateDependentKeyJoinObjects(Oid viewOid);
+static void revalidate_dependent_key_join_objects_recurse(Oid refclassid,
+														  Oid refobjid,
+														  List *ancestors);
+static bool object_address_list_member(List *objects, Oid classId,
+									   Oid objectId);
+static ObjectAddress *make_object_address(Oid classId, Oid objectId);
+static void revalidate_dependent_key_join_relation(Oid relationOid);
+static void revalidate_dependent_key_join_function(Oid procOid);
 
 /*---------------------------------------------------------------------
  * DefineVirtualRelation
@@ -181,6 +205,7 @@ DefineVirtualRelation(RangeVar *relation, List *tlist, bool replace,
 
 		/* Make the new view query visible */
 		CommandCounterIncrement();
+		revalidateDependentKeyJoinObjects(viewOid);
 
 		/*
 		 * Update the view's options.
@@ -516,4 +541,295 @@ StoreViewQuery(Oid viewOid, Query *viewParse, bool replace)
 	 * Now create the rules associated with the view.
 	 */
 	DefineViewRules(viewOid, viewParse, replace);
+}
+
+static Oid
+get_rule_event_relation(Oid ruleOid)
+{
+	Relation	rewriteRel;
+	ScanKeyData key[1];
+	SysScanDesc scan;
+	HeapTuple	tup;
+	Oid			result = InvalidOid;
+
+	rewriteRel = table_open(RewriteRelationId, AccessShareLock);
+	ScanKeyInit(&key[0],
+				Anum_pg_rewrite_oid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(ruleOid));
+	scan = systable_beginscan(rewriteRel, RewriteOidIndexId, true,
+							  NULL, 1, key);
+	tup = systable_getnext(scan);
+	if (HeapTupleIsValid(tup))
+		result = ((Form_pg_rewrite) GETSTRUCT(tup))->ev_class;
+	systable_endscan(scan);
+	table_close(rewriteRel, AccessShareLock);
+
+	return result;
+}
+
+static List *
+find_dependent_key_join_objects(Oid refclassid, Oid refobjid)
+{
+	Relation	depRel;
+	ScanKeyData key[2];
+	SysScanDesc scan;
+	HeapTuple	tup;
+	List	   *result = NIL;
+
+	depRel = table_open(DependRelationId, AccessShareLock);
+	ScanKeyInit(&key[0],
+				Anum_pg_depend_refclassid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(refclassid));
+	ScanKeyInit(&key[1],
+				Anum_pg_depend_refobjid,
+				BTEqualStrategyNumber, F_OIDEQ,
+				ObjectIdGetDatum(refobjid));
+	scan = systable_beginscan(depRel, DependReferenceIndexId, true,
+							  NULL, 2, key);
+
+	while (HeapTupleIsValid((tup = systable_getnext(scan))))
+	{
+		Form_pg_depend dep = (Form_pg_depend) GETSTRUCT(tup);
+		Oid			classid = InvalidOid;
+		Oid			objectid = InvalidOid;
+
+		if (dep->classid == RewriteRelationId)
+		{
+			objectid = get_rule_event_relation(dep->objid);
+			if (!OidIsValid(objectid))
+				continue;
+			classid = RelationRelationId;
+		}
+		else if (dep->classid == ProcedureRelationId)
+		{
+			classid = ProcedureRelationId;
+			objectid = dep->objid;
+		}
+		else if (dep->classid == PolicyRelationId)
+		{
+			classid = PolicyRelationId;
+			objectid = dep->objid;
+		}
+		else
+			continue;
+
+		if (classid == refclassid && objectid == refobjid)
+			continue;
+		if (!object_address_list_member(result, classid, objectid))
+			result = lappend(result, make_object_address(classid, objectid));
+	}
+
+	systable_endscan(scan);
+	table_close(depRel, AccessShareLock);
+
+	return result;
+}
+
+static void
+revalidate_dependent_key_join_objects_recurse(Oid refclassid, Oid refobjid,
+											  List *ancestors)
+{
+	List	   *dependents;
+	List	   *path = list_copy(ancestors);
+	ListCell   *lc;
+
+	if (object_address_list_member(ancestors, refclassid, refobjid))
+		return;
+	path = lappend(path, make_object_address(refclassid, refobjid));
+
+	dependents = find_dependent_key_join_objects(refclassid, refobjid);
+	foreach(lc, dependents)
+	{
+		ObjectAddress *depobj = (ObjectAddress *) lfirst(lc);
+
+		if (object_address_list_member(path, depobj->classId,
+									   depobj->objectId))
+			continue;
+
+		switch (depobj->classId)
+		{
+			case RelationRelationId:
+				revalidate_dependent_key_join_relation(depobj->objectId);
+				revalidate_dependent_key_join_objects_recurse(RelationRelationId,
+															  depobj->objectId,
+															  path);
+				break;
+			case ProcedureRelationId:
+				revalidate_dependent_key_join_function(depobj->objectId);
+				revalidate_dependent_key_join_objects_recurse(ProcedureRelationId,
+															  depobj->objectId,
+															  path);
+				break;
+			case PolicyRelationId:
+				RevalidateDependentKeyJoinPolicy(depobj->objectId);
+				revalidate_dependent_key_join_objects_recurse(PolicyRelationId,
+															  depobj->objectId,
+															  path);
+				break;
+			default:
+				break;
+		}
+	}
+}
+
+static void
+revalidate_dependent_key_join_relation(Oid relationOid)
+{
+	Relation	rel;
+
+	rel = relation_open(relationOid, AccessShareLock);
+
+	/*
+	 * Walk every rule attached to the dependent relation.  A stored key-join
+	 * proof can live in any rule action: a view's or matview's _RETURN rule,
+	 * an INSTEAD-OF rule on a view, a DO ALSO/INSTEAD rule on a plain table,
+	 * etc.  Each key-join-bearing action must be revalidated so DDL that
+	 * would make the proof unprovable is rejected with the existing "key join
+	 * cannot be proven from available constraints" error.
+	 *
+	 * Revalidation may change copied KeyJoinNode dependency lists.
+	 * Dependency shrinkage is safe to leave stale in pg_depend, but new
+	 * dependencies or other semantic changes would make the stored proof
+	 * unsafe without rewriting its owning object.
+	 */
+	if (rel->rd_rules != NULL)
+	{
+		for (int i = 0; i < rel->rd_rules->numLocks; i++)
+		{
+			RewriteRule *rule = rel->rd_rules->rules[i];
+			ListCell   *lc2;
+
+			foreach(lc2, rule->actions)
+			{
+				Node	   *action = (Node *) lfirst(lc2);
+				Query	   *copy;
+
+				if (!IsA(action, Query))
+					continue;
+				if (!storedNodeContainsKeyJoin(action))
+					continue;
+
+				copy = copyObject((Query *) action);
+				revalidateStoredKeyJoinProofsInQuery(copy);
+
+				if (!revalidatedStoredKeyJoinProofsAreSafe(action,
+														   (Node *) copy))
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_FOREIGN_KEY),
+							 errmsg("stored key join proof would require new dependencies")));
+			}
+
+			if (rule->qual != NULL && storedNodeContainsKeyJoin(rule->qual))
+			{
+				Node	   *copy;
+
+				copy = copyObject(rule->qual);
+				revalidateStoredKeyJoinProofsInNode(copy);
+
+				if (!revalidatedStoredKeyJoinProofsAreSafe(rule->qual, copy))
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_FOREIGN_KEY),
+							 errmsg("stored key join proof would require new dependencies")));
+			}
+		}
+	}
+
+	relation_close(rel, AccessShareLock);
+}
+
+static void
+revalidate_dependent_key_join_function(Oid procOid)
+{
+	HeapTuple	tup;
+	Datum		datum;
+	bool		isnull;
+	Node	   *body;
+	Node	   *copy;
+
+	tup = SearchSysCache1(PROCOID, ObjectIdGetDatum(procOid));
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "cache lookup failed for function %u", procOid);
+
+	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_prosqlbody, &isnull);
+	if (isnull)
+	{
+		ReleaseSysCache(tup);
+		return;
+	}
+
+	body = stringToNode(TextDatumGetCString(datum));
+	if (!storedNodeContainsKeyJoin(body))
+	{
+		ReleaseSysCache(tup);
+		return;
+	}
+
+	copy = copyObject(body);
+	revalidateStoredKeyJoinProofsInNode(copy);
+	ReleaseSysCache(tup);
+
+	if (!revalidatedStoredKeyJoinProofsAreSafe(body, copy))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
+				 errmsg("stored key join proof would require new dependencies")));
+}
+
+static void
+revalidateDependentKeyJoinObjects(Oid viewOid)
+{
+	revalidate_dependent_key_join_objects_recurse(RelationRelationId, viewOid, NIL);
+}
+
+void
+RevalidateDependentKeyJoinObjectsOnConstraint(Oid constraintOid)
+{
+	if (!OidIsValid(constraintOid))
+		return;
+
+	revalidate_dependent_key_join_objects_recurse(ConstraintRelationId,
+												  constraintOid, NIL);
+}
+
+void
+RevalidateDependentKeyJoinObjectsOnRelation(Oid relationOid)
+{
+	if (!OidIsValid(relationOid))
+		return;
+
+	revalidate_dependent_key_join_objects_recurse(RelationRelationId,
+												  relationOid, NIL);
+}
+
+void
+RevalidateDependentKeyJoinObjectsOnProcedure(Oid procOid)
+{
+	if (!OidIsValid(procOid))
+		return;
+
+	revalidate_dependent_key_join_objects_recurse(ProcedureRelationId,
+												  procOid, NIL);
+}
+
+static bool
+object_address_list_member(List *objects, Oid classId, Oid objectId)
+{
+	foreach_ptr(ObjectAddress, object, objects)
+	{
+		if (object->classId == classId &&
+			object->objectId == objectId &&
+			object->objectSubId == 0)
+			return true;
+	}
+	return false;
+}
+
+static ObjectAddress *
+make_object_address(Oid classId, Oid objectId)
+{
+	ObjectAddress *object = palloc(sizeof(ObjectAddress));
+
+	ObjectAddressSet(*object, classId, objectId);
+	return object;
 }

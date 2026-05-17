@@ -27,6 +27,8 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_type.h"
+#include "commands/defrem.h"
+#include "commands/view.h"
 #include "executor/functions.h"
 #include "funcapi.h"
 #include "mb/pg_wchar.h"
@@ -35,6 +37,7 @@
 #include "parser/parse_coerce.h"
 #include "pgstat.h"
 #include "rewrite/rewriteHandler.h"
+#include "storage/lmgr.h"
 #include "tcop/pquery.h"
 #include "tcop/tcopprot.h"
 #include "utils/acl.h"
@@ -56,6 +59,8 @@ static int	match_prosrc_to_query(const char *prosrc, const char *queryText,
 								  int cursorpos);
 static bool match_prosrc_to_literal(const char *prosrc, const char *literal,
 									int cursorpos, int *newcursorpos);
+static void record_procedure_dependencies(Oid retval, HeapTuple tup,
+										  Node *prosqlbody);
 
 
 /* ----------------------------------------------------------------
@@ -141,12 +146,9 @@ ProcedureCreate(const char *procedureName,
 	NameData	procname;
 	TupleDesc	tupDesc;
 	bool		is_update;
-	ObjectAddress myself,
-				referenced,
-				temp_object;
+	ObjectAddress myself;
 	char	   *detailmsg;
 	int			i;
-	ObjectAddresses *addrs;
 
 	/*
 	 * sanity checks
@@ -394,6 +396,7 @@ ProcedureCreate(const char *procedureName,
 	{
 		/* There is one; okay to replace it? */
 		Form_pg_proc oldproc = (Form_pg_proc) GETSTRUCT(oldtup);
+		Oid			oldprocid = oldproc->oid;
 		Datum		proargnames;
 		bool		isnull;
 		const char *dropcmd;
@@ -403,6 +406,22 @@ ProcedureCreate(const char *procedureName,
 					(errcode(ERRCODE_DUPLICATE_FUNCTION),
 					 errmsg("function \"%s\" already exists with same argument types",
 							procedureName)));
+
+		/*
+		 * Key-join proof can depend on this function's volatility,
+		 * strictness, and body.  Serialize replacement with CREATE VIEW
+		 * analysis that may be capturing such a proof, so the later command
+		 * either sees and revalidates the new dependent object or validates
+		 * against the new function definition.
+		 */
+		LockDatabaseObject(ProcedureRelationId, oldprocid, 0,
+						   AccessExclusiveLock);
+		ReleaseSysCache(oldtup);
+		oldtup = SearchSysCache1(PROCOID, ObjectIdGetDatum(oldprocid));
+		if (!HeapTupleIsValid(oldtup))
+			elog(ERROR, "cache lookup failed for function %u", oldprocid);
+		oldproc = (Form_pg_proc) GETSTRUCT(oldtup);
+
 		if (!object_ownercheck(ProcedureRelationId, oldproc->oid, proowner))
 			aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_FUNCTION,
 						   procedureName);
@@ -623,77 +642,8 @@ ProcedureCreate(const char *procedureName,
 	if (is_update)
 		deleteDependencyRecordsFor(ProcedureRelationId, retval, true);
 
-	addrs = new_object_addresses();
-
 	ObjectAddressSet(myself, ProcedureRelationId, retval);
-
-	/* dependency on namespace */
-	ObjectAddressSet(referenced, NamespaceRelationId, procNamespace);
-	add_exact_object_address(&referenced, addrs);
-
-	/* dependency on implementation language */
-	ObjectAddressSet(referenced, LanguageRelationId, languageObjectId);
-	add_exact_object_address(&referenced, addrs);
-
-	/* dependency on return type */
-	ObjectAddressSet(referenced, TypeRelationId, returnType);
-	add_exact_object_address(&referenced, addrs);
-
-	/* dependency on parameter types */
-	for (i = 0; i < allParamCount; i++)
-	{
-		ObjectAddressSet(referenced, TypeRelationId, allParams[i]);
-		add_exact_object_address(&referenced, addrs);
-	}
-
-	/* dependency on transforms, if any */
-	foreach_oid(transformid, trfoids)
-	{
-		ObjectAddressSet(referenced, TransformRelationId, transformid);
-		add_exact_object_address(&referenced, addrs);
-	}
-
-	/* dependency on support function, if any */
-	if (OidIsValid(prosupport))
-	{
-		ObjectAddressSet(referenced, ProcedureRelationId, prosupport);
-		add_exact_object_address(&referenced, addrs);
-	}
-
-	/* dependencies appearing in new-style SQL routine body */
-	if (languageObjectId == SQLlanguageId && prosqlbody)
-		collectDependenciesOfExpr(addrs, prosqlbody, NIL);
-
-	/* dependency on parameter default expressions */
-	if (parameterDefaults)
-		collectDependenciesOfExpr(addrs, (Node *) parameterDefaults, NIL);
-
-	/*
-	 * Now that we have all the normal dependencies, thumb through them and
-	 * warn if any are to temporary objects.  This informs the user if their
-	 * supposedly non-temp function will silently go away at session exit, due
-	 * to a dependency on a temp object.  However, do not complain when a
-	 * function created in our own pg_temp namespace refers to other objects
-	 * in that namespace, since then they'll have similar lifespans anyway.
-	 */
-	if (find_temp_object(addrs, isTempNamespace(procNamespace), &temp_object))
-		ereport(NOTICE,
-				(errmsg("function \"%s\" will be effectively temporary",
-						procedureName),
-				 errdetail("It depends on temporary %s.",
-						   getObjectDescription(&temp_object, false))));
-
-	/*
-	 * Now record all normal dependencies at once.  This will also remove any
-	 * duplicates in the list.  (Role and extension dependencies are handled
-	 * separately below.  Role dependencies would have to be separate anyway
-	 * since they are shared dependencies.  An extension dependency could be
-	 * folded into the addrs list, but pg_depend.c doesn't make that easy, and
-	 * it won't duplicate anything we've collected so far anyway.)
-	 */
-	record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
-
-	free_object_addresses(addrs);
+	record_procedure_dependencies(retval, tup, prosqlbody);
 
 	/* dependency on owner */
 	if (!is_update)
@@ -756,7 +706,174 @@ ProcedureCreate(const char *procedureName,
 	if (!is_update)
 		pgstat_create_function(retval);
 
+	/*
+	 * For CREATE OR REPLACE FUNCTION, revalidate stored key-join proofs that
+	 * captured this function in a matched-filter conjunct.  The function's
+	 * body, volatility, or strictness may all have changed; if a stored proof
+	 * no longer holds, revalidation raises an error and aborts the DDL.
+	 * Plain CREATE FUNCTION can't have any dependents yet, so revalidation is
+	 * needed only for the replace path.
+	 */
+	if (is_update)
+	{
+		CommandCounterIncrement();
+		RevalidateDependentKeyJoinObjectsOnProcedure(retval);
+	}
+
 	return myself;
+}
+
+/*
+ * record_procedure_dependencies
+ *
+ *		Record the normal dependencies for a pg_proc tuple.  Owner, ACL, and
+ *		extension dependencies are handled by callers because they live
+ *		outside the normal pg_depend replacement set or must be preserved on
+ *		updates.
+ */
+static void
+record_procedure_dependencies(Oid retval, HeapTuple tup, Node *prosqlbody)
+{
+	Form_pg_proc proc = (Form_pg_proc) GETSTRUCT(tup);
+	ObjectAddress myself,
+				referenced,
+				temp_object;
+	ObjectAddresses *addrs;
+	Datum		datum;
+	bool		isnull;
+	List	   *allParams = NIL;
+
+	addrs = new_object_addresses();
+	ObjectAddressSet(myself, ProcedureRelationId, retval);
+
+	/* dependency on namespace */
+	ObjectAddressSet(referenced, NamespaceRelationId, proc->pronamespace);
+	add_exact_object_address(&referenced, addrs);
+
+	/* dependency on implementation language */
+	ObjectAddressSet(referenced, LanguageRelationId, proc->prolang);
+	add_exact_object_address(&referenced, addrs);
+
+	/* dependency on return type */
+	ObjectAddressSet(referenced, TypeRelationId, proc->prorettype);
+	add_exact_object_address(&referenced, addrs);
+
+	/* dependency on parameter types */
+	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_proallargtypes,
+							&isnull);
+	if (!isnull)
+		allParams = oid_array_to_list(datum);
+	else
+	{
+		for (int i = 0; i < proc->pronargs; i++)
+			allParams = lappend_oid(allParams, proc->proargtypes.values[i]);
+	}
+	foreach_oid(paramOid, allParams)
+	{
+		ObjectAddressSet(referenced, TypeRelationId, paramOid);
+		add_exact_object_address(&referenced, addrs);
+	}
+
+	/* dependency on transforms, if any */
+	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_protrftypes,
+							&isnull);
+	if (!isnull)
+	{
+		foreach_oid(typeid, oid_array_to_list(datum))
+		{
+			Oid			transformid = get_transform_oid(typeid,
+														proc->prolang,
+														false);
+
+			ObjectAddressSet(referenced, TransformRelationId, transformid);
+			add_exact_object_address(&referenced, addrs);
+		}
+	}
+
+	/* dependency on support function, if any */
+	if (OidIsValid(proc->prosupport))
+	{
+		ObjectAddressSet(referenced, ProcedureRelationId, proc->prosupport);
+		add_exact_object_address(&referenced, addrs);
+	}
+
+	/* dependencies appearing in new-style SQL routine body */
+	if (proc->prolang == SQLlanguageId && prosqlbody)
+		collectDependenciesOfExpr(addrs, prosqlbody, NIL);
+
+	/* dependency on parameter default expressions */
+	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_proargdefaults,
+							&isnull);
+	if (!isnull)
+		collectDependenciesOfExpr(addrs,
+								  stringToNode(TextDatumGetCString(datum)),
+								  NIL);
+
+	/*
+	 * Now that we have all the normal dependencies, thumb through them and
+	 * warn if any are to temporary objects.  This informs the user if their
+	 * supposedly non-temp function will silently go away at session exit, due
+	 * to a dependency on a temp object.  However, do not complain when a
+	 * function created in our own pg_temp namespace refers to other objects
+	 * in that namespace, since then they'll have similar lifespans anyway.
+	 */
+	if (find_temp_object(addrs, isTempNamespace(proc->pronamespace),
+						 &temp_object))
+		ereport(NOTICE,
+				(errmsg("function \"%s\" will be effectively temporary",
+						NameStr(proc->proname)),
+				 errdetail("It depends on temporary %s.",
+						   getObjectDescription(&temp_object, false))));
+
+	/*
+	 * Now record all normal dependencies at once.  This will also remove any
+	 * duplicates in the list.
+	 */
+	record_object_address_dependencies(&myself, addrs, DEPENDENCY_NORMAL);
+
+	free_object_addresses(addrs);
+}
+
+/*
+ * ProcedureStoreSQLBody
+ *
+ *		Replace a new-style SQL function body and rebuild normal pg_depend
+ *		entries from the current pg_proc tuple.  Extension membership and
+ *		shared dependencies are deliberately preserved.
+ */
+void
+ProcedureStoreSQLBody(Oid funcOid, Node *prosqlbody)
+{
+	Relation	rel;
+	TupleDesc	tupDesc;
+	HeapTuple	oldtup;
+	HeapTuple	newtup;
+	Datum		values[Natts_pg_proc] = {0};
+	bool		nulls[Natts_pg_proc] = {0};
+	bool		replaces[Natts_pg_proc] = {0};
+
+	Assert(prosqlbody != NULL);
+
+	rel = table_open(ProcedureRelationId, RowExclusiveLock);
+	tupDesc = RelationGetDescr(rel);
+
+	oldtup = SearchSysCacheCopy1(PROCOID, ObjectIdGetDatum(funcOid));
+	if (!HeapTupleIsValid(oldtup))
+		elog(ERROR, "cache lookup failed for function %u", funcOid);
+
+	values[Anum_pg_proc_prosqlbody - 1] =
+		CStringGetTextDatum(nodeToString(prosqlbody));
+	replaces[Anum_pg_proc_prosqlbody - 1] = true;
+
+	newtup = heap_modify_tuple(oldtup, tupDesc, values, nulls, replaces);
+	CatalogTupleUpdate(rel, &newtup->t_self, newtup);
+
+	deleteDependencyRecordsFor(ProcedureRelationId, funcOid, true);
+	record_procedure_dependencies(funcOid, newtup, prosqlbody);
+
+	heap_freetuple(oldtup);
+	heap_freetuple(newtup);
+	table_close(rel, RowExclusiveLock);
 }
 
 

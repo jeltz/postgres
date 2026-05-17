@@ -276,6 +276,8 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	struct KeyAction *keyaction;
 	ReturningClause *retclause;
 	ReturningOptionKind retoptionkind;
+	KeyJoinDirection direction;
+	KeyJoinClause *keyjn;
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
@@ -718,6 +720,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 				label_term
 %type <str>		opt_colid
 
+
 /*
  * Non-keyword token types.  These are hard-wired into the "flex" lexer.
  * They must be listed first so that their numeric codes do not depend on
@@ -734,6 +737,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %token <ival>	ICONST PARAM
 %token			TYPECAST DOT_DOT COLON_EQUALS EQUALS_GREATER
 %token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS
+%token			RIGHT_ARROW
 
 /*
  * If you want to make any keyword changes, update the keyword table in
@@ -14566,6 +14570,8 @@ joined_table:
 					n->rarg = $4;
 					n->usingClause = NIL;
 					n->join_using_alias = NULL;
+					n->keyJoin = NULL;
+					n->joinFilter = NULL;
 					n->quals = NULL;
 					$$ = n;
 				}
@@ -14579,13 +14585,30 @@ joined_table:
 					n->rarg = $4;
 					if ($5 != NULL && IsA($5, List))
 					{
-						 /* USING clause */
-						n->usingClause = linitial_node(List, castNode(List, $5));
-						n->join_using_alias = lsecond_node(Alias, castNode(List, $5));
+						/* USING clause */
+						List *usingInfo = castNode(List, $5);
+						n->usingClause = linitial_node(List, usingInfo);
+						n->join_using_alias = lsecond_node(Alias, usingInfo);
+						n->joinFilter = (Node *) lthird(usingInfo);
+						n->keyJoin = NULL;
+						n->quals = NULL;
+					}
+					else if ($5 != NULL && IsA($5, KeyJoinClause))
+					{
+						/* KEY clause */
+						n->usingClause = NIL;
+						n->join_using_alias = NULL;
+						n->keyJoin = (Node *) $5;
+						n->joinFilter = ((KeyJoinClause *) $5)->filter;
+						n->quals = NULL;
 					}
 					else
 					{
 						/* ON clause */
+						n->usingClause = NIL;
+						n->join_using_alias = NULL;
+						n->keyJoin = NULL;
+						n->joinFilter = NULL;
 						n->quals = $5;
 					}
 					$$ = n;
@@ -14602,12 +14625,29 @@ joined_table:
 					if ($4 != NULL && IsA($4, List))
 					{
 						/* USING clause */
-						n->usingClause = linitial_node(List, castNode(List, $4));
-						n->join_using_alias = lsecond_node(Alias, castNode(List, $4));
+						List *usingInfo = castNode(List, $4);
+						n->usingClause = linitial_node(List, usingInfo);
+						n->join_using_alias = lsecond_node(Alias, usingInfo);
+						n->joinFilter = (Node *) lthird(usingInfo);
+						n->keyJoin = NULL;
+						n->quals = NULL;
+					}
+					else if ($4 != NULL && IsA($4, KeyJoinClause))
+					{
+						/* KEY clause */
+						n->usingClause = NIL;
+						n->join_using_alias = NULL;
+						n->keyJoin = (Node *) $4;
+						n->joinFilter = ((KeyJoinClause *) $4)->filter;
+						n->quals = NULL;
 					}
 					else
 					{
 						/* ON clause */
+						n->usingClause = NIL;
+						n->join_using_alias = NULL;
+						n->keyJoin = NULL;
+						n->joinFilter = NULL;
 						n->quals = $4;
 					}
 					$$ = n;
@@ -14622,6 +14662,8 @@ joined_table:
 					n->rarg = $5;
 					n->usingClause = NIL; /* figure out which columns later... */
 					n->join_using_alias = NULL;
+					n->keyJoin = NULL;
+					n->joinFilter = NULL;
 					n->quals = NULL; /* fill later */
 					$$ = n;
 				}
@@ -14636,6 +14678,8 @@ joined_table:
 					n->rarg = $4;
 					n->usingClause = NIL; /* figure out which columns later... */
 					n->join_using_alias = NULL;
+					n->keyJoin = NULL;
+					n->joinFilter = NULL;
 					n->quals = NULL; /* fill later */
 					$$ = n;
 				}
@@ -14742,15 +14786,37 @@ opt_outer: OUTER_P
  * An ON-expr will not be a List, so it can be told apart that way.
  */
 
-join_qual: USING '(' name_list ')' opt_alias_clause_for_join_using
+join_qual: USING '(' name_list ')' opt_alias_clause_for_join_using filter_clause
 				{
-					$$ = (Node *) list_make2($3, $5);
+					$$ = (Node *) list_make3($3, $5, $6);
 				}
 			| ON a_expr
 				{
 					$$ = $2;
 				}
-		;
+			| FOR KEY '(' name_list ')' '<' '-' ColId '(' name_list ')' filter_clause
+				{
+					KeyJoinClause *n = makeNode(KeyJoinClause);
+					n->localCols = $4;
+					n->direction = KEY_JOIN_FROM;
+					n->refAlias = $8;
+					n->refCols = $10;
+					n->filter = $12;
+					n->location = @1;
+					$$ = (Node *) n;
+				}
+			| FOR KEY '(' name_list ')' RIGHT_ARROW ColId '(' name_list ')' filter_clause
+				{
+					KeyJoinClause *n = makeNode(KeyJoinClause);
+					n->localCols = $4;
+					n->direction = KEY_JOIN_TO;
+					n->refAlias = $7;
+					n->refCols = $9;
+					n->filter = $11;
+					n->location = @1;
+					$$ = (Node *) n;
+				}
+			;
 
 
 relation_expr:

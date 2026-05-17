@@ -70,6 +70,7 @@
 #include "commands/typecmds.h"
 #include "commands/user.h"
 #include "commands/vacuum.h"
+#include "commands/view.h"
 #include "common/int.h"
 #include "executor/executor.h"
 #include "foreign/fdwapi.h"
@@ -3655,6 +3656,19 @@ StoreCatalogInheritance1(Oid relationId, Oid parentOid,
 	 * Mark the parent as having subclasses.
 	 */
 	SetRelationHasSubclass(parentOid, true);
+
+	/*
+	 * Revalidate stored key-join proofs that depend on this parent.  For
+	 * ordinary inheritance, an inh=true scan can now fan out via children that
+	 * do not enforce the parent's unique constraint, so
+	 * compute_key_join_relation_facts() will stop exposing that inherited
+	 * parent as a key-join base surface.  Partition attachment normally keeps
+	 * partitioned-parent proofs valid, but replay verifies that against the
+	 * visible catalog state.  CommandCounterIncrement makes the new pg_inherits
+	 * row and relhassubclass flag visible to has_subclass().
+	 */
+	CommandCounterIncrement();
+	RevalidateDependentKeyJoinObjectsOnRelation(parentOid);
 }
 
 /*
@@ -12551,6 +12565,8 @@ ATExecAlterFKConstrEnforceability(List **wqueue, ATAlterConstraint *cmdcon,
 	if (currcon->conenforced != cmdcon->is_enforced)
 	{
 		AlterConstrUpdateConstraintEntry(cmdcon, conrel, contuple);
+		CommandCounterIncrement();
+		RevalidateDependentKeyJoinObjectsOnConstraint(conoid);
 		changed = true;
 	}
 
@@ -12855,6 +12871,8 @@ ATExecAlterConstrDeferrability(List **wqueue, ATAlterConstraint *cmdcon,
 		currcon->condeferred != cmdcon->initdeferred)
 	{
 		AlterConstrUpdateConstraintEntry(cmdcon, conrel, contuple);
+		CommandCounterIncrement();
+		RevalidateDependentKeyJoinObjectsOnConstraint(currcon->oid);
 		changed = true;
 
 		/*
@@ -12909,6 +12927,7 @@ ATExecAlterConstrInheritability(List **wqueue, ATAlterConstraint *cmdcon,
 
 	AlterConstrUpdateConstraintEntry(cmdcon, conrel, contuple);
 	CommandCounterIncrement();
+	RevalidateDependentKeyJoinObjectsOnConstraint(currcon->oid);
 
 	/* Fetch the column number and name */
 	colNum = extractNotNullColumn(contuple);
@@ -18870,6 +18889,7 @@ ATExecSetRowSecurity(Relation rel, bool rls)
 	Relation	pg_class;
 	Oid			relid;
 	HeapTuple	tuple;
+	bool		prev_rls;
 
 	relid = RelationGetRelid(rel);
 
@@ -18881,6 +18901,7 @@ ATExecSetRowSecurity(Relation rel, bool rls)
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for relation %u", relid);
 
+	prev_rls = ((Form_pg_class) GETSTRUCT(tuple))->relrowsecurity;
 	((Form_pg_class) GETSTRUCT(tuple))->relrowsecurity = rls;
 	CatalogTupleUpdate(pg_class, &tuple->t_self, tuple);
 
@@ -18889,6 +18910,21 @@ ATExecSetRowSecurity(Relation rel, bool rls)
 
 	table_close(pg_class, RowExclusiveLock);
 	heap_freetuple(tuple);
+
+	/*
+	 * Revalidate stored key-join proofs that depend on this relation.  The
+	 * key-join base-fact computation refuses to expose facts for a relation
+	 * with row-level security enabled (parse_key_join.c), so flipping
+	 * relrowsecurity can leave a stored proof unprovable.  Revalidate
+	 * whenever the flag actually changes; for the off-to-on transition the
+	 * revalidation raises an error and aborts this DDL, while the on-to-off
+	 * transition is a no-op for proofs that were already valid.
+	 */
+	if (rls != prev_rls)
+	{
+		CommandCounterIncrement();
+		RevalidateDependentKeyJoinObjectsOnRelation(relid);
+	}
 }
 
 /*

@@ -221,6 +221,8 @@ extern ObjectAddress ProcedureCreate(const char *procedureName,
 									 float4 procost,
 									 float4 prorows);
 
+extern void ProcedureStoreSQLBody(Oid funcOid, Node *prosqlbody);
+
 extern bool function_parse_error_transpose(const char *prosrc);
 
 extern List *oid_array_to_list(Datum datum);

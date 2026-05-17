@@ -1149,6 +1149,10 @@ checkWellFormedRecursionWalker(Node *node, CteState *cstate)
 				checkWellFormedRecursionWalker(j->larg, cstate);
 				checkWellFormedRecursionWalker(j->rarg, cstate);
 				checkWellFormedRecursionWalker(j->quals, cstate);
+				if (j->keyJoin != NULL)
+					checkWellFormedRecursionWalker(j->keyJoin, cstate);
+				else
+					checkWellFormedRecursionWalker(j->joinFilter, cstate);
 				break;
 			case JOIN_LEFT:
 				checkWellFormedRecursionWalker(j->larg, cstate);
@@ -1157,6 +1161,10 @@ checkWellFormedRecursionWalker(Node *node, CteState *cstate)
 				checkWellFormedRecursionWalker(j->rarg, cstate);
 				cstate->context = save_context;
 				checkWellFormedRecursionWalker(j->quals, cstate);
+				if (j->keyJoin != NULL)
+					checkWellFormedRecursionWalker(j->keyJoin, cstate);
+				else
+					checkWellFormedRecursionWalker(j->joinFilter, cstate);
 				break;
 			case JOIN_FULL:
 				if (save_context == RECURSION_OK)
@@ -1165,6 +1173,10 @@ checkWellFormedRecursionWalker(Node *node, CteState *cstate)
 				checkWellFormedRecursionWalker(j->rarg, cstate);
 				cstate->context = save_context;
 				checkWellFormedRecursionWalker(j->quals, cstate);
+				if (j->keyJoin != NULL)
+					checkWellFormedRecursionWalker(j->keyJoin, cstate);
+				else
+					checkWellFormedRecursionWalker(j->joinFilter, cstate);
 				break;
 			case JOIN_RIGHT:
 				if (save_context == RECURSION_OK)
@@ -1173,6 +1185,10 @@ checkWellFormedRecursionWalker(Node *node, CteState *cstate)
 				cstate->context = save_context;
 				checkWellFormedRecursionWalker(j->rarg, cstate);
 				checkWellFormedRecursionWalker(j->quals, cstate);
+				if (j->keyJoin != NULL)
+					checkWellFormedRecursionWalker(j->keyJoin, cstate);
+				else
+					checkWellFormedRecursionWalker(j->joinFilter, cstate);
 				break;
 			default:
 				elog(ERROR, "unrecognized join type: %d",

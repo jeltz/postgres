@@ -12967,6 +12967,47 @@ get_from_clause(Query *query, const char *prefix, deparse_context *context)
 }
 
 static void
+get_key_join_col_list(StringInfo buf, Query *query, Index varno, List *attnums)
+{
+	RangeTblEntry *rte = rt_fetch(varno, query->rtable);
+	ListCell   *lc;
+	bool		first = true;
+
+	appendStringInfoChar(buf, '(');
+	foreach(lc, attnums)
+	{
+		int			attno = lfirst_int(lc);
+		char	   *colname;
+
+		if (!first)
+			appendStringInfoString(buf, ", ");
+		first = false;
+
+		if (attno <= 0 ||
+			(rte->rtekind != RTE_RELATION &&
+			 attno > list_length(rte->eref->colnames)))
+			colname = "?column?";
+		else
+			colname = get_rte_attribute_name(rte, attno);
+		appendStringInfoString(buf, quote_identifier(colname));
+	}
+	appendStringInfoChar(buf, ')');
+}
+
+static void
+get_join_filter_clause(Node *joinFilter, deparse_context *context)
+{
+	StringInfo	buf = context->buf;
+
+	if (joinFilter == NULL)
+		return;
+
+	appendStringInfoString(buf, " FILTER (WHERE ");
+	get_rule_expr(joinFilter, context, false);
+	appendStringInfoChar(buf, ')');
+}
+
+static void
 get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 {
 	StringInfo	buf = context->buf;
@@ -13213,7 +13254,42 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 		if (need_paren_on_right)
 			appendStringInfoChar(buf, ')');
 
-		if (j->usingClause)
+		if (j->keyJoin && IsA(j->keyJoin, KeyJoinNode))
+		{
+			KeyJoinNode *key_join = castNode(KeyJoinNode, j->keyJoin);
+			Index		localvarno;
+			Index		refvarno;
+			List	   *localattnums;
+			List	   *refattnums;
+			char	   *refname;
+
+			if (key_join->direction == KEY_JOIN_TO)
+			{
+				localvarno = key_join->referencingVarno;
+				localattnums = key_join->referencingAttnums;
+			}
+			else
+			{
+				localvarno = key_join->referencedVarno;
+				localattnums = key_join->referencedAttnums;
+			}
+
+			refvarno = key_join->refAliasVarno;
+			refattnums = key_join->refAliasAttnums;
+			refname = get_rtable_name(refvarno, context);
+			if (refname == NULL)
+				elog(ERROR, "could not deparse key join reference alias");
+
+			appendStringInfoString(buf, " FOR KEY ");
+			get_key_join_col_list(buf, query, localvarno, localattnums);
+			appendStringInfo(buf, " %s %s ",
+							 key_join->direction == KEY_JOIN_TO ? "->" : "<-",
+							 quote_identifier(refname));
+			get_key_join_col_list(buf, query, refvarno, refattnums);
+
+			get_join_filter_clause(j->joinFilter, context);
+		}
+		else if (j->usingClause)
 		{
 			ListCell   *lc;
 			bool		first = true;
@@ -13235,6 +13311,8 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			if (j->join_using_alias)
 				appendStringInfo(buf, " AS %s",
 								 quote_identifier(j->join_using_alias->aliasname));
+
+			get_join_filter_clause(j->joinFilter, context);
 		}
 		else if (j->quals)
 		{

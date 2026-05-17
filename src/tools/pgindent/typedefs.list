@@ -670,6 +670,11 @@ DependenciesSemanticState
 DependencyGenerator
 DependencyGeneratorData
 DependencyType
+KeyJoinSurfaceFacts
+KeyJoinFact
+KeyJoinFactKind
+KeyJoinKeyPosition
+KeyJoinProofDependency
 DeserialIOData
 DestReceiver
 DictISpell
@@ -834,6 +839,12 @@ ExtensionSiblingCache
 ExtensionVersionInfo
 FDWCollateState
 FD_SET
+FKFilterCanonicalizeContext
+FKFilterRemapContext
+KeyJoinColumn
+KeyJoinFactContext
+KeyJoinMatch
+KeyJoinQueryStack
 FILE
 FILETIME
 FPI
@@ -889,6 +900,9 @@ ForeignAsyncNotify_function
 ForeignAsyncRequest_function
 ForeignDataWrapper
 ForeignKeyCacheInfo
+KeyJoinClause
+KeyJoinDirection
+KeyJoinNode
 ForeignKeyOptInfo
 ForeignPath
 ForeignScan
