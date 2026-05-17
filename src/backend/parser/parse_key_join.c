@@ -1333,8 +1333,7 @@ filter_conjunct_matches_key_positions(Node *conjunct, List *keyPositions)
 static bool
 filter_value_allowed(Node *node)
 {
-	if (node == NULL)
-		return false;
+	Assert(node != NULL);
 
 	if (IsA(node, Const))
 		return true;
