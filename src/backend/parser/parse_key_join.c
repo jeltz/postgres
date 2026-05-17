@@ -3190,7 +3190,7 @@ filter_dependency_walker(Node *node, void *context_arg)
 		*dependencies =
 			append_filter_dependency(*dependencies, ProcedureRelationId,
 									 castNode(FuncExpr, node)->funcid);
-	else if (IsA(node, OpExpr) || IsA(node, DistinctExpr))
+	else if (IsA(node, OpExpr))
 	{
 		OpExpr	   *expr = (OpExpr *) node;
 
