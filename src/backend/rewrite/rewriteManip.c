@@ -428,9 +428,7 @@ OffsetVarNodes_walker(Node *node, OffsetVarNodes_context *context)
 
 		if (j->rtindex && context->sublevels_up == 0)
 			j->rtindex += context->offset;
-		if (j->keyJoin &&
-			OffsetVarNodes_walker(j->keyJoin, context))
-			return true;
+		OffsetVarNodes_walker(j->keyJoin, context);
 		/* fall through to examine children */
 	}
 	if (IsA(node, KeyJoinNode))
@@ -439,12 +437,12 @@ OffsetVarNodes_walker(Node *node, OffsetVarNodes_context *context)
 
 		if (context->sublevels_up == 0)
 		{
-			if (kjn->referencingVarno)
-				kjn->referencingVarno += context->offset;
-			if (kjn->referencedVarno)
-				kjn->referencedVarno += context->offset;
-			if (kjn->refAliasVarno)
-				kjn->refAliasVarno += context->offset;
+			Assert(kjn->referencingVarno > 0);
+			Assert(kjn->referencedVarno > 0);
+			Assert(kjn->refAliasVarno > 0);
+			kjn->referencingVarno += context->offset;
+			kjn->referencedVarno += context->offset;
+			kjn->refAliasVarno += context->offset;
 		}
 		/* fall through to examine children */
 	}
@@ -620,9 +618,7 @@ ChangeVarNodes_walker(Node *node, ChangeVarNodes_context *context)
 		if (context->sublevels_up == 0 &&
 			j->rtindex == context->rt_index)
 			j->rtindex = context->new_index;
-		if (j->keyJoin &&
-			ChangeVarNodes_walker(j->keyJoin, context))
-			return true;
+		ChangeVarNodes_walker(j->keyJoin, context);
 		/* fall through to examine children */
 	}
 	if (IsA(node, KeyJoinNode))
