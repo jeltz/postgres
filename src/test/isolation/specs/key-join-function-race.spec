@@ -26,6 +26,8 @@ setup
  INSERT INTO key_join_function_race.c VALUES (10, 1, 1), (20, 2, 1);
  CREATE FUNCTION key_join_function_race.f() RETURNS int
      LANGUAGE sql STABLE AS 'SELECT 1';
+ CREATE FUNCTION key_join_function_race.g() RETURNS int
+     LANGUAGE sql STABLE AS 'SELECT 1';
  CREATE VIEW key_join_function_race.v_p AS
      SELECT * FROM key_join_function_race.p
      WHERE region = key_join_function_race.f();
@@ -46,6 +48,8 @@ step s1_alter
  CREATE OR REPLACE FUNCTION key_join_function_race.f() RETURNS int
      LANGUAGE sql VOLATILE AS 'SELECT 1';
 }
+step s1_lock_g { ALTER FUNCTION key_join_function_race.g() COST 1; }
+step s1_drop_g { DROP FUNCTION key_join_function_race.g(); }
 step s1_commit { COMMIT; }
 
 session s2
@@ -57,5 +61,11 @@ step s2_create_view
  JOIN key_join_function_race.v_c
      FOR KEY (region, parent_id) -> v_p (region, id);
 }
+step s2_replace_g
+{
+ CREATE OR REPLACE FUNCTION key_join_function_race.g() RETURNS int
+     LANGUAGE sql STABLE AS 'SELECT 2';
+}
 
 permutation s1_begin s1_alter s2_create_view s1_commit
+permutation s1_begin s1_lock_g s2_replace_g s1_drop_g s1_commit

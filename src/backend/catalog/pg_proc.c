@@ -419,7 +419,10 @@ ProcedureCreate(const char *procedureName,
 		ReleaseSysCache(oldtup);
 		oldtup = SearchSysCache1(PROCOID, ObjectIdGetDatum(oldprocid));
 		if (!HeapTupleIsValid(oldtup))
-			elog(ERROR, "cache lookup failed for function %u", oldprocid);
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_FUNCTION),
+					 errmsg("function \"%s\" was concurrently dropped",
+							procedureName)));
 		oldproc = (Form_pg_proc) GETSTRUCT(oldtup);
 
 		if (!object_ownercheck(ProcedureRelationId, oldproc->oid, proowner))
