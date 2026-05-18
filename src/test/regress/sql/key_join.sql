@@ -87,6 +87,16 @@ SELECT * FROM t2 JOIN t1 FOR KEY (c2) -> t2 (c3); -- rejected, reason: wrong dir
 SELECT * FROM t2 JOIN t1 FOR KEY (c1,c2) -> t2 (c3,c4); -- rejected, reason: wrong direction for the composite key
 SELECT * FROM t2 AS a JOIN t1 AS b FOR KEY (c1) <- a (c4); -- rejected, reason: alias resolves to a non-referencing FK column
 
+-- Self-join elimination must update stored key-join RT indexes when the
+-- duplicate relation is the referencing side.
+SET enable_self_join_elimination = on;
+SELECT c1.c3 AS child_key, p.c1 AS parent_key
+FROM t1 p
+JOIN t2 c1 FOR KEY (c3) -> p (c1)
+JOIN t2 c2 ON c2.c3 = c1.c3
+ORDER BY c1.c3;
+RESET enable_self_join_elimination;
+
 SELECT *
 FROM t1 p
 JOIN LATERAL (SELECT p.c1 AS c1) q
