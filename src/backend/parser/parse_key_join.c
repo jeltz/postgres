@@ -1983,8 +1983,12 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 		if (!fk->conenforced)
 			continue;
 		contup = SearchSysCache1(CONSTROID, ObjectIdGetDatum(fk->conoid));
-		/* XXX Should be elog(ERROR) for a missing pg_constraint tuple. */
+#ifdef USE_ASSERT_CHECKING
 		Assert(HeapTupleIsValid(contup));
+#else
+		if (!HeapTupleIsValid(contup))
+			elog(ERROR, "cache lookup failed for constraint %u", fk->conoid);
+#endif
 		con = (Form_pg_constraint) GETSTRUCT(contup);
 		if (!con->convalidated || con->condeferrable || con->conperiod)
 		{
@@ -2015,8 +2019,13 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 
 				parenttup = SearchSysCache1(CONSTROID,
 											ObjectIdGetDatum(parentid));
-				/* XXX Should be elog(ERROR) for a missing pg_constraint tuple. */
+#ifdef USE_ASSERT_CHECKING
 				Assert(HeapTupleIsValid(parenttup));
+#else
+				if (!HeapTupleIsValid(parenttup))
+					elog(ERROR, "cache lookup failed for constraint %u",
+						 parentid);
+#endif
 
 				parentcon = (Form_pg_constraint) GETSTRUCT(parenttup);
 				Assert(parentcon->contype == CONSTRAINT_FOREIGN);

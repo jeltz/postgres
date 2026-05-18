@@ -70,8 +70,12 @@ get_rule_event_relation(Oid ruleOid)
 	scan = systable_beginscan(rewriteRel, RewriteOidIndexId, true,
 							  NULL, 1, key);
 	tup = systable_getnext(scan);
-	/* XXX Should be elog(ERROR) for a missing pg_rewrite tuple. */
+#ifdef USE_ASSERT_CHECKING
 	Assert(HeapTupleIsValid(tup));
+#else
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "cache lookup failed for rule %u", ruleOid);
+#endif
 	result = ((Form_pg_rewrite) GETSTRUCT(tup))->ev_class;
 	Assert(OidIsValid(result));
 	systable_endscan(scan);
@@ -231,8 +235,12 @@ revalidate_dependent_key_join_function(Oid procOid)
 	Node	   *body;
 
 	tup = SearchSysCache1(PROCOID, ObjectIdGetDatum(procOid));
-	/* XXX Should be elog(ERROR) for a missing pg_proc tuple. */
+#ifdef USE_ASSERT_CHECKING
 	Assert(HeapTupleIsValid(tup));
+#else
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "cache lookup failed for function %u", procOid);
+#endif
 
 	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_prosqlbody, &isnull);
 	if (isnull)
@@ -273,8 +281,12 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 							   1, skey);
 	policy_tuple = systable_getnext(sscan);
 
-	/* XXX Should be elog(ERROR) for a missing pg_policy tuple. */
+#ifdef USE_ASSERT_CHECKING
 	Assert(HeapTupleIsValid(policy_tuple));
+#else
+	if (!HeapTupleIsValid(policy_tuple))
+		elog(ERROR, "cache lookup failed for policy %u", policy_id);
+#endif
 
 	policy_desc = RelationGetDescr(pg_policy_rel);
 	qual = policy_string_to_node(policy_tuple, policy_desc,
@@ -380,8 +392,12 @@ get_policy_relid(Oid policy_id)
 							   1, skey);
 	policy_tuple = systable_getnext(sscan);
 
+#ifdef USE_ASSERT_CHECKING
+	Assert(HeapTupleIsValid(policy_tuple));
+#else
 	if (!HeapTupleIsValid(policy_tuple))
 		elog(ERROR, "cache lookup failed for policy %u", policy_id);
+#endif
 
 	table_id = ((Form_pg_policy) GETSTRUCT(policy_tuple))->polrelid;
 
