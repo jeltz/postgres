@@ -1983,6 +1983,7 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 		if (!fk->conenforced)
 			continue;
 		contup = SearchSysCache1(CONSTROID, ObjectIdGetDatum(fk->conoid));
+		/* XXX Should be elog(ERROR) for a missing pg_constraint tuple. */
 		Assert(HeapTupleIsValid(contup));
 		con = (Form_pg_constraint) GETSTRUCT(contup);
 		if (!con->convalidated || con->condeferrable || con->conperiod)
@@ -2014,6 +2015,7 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 
 				parenttup = SearchSysCache1(CONSTROID,
 											ObjectIdGetDatum(parentid));
+				/* XXX Should be elog(ERROR) for a missing pg_constraint tuple. */
 				Assert(HeapTupleIsValid(parenttup));
 
 				parentcon = (Form_pg_constraint) GETSTRUCT(parenttup);

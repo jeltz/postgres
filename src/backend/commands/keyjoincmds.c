@@ -70,6 +70,7 @@ get_rule_event_relation(Oid ruleOid)
 	scan = systable_beginscan(rewriteRel, RewriteOidIndexId, true,
 							  NULL, 1, key);
 	tup = systable_getnext(scan);
+	/* XXX Should be elog(ERROR) for a missing pg_rewrite tuple. */
 	Assert(HeapTupleIsValid(tup));
 	result = ((Form_pg_rewrite) GETSTRUCT(tup))->ev_class;
 	Assert(OidIsValid(result));
@@ -230,6 +231,7 @@ revalidate_dependent_key_join_function(Oid procOid)
 	Node	   *body;
 
 	tup = SearchSysCache1(PROCOID, ObjectIdGetDatum(procOid));
+	/* XXX Should be elog(ERROR) for a missing pg_proc tuple. */
 	Assert(HeapTupleIsValid(tup));
 
 	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_prosqlbody, &isnull);
@@ -271,6 +273,7 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 							   1, skey);
 	policy_tuple = systable_getnext(sscan);
 
+	/* XXX Should be elog(ERROR) for a missing pg_policy tuple. */
 	Assert(HeapTupleIsValid(policy_tuple));
 
 	policy_desc = RelationGetDescr(pg_policy_rel);
