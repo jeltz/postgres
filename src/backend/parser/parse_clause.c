@@ -1577,13 +1577,11 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 			j->joinFilter = transformJoinQualClause(pstate, j->joinFilter,
 													my_namespace, "FILTER");
 
-			if (j->quals == NULL)
-				j->quals = j->joinFilter;
-			else
-				j->quals = (Node *)
-					makeBoolExpr(AND_EXPR,
-								 list_make2(j->quals, j->joinFilter),
-								 -1);
+			Assert(j->quals != NULL);
+			j->quals = (Node *)
+				makeBoolExpr(AND_EXPR,
+							 list_make2(j->quals, j->joinFilter),
+							 -1);
 		}
 
 		/*
