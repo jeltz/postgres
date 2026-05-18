@@ -5217,6 +5217,8 @@ ERROR:  key join cannot be proven from available constraints
 -- After dropping the view, ENABLE ROW LEVEL SECURITY succeeds.
 DROP VIEW rls_kj_v;
 ALTER TABLE rls_kj_parent ENABLE ROW LEVEL SECURITY;
+-- Repeating the same setting does not need key-join revalidation.
+ALTER TABLE rls_kj_parent ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rls_kj_parent DISABLE ROW LEVEL SECURITY;
 DROP TABLE rls_kj_child, rls_kj_parent;
 -- Materialized views must follow the same proof revalidation path as

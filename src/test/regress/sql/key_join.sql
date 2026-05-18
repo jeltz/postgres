@@ -4493,6 +4493,8 @@ ALTER TABLE rls_kj_child ENABLE ROW LEVEL SECURITY;
 -- After dropping the view, ENABLE ROW LEVEL SECURITY succeeds.
 DROP VIEW rls_kj_v;
 ALTER TABLE rls_kj_parent ENABLE ROW LEVEL SECURITY;
+-- Repeating the same setting does not need key-join revalidation.
+ALTER TABLE rls_kj_parent ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rls_kj_parent DISABLE ROW LEVEL SECURITY;
 DROP TABLE rls_kj_child, rls_kj_parent;
 
