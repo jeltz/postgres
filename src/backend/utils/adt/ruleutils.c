@@ -13273,8 +13273,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			refvarno = key_join->refAliasVarno;
 			refattnums = key_join->refAliasAttnums;
 			refname = get_rtable_name(refvarno, context);
-			if (refname == NULL)
-				elog(ERROR, "could not deparse key join reference alias");
+			Assert(refname != NULL);
 
 			appendStringInfoString(buf, " FOR KEY ");
 			get_key_join_col_list(buf, query, localvarno, localattnums);
