@@ -1,7 +1,10 @@
 #!/bin/bash
 set -e
 
-SRC=/Users/joel/src/postgresql
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(cd "$script_dir/.." && pwd -P)
+
+SRC=${SRC:-$repo_root}
 BUILD=/Users/joel/build-postgresql-release
 INSTALL=/Users/joel/install-postgresql-release
 COVERAGE_BUILD=/Users/joel/build-postgresql-coverage

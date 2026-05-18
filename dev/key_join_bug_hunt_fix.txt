@@ -82,7 +82,7 @@ For each verified bug, separately:
 
 2. Run:
 
-     ./rebuild.sh test
+     ./dev/rebuild.sh test
 
    Verify the new SQL hits the bug:
    - soundness bug: the invalid key join is accepted;
@@ -94,7 +94,7 @@ For each verified bug, separately:
 
 4. Run:
 
-     ./rebuild.sh test
+     ./dev/rebuild.sh test
 
    Inspect the generated result `.out` file and verify the bug is fixed. The
    expected result must follow from the verified reproducer and the minimal
@@ -104,7 +104,7 @@ For each verified bug, separately:
 
 6. Run:
 
-     ./rebuild.sh test
+     ./dev/rebuild.sh test
 
    The test run must pass.
 
