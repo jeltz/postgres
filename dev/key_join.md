@@ -704,31 +704,26 @@ or the corresponding `<-` form.  Generated equality quals are not printed
 as an `ON` clause, because they implement the key join.  A user-written
 `FILTER (WHERE ...)` attached to the join is deparsed separately.
 
-### Coverage-Driven Asserts Before Review
+### Cache Lookup Checks In Assert Builds
 
-Some MC/DC cleanup changes temporarily express catalog lookup assumptions
-as `Assert(...)` rather than runtime errors.  That is useful while driving
-the local LLVM MC/DC report to 100%: branches that represent impossible
-catalog states should not force synthetic tests whose only purpose is to
-manufacture corrupt dependency metadata.
+Some stored-object revalidation lookups are expected to find catalog
+tuples because dependency scanning or the DDL caller identified the
+object.  A missing tuple indicates a catalog consistency bug, stale
+dependency metadata, or an unexpected race or locking hole, not a normal
+user error.
 
-Before sending the patch to `pgsql-hackers`, cache lookup assumptions in
-stored-object revalidation should be changed back to PostgreSQL's normal
-defensive form, for example `elog(ERROR, "cache lookup failed ...")`.
-Those checks cover rule, function, policy, and similar catalog tuples
-that are expected to exist because dependency scanning or the DDL caller
-identified them.  They are still "should not happen" paths, but they are
-not just local control-flow invariants: they depend on catalog contents,
-dependency edges, cache state, and concurrent DDL locking behavior.
+For those checks, assert-enabled builds use `Assert(...)` so developer
+testing fails as a PostgreSQL bug.  Non-assert builds keep the defensive
+`elog(ERROR, "cache lookup failed ...")` path so an unexpected catalog
+state is still reported as a controlled backend error rather than
+continuing toward an invalid tuple dereference or crashing through an
+assertion failure.
 
-Keeping an `elog(ERROR)` there matches surrounding PostgreSQL code and is
-safer in non-assert builds.  If an unexpected catalog state is ever
-observed, the backend reports a controlled catalog lookup failure instead
-of compiling the check away and continuing toward an invalid tuple
-dereference or misleading follow-on error.  `Assert` remains appropriate
-for purely internal invariants, such as exhausted switch cases or
-locally-proven recursion preconditions, where a production runtime branch
-would only duplicate unreachable control flow.
+This split also lets the local LLVM MC/DC report reach 100% without
+tests that manufacture corrupt catalog dependency state.  Plain
+`Assert(...)` remains appropriate for purely internal invariants, such as
+exhausted switch cases or locally-proven recursion preconditions, where a
+production runtime branch would only duplicate unreachable control flow.
 
 ### Future Work
 
