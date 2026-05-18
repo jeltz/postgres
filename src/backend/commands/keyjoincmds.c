@@ -230,8 +230,7 @@ revalidate_dependent_key_join_function(Oid procOid)
 	Node	   *body;
 
 	tup = SearchSysCache1(PROCOID, ObjectIdGetDatum(procOid));
-	if (!HeapTupleIsValid(tup))
-		elog(ERROR, "cache lookup failed for function %u", procOid);
+	Assert(HeapTupleIsValid(tup));
 
 	datum = SysCacheGetAttr(PROCOID, tup, Anum_pg_proc_prosqlbody, &isnull);
 	if (isnull)
