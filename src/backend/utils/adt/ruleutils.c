@@ -12983,12 +12983,8 @@ get_key_join_col_list(StringInfo buf, Query *query, Index varno, List *attnums)
 			appendStringInfoString(buf, ", ");
 		first = false;
 
-		if (attno <= 0 ||
-			(rte->rtekind != RTE_RELATION &&
-			 attno > list_length(rte->eref->colnames)))
-			colname = "?column?";
-		else
-			colname = get_rte_attribute_name(rte, attno);
+		Assert(attno > 0);
+		colname = get_rte_attribute_name(rte, attno);
 		appendStringInfoString(buf, quote_identifier(colname));
 	}
 	appendStringInfoChar(buf, ')');
