@@ -31,6 +31,7 @@
 #include "nodes/nodeFuncs.h"
 #include "nodes/parsenodes.h"
 #include "parser/parse_key_join.h"
+#include "storage/lmgr.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/rel.h"
@@ -254,7 +255,6 @@ static void
 revalidate_dependent_key_join_policy(Oid policy_id)
 {
 	Relation	pg_policy_rel;
-	Relation	target_table;
 	Oid			table_id;
 	ScanKeyData skey[1];
 	SysScanDesc sscan;
@@ -264,7 +264,7 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 	Node	   *with_check_qual;
 
 	table_id = get_policy_relid(policy_id);
-	target_table = relation_open(table_id, AccessExclusiveLock);
+	LockRelationOid(table_id, AccessExclusiveLock);
 
 	pg_policy_rel = table_open(PolicyRelationId, AccessShareLock);
 
@@ -291,7 +291,6 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 
 	systable_endscan(sscan);
 	table_close(pg_policy_rel, AccessShareLock);
-	relation_close(target_table, NoLock);
 }
 
 static void

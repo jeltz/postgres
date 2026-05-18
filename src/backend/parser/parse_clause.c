@@ -59,8 +59,8 @@ static int	extractRemainingColumns(ParseState *pstate,
 									ParseNamespaceColumn *res_nscolumns);
 static Node *transformJoinUsingClause(ParseState *pstate,
 									  List *leftVars, List *rightVars);
-static Node *transformJoinOnClause(ParseState *pstate, JoinExpr *j,
-								   List *namespace);
+static Node *transformJoinQualClause(ParseState *pstate, Node *qual,
+									 List *namespace, const char *constructName);
 static ParseNamespaceItem *transformTableEntry(ParseState *pstate, RangeVar *r);
 static ParseNamespaceItem *transformRangeSubselect(ParseState *pstate,
 												   RangeSubselect *r);
@@ -353,7 +353,7 @@ transformJoinUsingClause(ParseState *pstate,
 	/*
 	 * Since the references are already Vars, and are certainly from the input
 	 * relations, we don't have to go through the same pushups that
-	 * transformJoinOnClause() does.  Just invoke transformExpr() to fix up
+	 * transformJoinQualClause() does.  Just invoke transformExpr() to fix up
 	 * the operators, and we're done.
 	 */
 	result = transformExpr(pstate, result, EXPR_KIND_JOIN_USING);
@@ -364,12 +364,13 @@ transformJoinUsingClause(ParseState *pstate,
 }
 
 /*
- * transformJoinOnClause()
- *	  Transform the qual conditions for JOIN/ON.
+ * transformJoinQualClause()
+ *	  Transform the qual conditions for JOIN/ON or join FILTER.
  *	  Result is a transformed qualification expression.
  */
 static Node *
-transformJoinOnClause(ParseState *pstate, JoinExpr *j, List *namespace)
+transformJoinQualClause(ParseState *pstate, Node *qual, List *namespace,
+						const char *constructName)
 {
 	Node	   *result;
 	List	   *save_namespace;
@@ -387,8 +388,8 @@ transformJoinOnClause(ParseState *pstate, JoinExpr *j, List *namespace)
 	save_namespace = pstate->p_namespace;
 	pstate->p_namespace = namespace;
 
-	result = transformWhereClause(pstate, j->quals,
-								  EXPR_KIND_JOIN_ON, "JOIN/ON");
+	result = transformWhereClause(pstate, qual,
+								  EXPR_KIND_JOIN_ON, constructName);
 
 	pstate->p_namespace = save_namespace;
 
@@ -1547,7 +1548,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		else if (j->quals)
 		{
 			/* User-written ON-condition; transform it */
-			j->quals = transformJoinOnClause(pstate, j, my_namespace);
+			j->quals = transformJoinQualClause(pstate, j->quals,
+											   my_namespace, "JOIN/ON");
 		}
 		else if (j->keyJoin)
 		{
@@ -1572,18 +1574,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		 */
 		if (j->joinFilter != NULL)
 		{
-			List	   *save_namespace;
-
-			setNamespaceLateralState(my_namespace, false, true);
-
-			save_namespace = pstate->p_namespace;
-			pstate->p_namespace = my_namespace;
-
-			j->joinFilter = transformWhereClause(pstate, j->joinFilter,
-												 EXPR_KIND_JOIN_ON,
-												 "FILTER");
-
-			pstate->p_namespace = save_namespace;
+			j->joinFilter = transformJoinQualClause(pstate, j->joinFilter,
+													my_namespace, "FILTER");
 
 			if (j->quals == NULL)
 				j->quals = j->joinFilter;

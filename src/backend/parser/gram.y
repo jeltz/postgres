@@ -276,8 +276,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	struct KeyAction *keyaction;
 	ReturningClause *retclause;
 	ReturningOptionKind retoptionkind;
-	KeyJoinDirection direction;
-	KeyJoinClause *keyjn;
 }
 
 %type <node>	stmt toplevel_stmt schema_stmt routine_body_stmt
@@ -737,7 +735,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %token <ival>	ICONST PARAM
 %token			TYPECAST DOT_DOT COLON_EQUALS EQUALS_GREATER
 %token			LESS_EQUALS GREATER_EQUALS NOT_EQUALS
-%token			RIGHT_ARROW
 
 /*
  * If you want to make any keyword changes, update the keyword table in

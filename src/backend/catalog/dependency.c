@@ -2390,8 +2390,6 @@ find_expr_references_walker(Node *node,
 
 		if (find_expr_references_walker(join->keyJoin, context))
 			return true;
-		if (find_expr_references_walker(join->joinFilter, context))
-			return true;
 		/* fall through to examine the ordinary join substructure */
 	}
 	else if (IsA(node, KeyJoinNode))
