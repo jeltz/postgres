@@ -70,8 +70,9 @@ get_rule_event_relation(Oid ruleOid)
 	scan = systable_beginscan(rewriteRel, RewriteOidIndexId, true,
 							  NULL, 1, key);
 	tup = systable_getnext(scan);
-	if (HeapTupleIsValid(tup))
-		result = ((Form_pg_rewrite) GETSTRUCT(tup))->ev_class;
+	Assert(HeapTupleIsValid(tup));
+	result = ((Form_pg_rewrite) GETSTRUCT(tup))->ev_class;
+	Assert(OidIsValid(result));
 	systable_endscan(scan);
 	table_close(rewriteRel, AccessShareLock);
 
@@ -108,8 +109,6 @@ find_dependent_key_join_objects(Oid refclassid, Oid refobjid)
 		if (dep->classid == RewriteRelationId)
 		{
 			objectid = get_rule_event_relation(dep->objid);
-			if (!OidIsValid(objectid))
-				continue;
 			classid = RelationRelationId;
 		}
 		else if (dep->classid == ProcedureRelationId)
