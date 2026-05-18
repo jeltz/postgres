@@ -333,8 +333,7 @@ RevalidateDependentKeyJoinObjectsOnConstraint(Oid constraintOid)
 void
 RevalidateDependentKeyJoinObjectsOnRelation(Oid relationOid)
 {
-	if (!OidIsValid(relationOid))
-		return;
+	Assert(OidIsValid(relationOid));
 
 	revalidate_dependent_key_join_objects_recurse(RelationRelationId,
 												  relationOid, NIL);
