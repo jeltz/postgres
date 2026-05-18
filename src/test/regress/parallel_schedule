@@ -106,6 +106,7 @@ test: select_views portals_p2 foreign_key dependency guc bitmapops combocid tsea
 test: key_join
 test: key_join_matched_filter
 test: key_join_overview
+test: key_join_mcdc
 
 # ----------
 # Another group of parallel tests (JSON related)
