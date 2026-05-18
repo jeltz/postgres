@@ -3014,6 +3014,51 @@ DROP VIEW filter_volatile_child_v, filter_volatile_parent_v;
 DROP TABLE filter_volatile_child, filter_volatile_parent;
 DROP FUNCTION filter_volatile_identity(int);
 
+-- FILTER1g: strict proof-filter value allowlist rejects volatile CoerceViaIO
+-- input/output functions before row-coverage propagation.
+SET client_min_messages = warning;
+CREATE TYPE filter_coerce_io_type;
+CREATE FUNCTION filter_coerce_io_type_in(cstring)
+RETURNS filter_coerce_io_type
+LANGUAGE internal STRICT IMMUTABLE AS 'int4in';
+CREATE FUNCTION filter_coerce_io_type_out(filter_coerce_io_type)
+RETURNS cstring
+LANGUAGE internal STRICT IMMUTABLE AS 'int4out';
+CREATE TYPE filter_coerce_io_type (
+    input = filter_coerce_io_type_in,
+    output = filter_coerce_io_type_out,
+    like = int4
+);
+RESET client_min_messages;
+CREATE CAST (filter_coerce_io_type AS integer) WITH INOUT;
+CREATE TABLE filter_coerce_io_parent (id int PRIMARY KEY);
+CREATE TABLE filter_coerce_io_child
+(
+    id int NOT NULL UNIQUE REFERENCES filter_coerce_io_parent (id)
+);
+CREATE TABLE filter_coerce_io_grandchild
+(
+    id int NOT NULL REFERENCES filter_coerce_io_child (id)
+);
+INSERT INTO filter_coerce_io_parent VALUES (1), (2);
+INSERT INTO filter_coerce_io_child VALUES (1), (2);
+INSERT INTO filter_coerce_io_grandchild VALUES (1), (1), (2);
+ALTER FUNCTION filter_coerce_io_type_out(filter_coerce_io_type) VOLATILE;
+SELECT count(*) AS volatile_coerceviaio_filter_rows
+FROM (
+    filter_coerce_io_parent p
+    JOIN filter_coerce_io_child c FOR KEY (id) -> p (id)
+    FILTER (WHERE c.id = ('1'::filter_coerce_io_type)::integer)
+)
+-- rejected, reason: CoerceViaIO output function is volatile
+JOIN filter_coerce_io_grandchild g FOR KEY (id) -> c (id);
+DROP TABLE filter_coerce_io_grandchild, filter_coerce_io_child,
+           filter_coerce_io_parent;
+DROP CAST (filter_coerce_io_type AS integer);
+SET client_min_messages = warning;
+DROP TYPE filter_coerce_io_type CASCADE;
+RESET client_min_messages;
+
 -- FILTER2: FK left join with FILTER — outer join rows still present
 SELECT * FROM t1
 -- accepted
@@ -4655,6 +4700,56 @@ CREATE OR REPLACE FUNCTION pf_kj_pick() RETURNS int
 DROP VIEW pf_kj_vp, pf_kj_vr;
 DROP TABLE pf_kj_r, pf_kj_p;
 DROP FUNCTION pf_kj_pick();
+
+-- CoerceViaIO proof filters must depend on hidden type I/O functions too.
+-- Otherwise ALTER FUNCTION can make a stored proof stale without revalidation.
+SET client_min_messages = warning;
+CREATE TYPE pf_kj_io_type;
+CREATE FUNCTION pf_kj_io_type_in(cstring)
+RETURNS pf_kj_io_type
+LANGUAGE internal STRICT IMMUTABLE AS 'int4in';
+CREATE FUNCTION pf_kj_io_type_out(pf_kj_io_type)
+RETURNS cstring
+LANGUAGE internal STRICT IMMUTABLE AS 'int4out';
+CREATE TYPE pf_kj_io_type (
+    input = pf_kj_io_type_in,
+    output = pf_kj_io_type_out,
+    like = int4
+);
+RESET client_min_messages;
+CREATE CAST (pf_kj_io_type AS integer) WITH INOUT;
+CREATE TABLE pf_kj_io_p (id int PRIMARY KEY);
+CREATE TABLE pf_kj_io_r (id int NOT NULL REFERENCES pf_kj_io_p (id));
+INSERT INTO pf_kj_io_p VALUES (1), (2);
+INSERT INTO pf_kj_io_r VALUES (1);
+CREATE VIEW pf_kj_io_vp AS
+SELECT id FROM pf_kj_io_p WHERE id = ('1'::pf_kj_io_type)::integer;
+CREATE VIEW pf_kj_io_vr AS
+SELECT id FROM pf_kj_io_r WHERE id = ('1'::pf_kj_io_type)::integer;
+CREATE VIEW pf_kj_io_dep AS
+SELECT pf_kj_io_vp.id FROM pf_kj_io_vp
+-- accepted
+JOIN pf_kj_io_vr FOR KEY (id) -> pf_kj_io_vp (id);
+
+-- rejected, reason: stored proof depends on CoerceViaIO output being non-volatile
+ALTER FUNCTION pf_kj_io_type_out(pf_kj_io_type) VOLATILE;
+-- rejected, reason: CREATE OR REPLACE may change CoerceViaIO output volatility
+CREATE OR REPLACE FUNCTION pf_kj_io_type_out(pf_kj_io_type)
+RETURNS cstring
+LANGUAGE internal STRICT VOLATILE AS 'int4out';
+
+-- After dropping the consumer view, both DDL paths succeed.
+DROP VIEW pf_kj_io_dep;
+ALTER FUNCTION pf_kj_io_type_out(pf_kj_io_type) VOLATILE;
+CREATE OR REPLACE FUNCTION pf_kj_io_type_out(pf_kj_io_type)
+RETURNS cstring
+LANGUAGE internal STRICT VOLATILE AS 'int4out';
+DROP VIEW pf_kj_io_vp, pf_kj_io_vr;
+DROP TABLE pf_kj_io_r, pf_kj_io_p;
+DROP CAST (pf_kj_io_type AS integer);
+SET client_min_messages = warning;
+DROP TYPE pf_kj_io_type CASCADE;
+RESET client_min_messages;
 
 -- New-style SQL function bodies store analyzed key-join proofs, so DDL that
 -- changes a consumed proof dependency must revalidate those stored bodies.

@@ -172,6 +172,7 @@ static List *map_var_to_jtnode_surface(Query *query, Node *jtnode,
 									   Index varno, AttrNumber attno);
 static List *append_filter_expr_dependencies(List *dependencies, Node *node);
 static bool filter_dependency_walker(Node *node, void *context_arg);
+static bool filter_function_dependency_checker(Oid func_id, void *context_arg);
 static List *add_op_function_deps(List *deps, Oid opno, Oid opfuncid);
 static void compute_join_output_facts(JoinExpr *j, Index left_rtindex,
 									  RangeTblEntry *left_rte,
@@ -1336,6 +1337,9 @@ static bool
 filter_value_allowed(Node *node)
 {
 	Assert(node != NULL);
+
+	if (contain_volatile_functions(node))
+		return false;
 
 	if (IsA(node, Const))
 		return true;
@@ -2883,7 +2887,8 @@ add_filter_conjuncts(List **dst, List *keyPositions,
 			Assert(!contain_subplans(canon));
 			if (contain_volatile_functions(canon))
 			{
-				Assert(!strict);
+				if (strict)
+					return false;
 				continue;
 			}
 			Assert(dependencies != NULL);
@@ -3199,18 +3204,37 @@ filter_dependency_walker(Node *node, void *context_arg)
 
 	Assert(node != NULL);
 
-	if (IsA(node, FuncExpr))
-		*dependencies =
-			append_filter_dependency(*dependencies, ProcedureRelationId,
-									 castNode(FuncExpr, node)->funcid);
-	else if (IsA(node, OpExpr))
+	if (IsA(node, OpExpr))
 	{
 		OpExpr	   *expr = (OpExpr *) node;
 
+		set_opfuncid(expr);
 		*dependencies = add_op_function_deps(*dependencies, expr->opno,
 											 expr->opfuncid);
 	}
+	else
+		(void) check_functions_in_node(node, filter_function_dependency_checker,
+									   context_arg);
+
 	return expression_tree_walker(node, filter_dependency_walker, context_arg);
+}
+
+/*
+ * filter_function_dependency_checker
+ *
+ *		check_functions_in_node callback for collecting procedure dependencies.
+ *
+ * Called by:
+ *		filter_dependency_walker
+ */
+static bool
+filter_function_dependency_checker(Oid func_id, void *context_arg)
+{
+	List	  **dependencies = (List **) context_arg;
+
+	*dependencies = append_filter_dependency(*dependencies, ProcedureRelationId,
+											 func_id);
+	return false;
 }
 
 /*
