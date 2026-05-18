@@ -309,8 +309,7 @@ revalidate_stored_key_join_node(Node *stored, bool stored_is_query)
 void
 RevalidateDependentKeyJoinObjectsOnConstraint(Oid constraintOid)
 {
-	if (!OidIsValid(constraintOid))
-		return;
+	Assert(OidIsValid(constraintOid));
 
 	revalidate_dependent_key_join_objects_recurse(ConstraintRelationId,
 												  constraintOid, NIL);
