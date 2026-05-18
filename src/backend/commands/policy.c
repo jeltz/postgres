@@ -31,7 +31,6 @@
 #include "nodes/pg_list.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_collate.h"
-#include "parser/parse_key_join.h"
 #include "parser/parse_node.h"
 #include "parser/parse_relation.h"
 #include "rewrite/rewriteManip.h"
@@ -50,10 +49,6 @@ static void RangeVarCallbackForPolicy(const RangeVar *rv,
 									  Oid relid, Oid oldrelid, void *arg);
 static char parse_policy_command(const char *cmd_name);
 static Datum *policy_role_list_to_array(List *roles, int *num_roles);
-static Oid	get_policy_relid(Oid policy_id);
-static Node *policy_string_to_node(HeapTuple policy_tuple, TupleDesc policy_desc,
-								   AttrNumber attnum, Relation target_table,
-								   List **parse_rtable);
 
 /*
  * Callback to RangeVarGetRelidExtended().
@@ -1091,142 +1086,6 @@ AlterPolicy(AlterPolicyStmt *stmt)
 	table_close(pg_policy_rel, RowExclusiveLock);
 
 	return myself;
-}
-
-static Oid
-get_policy_relid(Oid policy_id)
-{
-	Relation	pg_policy_rel;
-	ScanKeyData skey[1];
-	SysScanDesc sscan;
-	HeapTuple	policy_tuple;
-	Oid			table_id;
-
-	pg_policy_rel = table_open(PolicyRelationId, AccessShareLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_policy_oid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(policy_id));
-
-	sscan = systable_beginscan(pg_policy_rel, PolicyOidIndexId, true, NULL,
-							   1, skey);
-	policy_tuple = systable_getnext(sscan);
-
-	if (!HeapTupleIsValid(policy_tuple))
-		elog(ERROR, "cache lookup failed for policy %u", policy_id);
-
-	table_id = ((Form_pg_policy) GETSTRUCT(policy_tuple))->polrelid;
-
-	systable_endscan(sscan);
-	table_close(pg_policy_rel, AccessShareLock);
-
-	return table_id;
-}
-
-static Node *
-policy_string_to_node(HeapTuple policy_tuple, TupleDesc policy_desc,
-					  AttrNumber attnum, Relation target_table,
-					  List **parse_rtable)
-{
-	Datum		expr_datum;
-	bool		expr_isnull;
-	Node	   *expr = NULL;
-
-	*parse_rtable = NIL;
-
-	expr_datum = heap_getattr(policy_tuple, attnum, policy_desc,
-							  &expr_isnull);
-	if (!expr_isnull)
-	{
-		char	   *expr_value;
-		ParseState *pstate;
-
-		pstate = make_parsestate(NULL);
-		expr_value = TextDatumGetCString(expr_datum);
-		expr = stringToNode(expr_value);
-
-		/* Add this rel to the rangetable for dependency recording. */
-		(void) addRangeTableEntryForRelation(pstate, target_table,
-											 AccessShareLock,
-											 NULL, false, false);
-
-		*parse_rtable = pstate->p_rtable;
-		free_parsestate(pstate);
-	}
-
-	return expr;
-}
-
-void
-RevalidateDependentKeyJoinPolicy(Oid policy_id)
-{
-	Relation	pg_policy_rel;
-	Relation	target_table;
-	Oid			table_id;
-	ScanKeyData skey[1];
-	SysScanDesc sscan;
-	HeapTuple	policy_tuple;
-	TupleDesc	policy_desc;
-	Node	   *qual;
-	Node	   *with_check_qual;
-	Node	   *new_qual;
-	Node	   *new_with_check_qual;
-	List	   *qual_parse_rtable;
-	List	   *with_check_parse_rtable;
-
-	table_id = get_policy_relid(policy_id);
-	target_table = relation_open(table_id, AccessExclusiveLock);
-
-	pg_policy_rel = table_open(PolicyRelationId, AccessShareLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_policy_oid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(policy_id));
-
-	sscan = systable_beginscan(pg_policy_rel, PolicyOidIndexId, true, NULL,
-							   1, skey);
-	policy_tuple = systable_getnext(sscan);
-
-	if (!HeapTupleIsValid(policy_tuple))
-		elog(ERROR, "cache lookup failed for policy %u", policy_id);
-
-	policy_desc = RelationGetDescr(pg_policy_rel);
-	qual = policy_string_to_node(policy_tuple, policy_desc,
-								 Anum_pg_policy_polqual, target_table,
-								 &qual_parse_rtable);
-	with_check_qual = policy_string_to_node(policy_tuple, policy_desc,
-											Anum_pg_policy_polwithcheck,
-											target_table,
-											&with_check_parse_rtable);
-
-	if (!storedNodeContainsKeyJoin(qual) &&
-		!storedNodeContainsKeyJoin(with_check_qual))
-	{
-		systable_endscan(sscan);
-		table_close(pg_policy_rel, AccessShareLock);
-		relation_close(target_table, NoLock);
-		return;
-	}
-
-	new_qual = qual == NULL ? NULL : copyObject(qual);
-	new_with_check_qual = with_check_qual == NULL ? NULL :
-		copyObject(with_check_qual);
-
-	revalidateStoredKeyJoinProofsInNode(new_qual);
-	revalidateStoredKeyJoinProofsInNode(new_with_check_qual);
-
-	if (!revalidatedStoredKeyJoinProofsAreSafe(qual, new_qual) ||
-		!revalidatedStoredKeyJoinProofsAreSafe(with_check_qual,
-											   new_with_check_qual))
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
-				 errmsg("stored key join proof would require new dependencies")));
-
-	systable_endscan(sscan);
-	table_close(pg_policy_rel, AccessShareLock);
-	relation_close(target_table, NoLock);
 }
 
 /*

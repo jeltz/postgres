@@ -20,12 +20,6 @@
 extern ObjectAddress DefineView(ViewStmt *stmt, const char *queryString,
 								int stmt_location, int stmt_len);
 
-extern void RevalidateDependentKeyJoinObjectsOnConstraint(Oid constraintOid);
-
-extern void RevalidateDependentKeyJoinObjectsOnRelation(Oid relationOid);
-
-extern void RevalidateDependentKeyJoinObjectsOnProcedure(Oid procOid);
-
 extern void StoreViewQuery(Oid viewOid, Query *viewParse, bool replace);
 
 #endif							/* VIEW_H */
