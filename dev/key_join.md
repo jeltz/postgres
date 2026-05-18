@@ -24,7 +24,7 @@ or not.
 ## Intention
 
 The intention of a key join is to enrich a referencing table with a referenced
-table, by following a declared referential constraint between the two, so that ´
+table, by following a declared referential constraint between the two, so that
 the result contain all rows from the referencing table, without any row loss or
 duplication, where all referencing non-null foreign keys find a unique
 matching referenced row.
