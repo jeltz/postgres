@@ -342,8 +342,7 @@ RevalidateDependentKeyJoinObjectsOnRelation(Oid relationOid)
 void
 RevalidateDependentKeyJoinObjectsOnProcedure(Oid procOid)
 {
-	if (!OidIsValid(procOid))
-		return;
+	Assert(OidIsValid(procOid));
 
 	revalidate_dependent_key_join_objects_recurse(ProcedureRelationId,
 												  procOid, NIL);
