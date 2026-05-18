@@ -2,40 +2,49 @@
 
 ## Introduction
 
-Key join is motivated by a gap between what a join means to the executor
-and what it means to the reader.  The executor sees a predicate.  The
-reader often needs to know which rows are being carried forward, which
-table is merely supplying attributes, and which catalog facts make that
-reading valid.
+This patch adds explicit syntax to express a key join.
+Key joins per-se are nothing new, they are probably one of the most common ways
+of joining two tables already.  What's new is just the explicit syntax,
+which gives the user two additional benefits:
 
-A traditional equijoin can produce the same rows, but its syntax leaves
-that intent to be recovered from constraints, names, and local
-convention.  That is a poor place to store meaning.  It tends to decay
-as queries move through views, rewrites, reviews, and years of
-maintenance.
+1. An error at compile-time if the key join is invalid.
+2. The syntax visually immediately reveal which join operand that is
+   referencing and referenced.
 
-Key join is a small attempt to keep that intent with the query.  Its aim
-is not novelty in the algebra, but better preservation of shared
-understanding: less private memory, fewer accidental ambiguities, and
-clearer programs.
+If the key join is accepted at compile-time, it is guaranteed to be valid,
+and it is transformed during parse time to a traditional ON-equijoin.
+
+This document will also establish a formal definition of what a key join is,
+and a present a specification that is sufficient under such definition.
+
+For the definition to be useful, we must first discuss what the intention
+of a key join is, since only then can we say if the definition make sense
+or not.
 
 ## Intention
 
-Key-join syntax records an intended reading of a join and makes
-PostgreSQL verify it.  The reading has two semantic parts and one aid to
-the reader:
+The intention of a key join is to enrich a referencing table with a referenced
+table, by following a declared referential constraint between the two, so that ´
+the result contain all rows from the referencing table, without any row loss or
+duplication, where all referencing non-null foreign keys find a unique
+matching referenced row.
 
-* the referencing rows are preserved;
-* referencing rows with non-null keys are enriched from the referenced
-  side;
-* the referencing side is visible from the syntax.
+The intention of the key join syntax is to make it visually easy to immediately
+identify which join operand that is the referencing and referenced table,
+and the referencing and referenced columns.
 
-This is a compile-time assertion, not a new executor operation.  Its
-only effect beyond an ordinary join is that parse analysis rejects the
-query unless the guarantees described below can be proven.  Once
-accepted, the join is executed as an ordinary join with generated
-`AND`ed equality qualifications using the referential constraint's
-equality operators.
+It is also to relief the user of the cognitive load of having to inspect
+if the key join syntax is valid or not, by automatically verifying at
+compile-time if it can be proven to be correct under the definition,
+and if not, reject it with an error.
+
+The key join proof checker guarantees soundness, meaning that an invalid
+key join must never be accepted, but a valid key join could possibly be
+rejected.
+
+The cases supported by the specification and the implementation, are thought
+to cover a vast majority of the query shapes already written by users that
+by definition already are key joins.
 
 ### Preservation Of Referencing Rows
 
