@@ -167,7 +167,8 @@ static bool add_filter_conjuncts(List **dst, List *keyPositions,
 								 Node *qual, Query *filter_query,
 								 Node *filter_jtnode, Index filter_rtindex,
 								 List **filter_attrmap, int filter_natts,
-								 List **dependencies, bool strict);
+								 List **dependencies,
+								 bool reject_lossy_filter);
 static List *map_var_to_jtnode_surface(Query *query, Node *jtnode,
 									   Index varno, AttrNumber attno);
 static List *append_filter_expr_dependencies(List *dependencies, Node *node);
@@ -2498,8 +2499,8 @@ project_key_join_query_facts(KeyJoinFactContext *context, Query *query)
  *
  *		The preservation flags describe which proof meanings the caller preserved.
  *		Foreign-key containment projects whenever its key columns survive;
- *		row-coverage filter handling is strict because filters define the
- *		referenced multiset.
+ *		row-coverage projection rejects lossy filter handling because filters
+ *		define the referenced multiset.
  *
  * Called by:
  *		project_key_join_query_facts
@@ -2616,6 +2617,10 @@ project_key_join_facts_from_rte(KeyJoinSurfaceFacts *dst, RangeTblEntry *src,
 
 					new = copyObject(old);
 					new->keyPositions = newpositions;
+					/*
+					 * Row coverage must account for every filter.  Dropping
+					 * one would claim coverage for rows no longer visible.
+					 */
 					if (!add_filter_conjuncts(&new->filterConjuncts,
 											  new->keyPositions, filter_qual,
 											  filter_query, filter_jtnode,
@@ -2635,6 +2640,10 @@ project_key_join_facts_from_rte(KeyJoinSurfaceFacts *dst, RangeTblEntry *src,
 					continue;
 				new = copyObject(old);
 				new->keyPositions = newpositions;
+				/*
+				 * FK-side filters are optional precision; unrecognized
+				 * conjuncts only remove referencing rows.
+				 */
 				(void) add_filter_conjuncts(&new->filterConjuncts,
 											new->keyPositions, filter_qual,
 											filter_query, filter_jtnode,
@@ -2729,8 +2738,9 @@ make_rowcollapse_key_positions(Query *query, List *clauses)
  *		Canonicalize filter conjuncts for a projected proof fact.
  *
  *		Only direct key = value filters matching the key's equality-input
- *		identity are retained; row-coverage callers are strict, while FK
- *		callers ignore unusable conjuncts.
+ *		identity are retained.  If reject_lossy_filter is true, failure to
+ *		retain any conjunct makes the whole projection fail; otherwise such
+ *		conjuncts are ignored.
  *
  * Called by:
  *		project_key_join_facts_from_rte
@@ -2739,7 +2749,8 @@ static bool
 add_filter_conjuncts(List **dst, List *keyPositions,
 					 Node *qual, Query *filter_query, Node *filter_jtnode,
 					 Index filter_rtindex, List **filter_attrmap,
-					 int filter_natts, List **dependencies, bool strict)
+					 int filter_natts, List **dependencies,
+					 bool reject_lossy_filter)
 {
 	if (qual == NULL)
 		return true;
@@ -2887,7 +2898,7 @@ add_filter_conjuncts(List **dst, List *keyPositions,
 			Assert(!contain_subplans(canon));
 			if (contain_volatile_functions(canon))
 			{
-				if (strict)
+				if (reject_lossy_filter)
 					return false;
 				continue;
 			}
@@ -2897,7 +2908,7 @@ add_filter_conjuncts(List **dst, List *keyPositions,
 			append_filter_conjunct_unique(dst, canon);
 			continue;
 		}
-		if (strict)
+		if (reject_lossy_filter)
 			return false;
 	}
 	return true;
