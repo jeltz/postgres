@@ -201,23 +201,21 @@ revalidate_dependent_key_join_relation(Oid relationOid)
 	 * dependencies or other semantic changes would make the stored proof
 	 * unsafe without rewriting its owning object.
 	 */
-	if (rel->rd_rules != NULL)
+	Assert(rel->rd_rules != NULL);
+	for (int i = 0; i < rel->rd_rules->numLocks; i++)
 	{
-		for (int i = 0; i < rel->rd_rules->numLocks; i++)
+		RewriteRule *rule = rel->rd_rules->rules[i];
+		ListCell   *lc;
+
+		foreach(lc, rule->actions)
 		{
-			RewriteRule *rule = rel->rd_rules->rules[i];
-			ListCell   *lc;
+			Node	   *action = (Node *) lfirst(lc);
 
-			foreach(lc, rule->actions)
-			{
-				Node	   *action = (Node *) lfirst(lc);
-
-				if (IsA(action, Query))
-					revalidate_stored_key_join_node(action, true);
-			}
-
-			revalidate_stored_key_join_node(rule->qual, false);
+			if (IsA(action, Query))
+				revalidate_stored_key_join_node(action, true);
 		}
+
+		revalidate_stored_key_join_node(rule->qual, false);
 	}
 
 	relation_close(rel, AccessShareLock);
