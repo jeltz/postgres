@@ -494,7 +494,8 @@ resolve_columns_on_nsitem(ParseState *pstate,
 /*
  * make_var_from_nscolumn
  *
- *		Build a Var for a namespace column and mark its nullable state.
+ *		Build a Var for a generated key-join qual and mark nullable state
+ *		and column read privilege.
  *
  * Called by:
  *		transformAndValidateKeyJoin
@@ -510,6 +511,7 @@ make_var_from_nscolumn(ParseState *pstate, ParseNamespaceColumn *nscol)
 	var->varnosyn = nscol->p_varnosyn;
 	var->varattnosyn = nscol->p_varattnosyn;
 	markNullableIfNeeded(pstate, var);
+	markVarForSelectPriv(pstate, var);
 	return var;
 }
 

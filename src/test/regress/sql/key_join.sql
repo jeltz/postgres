@@ -5430,6 +5430,49 @@ DROP OPERATOR =# (int, int);
 DROP FUNCTION key_join_srf_eq(int, int);
 DROP FUNCTION key_join_srf_cmp(int, int);
 
+-- Generated key-join quals must require SELECT on both key columns.
+CREATE ROLE key_join_priv_user;
+CREATE SCHEMA key_join_priv;
+CREATE TABLE key_join_priv.parent
+(
+    id int PRIMARY KEY,
+    visible text
+);
+CREATE TABLE key_join_priv.child
+(
+    id int PRIMARY KEY,
+    parent_id int NOT NULL REFERENCES key_join_priv.parent (id),
+    visible text
+);
+INSERT INTO key_join_priv.parent VALUES (1, 'parent-one');
+INSERT INTO key_join_priv.child VALUES (10, 1, 'child-one');
+GRANT USAGE ON SCHEMA key_join_priv TO key_join_priv_user;
+GRANT SELECT (visible) ON key_join_priv.parent TO key_join_priv_user;
+GRANT SELECT (visible) ON key_join_priv.child TO key_join_priv_user;
+
+SET ROLE key_join_priv_user;
+SELECT p.visible AS parent_visible, c.visible AS child_visible
+FROM key_join_priv.parent p
+JOIN key_join_priv.child c FOR KEY (parent_id) -> p (id);
+RESET ROLE;
+
+GRANT SELECT (id) ON key_join_priv.parent TO key_join_priv_user;
+SET ROLE key_join_priv_user;
+SELECT p.visible AS parent_visible, c.visible AS child_visible
+FROM key_join_priv.parent p
+JOIN key_join_priv.child c FOR KEY (parent_id) -> p (id);
+RESET ROLE;
+
+GRANT SELECT (parent_id) ON key_join_priv.child TO key_join_priv_user;
+SET ROLE key_join_priv_user;
+SELECT p.visible AS parent_visible, c.visible AS child_visible
+FROM key_join_priv.parent p
+JOIN key_join_priv.child c FOR KEY (parent_id) -> p (id);
+RESET ROLE;
+
+DROP SCHEMA key_join_priv CASCADE;
+DROP ROLE key_join_priv_user;
+
 -- Final cleanup: drop all remaining objects
 DROP VIEW v1, v2;
 DROP TABLE shipments, orders, order_items, packages CASCADE;
