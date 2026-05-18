@@ -144,8 +144,7 @@ revalidate_dependent_key_join_objects_recurse(Oid refclassid, Oid refobjid,
 	List	   *path = list_copy(ancestors);
 	ListCell   *lc;
 
-	if (object_address_list_member(ancestors, refclassid, refobjid))
-		return;
+	Assert(!object_address_list_member(ancestors, refclassid, refobjid));
 	path = lappend(path, make_object_address(refclassid, refobjid));
 
 	dependents = find_dependent_key_join_objects(refclassid, refobjid);
