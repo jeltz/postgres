@@ -2388,20 +2388,17 @@ find_expr_references_walker(Node *node,
 	{
 		JoinExpr   *join = (JoinExpr *) node;
 
-		if (find_expr_references_walker(join->keyJoin, context))
-			return true;
+		find_expr_references_walker(join->keyJoin, context);
 		/* fall through to examine the ordinary join substructure */
 	}
 	else if (IsA(node, KeyJoinNode))
 	{
 		KeyJoinNode *key_join = castNode(KeyJoinNode, node);
 
-		if (find_expr_references_walker((Node *) key_join->notNullConstraints,
-										context))
-			return true;
-		if (find_expr_references_walker((Node *) key_join->proofDependencies,
-										context))
-			return true;
+		find_expr_references_walker((Node *) key_join->notNullConstraints,
+									context);
+		find_expr_references_walker((Node *) key_join->proofDependencies,
+									context);
 		return false;
 	}
 	else if (IsA(node, KeyJoinProofDependency))
