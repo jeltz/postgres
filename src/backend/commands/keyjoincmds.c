@@ -353,9 +353,10 @@ object_address_list_member(List *objects, Oid classId, Oid objectId)
 {
 	foreach_ptr(ObjectAddress, object, objects)
 	{
+		Assert(object->objectSubId == 0);
+
 		if (object->classId == classId &&
-			object->objectId == objectId &&
-			object->objectSubId == 0)
+			object->objectId == objectId)
 			return true;
 	}
 	return false;
