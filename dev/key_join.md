@@ -704,6 +704,32 @@ or the corresponding `<-` form.  Generated equality quals are not printed
 as an `ON` clause, because they implement the key join.  A user-written
 `FILTER (WHERE ...)` attached to the join is deparsed separately.
 
+### Coverage-Driven Asserts Before Review
+
+Some MC/DC cleanup changes temporarily express catalog lookup assumptions
+as `Assert(...)` rather than runtime errors.  That is useful while driving
+the local LLVM MC/DC report to 100%: branches that represent impossible
+catalog states should not force synthetic tests whose only purpose is to
+manufacture corrupt dependency metadata.
+
+Before sending the patch to `pgsql-hackers`, cache lookup assumptions in
+stored-object revalidation should be changed back to PostgreSQL's normal
+defensive form, for example `elog(ERROR, "cache lookup failed ...")`.
+Those checks cover rule, function, policy, and similar catalog tuples
+that are expected to exist because dependency scanning or the DDL caller
+identified them.  They are still "should not happen" paths, but they are
+not just local control-flow invariants: they depend on catalog contents,
+dependency edges, cache state, and concurrent DDL locking behavior.
+
+Keeping an `elog(ERROR)` there matches surrounding PostgreSQL code and is
+safer in non-assert builds.  If an unexpected catalog state is ever
+observed, the backend reports a controlled catalog lookup failure instead
+of compiling the check away and continuing toward an invalid tuple
+dereference or misleading follow-on error.  `Assert` remains appropriate
+for purely internal invariants, such as exhausted switch cases or
+locally-proven recursion preconditions, where a production runtime branch
+would only duplicate unreachable control flow.
+
 ### Future Work
 
 A future version could mark stored key-join objects whose proof
