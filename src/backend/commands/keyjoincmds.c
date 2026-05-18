@@ -170,13 +170,12 @@ revalidate_dependent_key_join_objects_recurse(Oid refclassid, Oid refobjid,
 															  depobj->objectId,
 															  path);
 				break;
-			case PolicyRelationId:
+			default:
+				Assert(depobj->classId == PolicyRelationId);
 				revalidate_dependent_key_join_policy(depobj->objectId);
 				revalidate_dependent_key_join_objects_recurse(PolicyRelationId,
 															  depobj->objectId,
 															  path);
-				break;
-			default:
 				break;
 		}
 	}
