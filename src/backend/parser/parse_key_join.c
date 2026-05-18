@@ -733,8 +733,8 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 			{
 				/*
 				 * Per-coverage scratch.  These live only inside this
-				 * candidate; if any check below rejects it, control jumps to
-				 * next_coverage and the next iteration starts fresh.
+				 * candidate; if any check below rejects it, the next
+				 * coverage candidate starts fresh.
 				 */
 				List	   *coverage_base;
 				List	   *coverage_key_positions;
@@ -774,6 +774,7 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 				{
 					ListCell   *lcfkbase;
 					ListCell   *lcpkbase;
+					bool		fk_pairs_match = true;
 
 					/*
 					 * Key-join columns must cover the whole FK; a partial FK
@@ -810,10 +811,15 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 							if (lfirst_int(lcfkatt) != fkbase)
 								continue;
 							if (lfirst_int(lcrefatt) != pkbase)
-								goto next_coverage;
+							{
+								fk_pairs_match = false;
+								break;
+							}
 							fk_catalog_pos = foreach_current_index(lcfkatt);
 							break;
 						}
+						if (!fk_pairs_match)
+							break;
 
 						/*
 						 * referencing_base was selected from
@@ -833,6 +839,8 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 						fk_eqtypmods = lappend_int(fk_eqtypmods,
 												   keypos->eqTypmod);
 					}
+					if (!fk_pairs_match)
+						continue;
 				}
 
 				/*
@@ -845,10 +853,10 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 				 */
 				if (!key_position_identity_lists_equal(unique_key_positions,
 													   fk_key_positions))
-					goto next_coverage;
+					continue;
 				if (!key_position_identity_lists_equal(coverage_key_positions,
 													   fk_key_positions))
-					goto next_coverage;
+					continue;
 
 				/* ---- Condition 2c: referenced filters remap into FK ---- */
 				if (coverage->filterConjuncts != NIL)
@@ -890,6 +898,8 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 				/* ---- Condition 3: not-null evidence on referencing side ---- */
 				if (need_notnull)
 				{
+					bool		notnull_match = true;
+
 					foreach_int(attno, referencing_attnums)
 					{
 						bool		found = false;
@@ -907,15 +917,20 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 							break;
 						}
 						if (!found)
-							goto next_coverage;
+						{
+							notnull_match = false;
+							break;
+						}
 					}
+					if (!notnull_match)
+						continue;
 				}
 
 				/*
 				 * ---- Success: construct the result, exactly once ----
 				 *
-				 * *match is touched only here, so any next_coverage path
-				 * above leaves it untouched.  proofdeps is built locally
+				 * *match is touched only here, so failed candidate checks
+				 * above leave it untouched.  proofdeps is built locally
 				 * before commit, so a partial accumulation cannot leak into
 				 * the result.
 				 */
@@ -939,9 +954,6 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 					match->proofdeps = proofdeps;
 				}
 				return true;
-
-		next_coverage:
-				;
 			}
 		}
 	}
