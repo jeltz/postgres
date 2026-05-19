@@ -355,7 +355,7 @@ function parseGitDiffChangedLines() {
 			`${BASE_REF}...HEAD`,
 			"--",
 		],
-		{encoding: "utf8"}
+		{encoding: "utf8", maxBuffer: 128 * 1024 * 1024}
 	);
 
 	if (diff.error)
