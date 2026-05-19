@@ -1559,8 +1559,6 @@ make_dependency(Oid classId, Oid objectId)
 /*
  * ensure_key_join_surface_facts
  *
- *		Entry point for live parse analysis.
- *
  * Called by:
  *		transformAndValidateKeyJoin
  */
@@ -1577,7 +1575,16 @@ ensure_key_join_surface_facts(ParseState *pstate, RangeTblEntry *rte)
 /*
  * ensure_key_join_surface_facts_internal
  *
- *		Ensure that an RTE exposes key-join surface facts when possible.
+ *		Key-join validation needs a demand-driven fact cache on each RTE it
+ *		inspects.  Some RTEs have no sound surface facts in this proof model
+ *		(for example, lateral subqueries, recursive CTEs, and ordinary
+ *		joins whose output cannot preserve input facts), so the cache also
+ *		records "computed, but no facts".
+ *
+ *		Keep that decision on a single path across live parse analysis, view
+ *		projection, and stored-query revalidation.  Those callers reach the
+ *		same RTE graph with different context available (ParseState for live
+ *		parsing, copied Query stacks for stored queries).
  *
  * Called by:
  *		ensure_key_join_surface_facts
