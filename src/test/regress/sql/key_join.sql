@@ -2799,6 +2799,19 @@ SELECT * FROM (products_gbu p CROSS JOIN (SELECT count(*) AS n FROM products_gbu
 -- rejected, reason: volatile aggregate companion cannot preserve direct join facts
 JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
 
+SELECT count(*) AS pruned_volatile_rows
+FROM (
+    SELECT p.id
+    FROM products_gbu p
+    CROSS JOIN (
+        SELECT count(*) AS n
+        FROM products_gbu
+        WHERE false AND random() < 2
+    ) z
+) q
+-- accepted, reason: volatile branch is pruned before the after-planning check
+JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
+
 SELECT * FROM (SELECT p.id FROM products_gbu p CROSS JOIN (SELECT count(*) FROM products_gbu HAVING false) z) q
 -- rejected, reason: HAVING can suppress the aggregate companion row
 JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);

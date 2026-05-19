@@ -171,8 +171,9 @@ static bool add_filter_conjuncts(List **dst, List *keyPositions,
 								 List **dependencies,
 								 bool reject_lossy_filter);
 static bool key_join_contains_volatile_after_planning(Node *node);
-static bool key_join_volatile_after_planning_walker(Node *node,
-													void *context);
+static bool key_join_expression_contains_volatile_after_planning(Node *node);
+static bool key_join_after_planning_query_walker(Node *node, void *context);
+static bool key_join_nested_query_walker(Node *node, void *context);
 static List *map_var_to_jtnode_surface(Query *query, Node *jtnode,
 									   Index varno, AttrNumber attno);
 static List *append_filter_expr_dependencies(List *dependencies, Node *node);
@@ -1399,10 +1400,10 @@ filter_value_allowed(Node *node)
  *
  * contain_volatile_functions_after_planning() accepts expressions, not whole
  * Query trees.  Key-join proof code needs both forms, so handle Query nodes
- * by walking their expression subtrees and applying the expression helper to
- * each tree.  The extra walk after a false expression result catches nested
- * Query nodes, which expression_planner() deliberately does not descend into
- * when called on a standalone expression.
+ * by walking each top-level expression subtree once.  A separate nested-Query
+ * walk restarts after-planning preprocessing inside subqueries, which
+ * expression_planner() deliberately does not descend into when called on a
+ * standalone expression.
  *
  * Called by:
  *		filter_value_allowed
@@ -1417,14 +1418,26 @@ key_join_contains_volatile_after_planning(Node *node)
 
 	if (IsA(node, Query))
 		return query_tree_walker(castNode(Query, node),
-								 key_join_volatile_after_planning_walker,
+								 key_join_after_planning_query_walker,
 								 NULL, 0);
 
-	return key_join_volatile_after_planning_walker(node, NULL);
+	return key_join_expression_contains_volatile_after_planning(node);
 }
 
 static bool
-key_join_volatile_after_planning_walker(Node *node, void *context)
+key_join_expression_contains_volatile_after_planning(Node *node)
+{
+	Assert(node != NULL);
+	Assert(!IsA(node, Query));
+
+	if (contain_volatile_functions_after_planning((Expr *) node))
+		return true;
+
+	return expression_tree_walker(node, key_join_nested_query_walker, NULL);
+}
+
+static bool
+key_join_after_planning_query_walker(Node *node, void *context)
 {
 	if (node == NULL)
 		return false;
@@ -1432,11 +1445,24 @@ key_join_volatile_after_planning_walker(Node *node, void *context)
 	if (IsA(node, Query))
 		return key_join_contains_volatile_after_planning(node);
 
-	if (contain_volatile_functions_after_planning((Expr *) node))
-		return true;
+	return key_join_expression_contains_volatile_after_planning(node);
+}
 
-	return expression_tree_walker(node, key_join_volatile_after_planning_walker,
-								  context);
+static bool
+key_join_nested_query_walker(Node *node, void *context)
+{
+	if (node == NULL)
+		return false;
+
+	if (IsA(node, Query))
+		return key_join_contains_volatile_after_planning(node);
+
+	/*
+	 * key_join_expression_contains_volatile_after_planning() already checked
+	 * this whole expression subtree after planning.  Continue walking only so
+	 * that nested Query nodes get their own after-planning pass.
+	 */
+	return expression_tree_walker(node, key_join_nested_query_walker, context);
 }
 
 /*
