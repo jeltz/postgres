@@ -54,6 +54,7 @@
 #include "utils/builtins.h"
 #include "utils/errcodes.h"
 #include "utils/fmgroids.h"
+#include "utils/injection_point.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/relcache.h"
@@ -1794,6 +1795,7 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 {
 	KeyJoinSurfaceFacts *set;
 	TupleDesc	tupdesc;
+	List	   *fkeylist;
 
 	Assert(rte->rtekind == RTE_RELATION);
 
@@ -1982,7 +1984,12 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 	 * corruption outside the key-join proof model, not proof facts to audit
 	 * during parse analysis.
 	 */
-	foreach_node(ForeignKeyCacheInfo, fk, RelationGetFKeyList(rel))
+	fkeylist = copyObject(RelationGetFKeyList(rel));
+
+	if (fkeylist != NIL)
+		INJECTION_POINT("key-join-after-fkey-list-copy", NULL);
+
+	foreach_node(ForeignKeyCacheInfo, fk, fkeylist)
 	{
 		HeapTuple	contup;
 		Form_pg_constraint con;
@@ -2174,6 +2181,7 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 
 		ReleaseSysCache(contup);
 	}
+	list_free_deep(fkeylist);
 
 	if (key_join_surface_facts_has_facts(set))
 		rte->keyJoinFacts = set;

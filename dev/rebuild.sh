@@ -117,7 +117,7 @@ if [[ "$CMD" == "reconfig" ]]; then
     rm -rf $INSTALL
 
     echo "Configuring build with meson..."
-    meson setup $BUILD $SRC --prefix=$INSTALL --buildtype=debug -Dcassert=true -Dicu=enabled
+    meson setup $BUILD $SRC --prefix=$INSTALL --buildtype=debug -Dcassert=true -Dicu=enabled -Dinjection_points=true
 fi
 
 echo "Compiling..."
