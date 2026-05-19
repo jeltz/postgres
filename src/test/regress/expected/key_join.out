@@ -3445,6 +3445,33 @@ JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
 ERROR:  key join cannot be proven from available constraints
 LINE 3: JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
                               ^
+CREATE SEQUENCE volatile_default_seq;
+CREATE FUNCTION volatile_default_int(v int DEFAULT nextval('volatile_default_seq')::int)
+RETURNS int
+LANGUAGE sql STABLE AS $$ SELECT v $$;
+SELECT * FROM (
+    SELECT p.id
+    FROM products_gbu p
+    CROSS JOIN (
+        SELECT count(*) AS n, volatile_default_int() AS side_effect
+        FROM products_gbu
+    ) z
+) q
+-- rejected, reason: volatile default aggregate companion cannot preserve facts
+JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
+ERROR:  key join cannot be proven from available constraints
+LINE 10: JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
+                               ^
+SELECT * FROM (
+    SELECT p.id
+    FROM products_gbu p
+    CROSS JOIN ROWS FROM (volatile_default_int()) AS f(x)
+) q
+-- rejected, reason: volatile default ROWS FROM companion cannot preserve facts
+JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
+ERROR:  key join cannot be proven from available constraints
+LINE 7: JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
+                              ^
 CREATE VIEW volatile_target_parent_v AS
 SELECT id, set_config('key_join.volatile', id::text, false) AS side_effect
 FROM products_gbu;
@@ -3456,6 +3483,17 @@ ERROR:  key join cannot be proven from available constraints
 LINE 4: JOIN resupplies_gbu r FOR KEY (product_id) -> p (id);
                               ^
 DROP VIEW volatile_target_parent_v;
+CREATE VIEW volatile_default_target_parent_v AS
+SELECT id, volatile_default_int() AS side_effect
+FROM products_gbu;
+SELECT *
+FROM volatile_default_target_parent_v p
+-- rejected, reason: volatile default targetlist blocks surface row coverage
+JOIN resupplies_gbu r FOR KEY (product_id) -> p (id);
+ERROR:  key join cannot be proven from available constraints
+LINE 4: JOIN resupplies_gbu r FOR KEY (product_id) -> p (id);
+                              ^
+DROP VIEW volatile_default_target_parent_v;
 SELECT * FROM (
     SELECT p.id
     FROM products_gbu p
@@ -3469,6 +3507,8 @@ JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
 ERROR:  key join cannot be proven from available constraints
 LINE 10: JOIN resupplies_gbu r FOR KEY (product_id) -> q (id);
                                ^
+DROP FUNCTION volatile_default_int(int);
+DROP SEQUENCE volatile_default_seq;
 -- Cleanup
 DROP VIEW v_sales_agg, v_sales_multi_group, v_sales_distinct;
 DROP TABLE resupplies_gbu, sales_gbu, products_gbu CASCADE;
@@ -3641,6 +3681,35 @@ LINE 4: JOIN filter_volatile_child_v c FOR KEY (parent_id) -> p (id)...
 DROP VIEW filter_volatile_child_v, filter_volatile_parent_v;
 DROP TABLE filter_volatile_child, filter_volatile_parent;
 DROP FUNCTION filter_volatile_identity(int);
+-- FILTER1f2: strict proof-filter allowlist rejects volatile defaults
+CREATE SEQUENCE filter_volatile_default_seq;
+CREATE FUNCTION filter_volatile_default_identity(v int DEFAULT nextval('filter_volatile_default_seq')::int)
+RETURNS int
+LANGUAGE sql STABLE AS $$ SELECT v $$;
+CREATE TABLE filter_volatile_default_parent (id int PRIMARY KEY);
+CREATE TABLE filter_volatile_default_child
+(
+    parent_id int NOT NULL REFERENCES filter_volatile_default_parent (id)
+);
+INSERT INTO filter_volatile_default_parent VALUES (1), (2);
+INSERT INTO filter_volatile_default_child VALUES (1);
+CREATE VIEW filter_volatile_default_parent_v AS
+SELECT id FROM filter_volatile_default_parent
+WHERE id = filter_volatile_default_identity();
+CREATE VIEW filter_volatile_default_child_v AS
+SELECT parent_id FROM filter_volatile_default_child
+WHERE parent_id = filter_volatile_default_identity();
+SELECT count(*) AS volatile_default_filter_rows
+FROM filter_volatile_default_parent_v p
+-- rejected, reason: volatile default function filter values are not proof terms
+JOIN filter_volatile_default_child_v c FOR KEY (parent_id) -> p (id);
+ERROR:  key join cannot be proven from available constraints
+LINE 4: JOIN filter_volatile_default_child_v c FOR KEY (parent_id) -...
+                                               ^
+DROP VIEW filter_volatile_default_child_v, filter_volatile_default_parent_v;
+DROP TABLE filter_volatile_default_child, filter_volatile_default_parent;
+DROP FUNCTION filter_volatile_default_identity(int);
+DROP SEQUENCE filter_volatile_default_seq;
 -- FILTER1g: strict proof-filter value allowlist rejects volatile CoerceViaIO
 -- input/output functions before row-coverage propagation.
 SET client_min_messages = warning;

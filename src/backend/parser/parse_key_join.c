@@ -170,6 +170,9 @@ static bool add_filter_conjuncts(List **dst, List *keyPositions,
 								 List **filter_attrmap, int filter_natts,
 								 List **dependencies,
 								 bool reject_lossy_filter);
+static bool key_join_contains_volatile_after_planning(Node *node);
+static bool key_join_volatile_after_planning_walker(Node *node,
+													void *context);
 static List *map_var_to_jtnode_surface(Query *query, Node *jtnode,
 									   Index varno, AttrNumber attno);
 static List *append_filter_expr_dependencies(List *dependencies, Node *node);
@@ -1343,7 +1346,8 @@ filter_conjunct_matches_key_positions(Node *conjunct, List *keyPositions)
  *		Return true if a filter value can be stored in proof-filter form.
  *		Proof filters use a strict allowlist: constants, SQL value functions,
  *		non-volatile scalar functions, and transparent type/collation wrappers
- *		whose arguments are also allowed.
+ *		whose arguments are also allowed.  The full after-planning volatility
+ *		check runs on the canonical filter after locking its dependencies.
  *
  * Called by:
  *		filter_conjunct_matches_key_positions
@@ -1353,9 +1357,6 @@ static bool
 filter_value_allowed(Node *node)
 {
 	Assert(node != NULL);
-
-	if (contain_volatile_functions(node))
-		return false;
 
 	if (IsA(node, Const))
 		return true;
@@ -1388,6 +1389,54 @@ filter_value_allowed(Node *node)
 		return filter_value_allowed((Node *) castNode(CollateExpr, node)->arg);
 
 	return false;
+}
+
+/*
+ * key_join_contains_volatile_after_planning
+ *
+ *		Return true if a key-join proof expression or query contains
+ *		volatile functions after planner expression preprocessing.
+ *
+ * contain_volatile_functions_after_planning() accepts expressions, not whole
+ * Query trees.  Key-join proof code needs both forms, so handle Query nodes
+ * by walking their expression subtrees and applying the expression helper to
+ * each tree.  The extra walk after a false expression result catches nested
+ * Query nodes, which expression_planner() deliberately does not descend into
+ * when called on a standalone expression.
+ *
+ * Called by:
+ *		filter_value_allowed
+ *		add_filter_conjuncts
+ *		project_key_join_query_facts
+ *		compute_join_output_facts
+ */
+static bool
+key_join_contains_volatile_after_planning(Node *node)
+{
+	Assert(node != NULL);
+
+	if (IsA(node, Query))
+		return query_tree_walker(castNode(Query, node),
+								 key_join_volatile_after_planning_walker,
+								 NULL, 0);
+
+	return key_join_volatile_after_planning_walker(node, NULL);
+}
+
+static bool
+key_join_volatile_after_planning_walker(Node *node, void *context)
+{
+	if (node == NULL)
+		return false;
+
+	if (IsA(node, Query))
+		return key_join_contains_volatile_after_planning(node);
+
+	if (contain_volatile_functions_after_planning((Expr *) node))
+		return true;
+
+	return expression_tree_walker(node, key_join_volatile_after_planning_walker,
+								  context);
 }
 
 /*
@@ -2335,7 +2384,7 @@ project_key_join_query_facts(KeyJoinFactContext *context, Query *query)
 	 * while the executor evaluates later operands.  Treat them as a complete
 	 * proof barrier for computed query facts.
 	 */
-	if (contain_volatile_functions((Node *) query))
+	if (key_join_contains_volatile_after_planning((Node *) query))
 		return NULL;
 
 	natts = list_length(query->targetList);
@@ -2918,7 +2967,7 @@ add_filter_conjuncts(List **dst, List *keyPositions,
 									   dep->objectSubId, AccessShareLock);
 			}
 			Assert(!contain_subplans(canon));
-			if (contain_volatile_functions(canon))
+			if (key_join_contains_volatile_after_planning(canon))
 			{
 				if (reject_lossy_filter)
 					return false;
@@ -3663,7 +3712,7 @@ compute_join_output_facts(JoinExpr *j,
 					continue;
 				if (query->limitCount != NULL)
 					continue;
-				if (contain_volatile_functions((Node *) query))
+				if (key_join_contains_volatile_after_planning((Node *) query))
 					continue;
 				single_row[i] = true;
 			}
@@ -3677,7 +3726,8 @@ compute_join_output_facts(JoinExpr *j,
 						single_row[i] = false;
 						break;
 					}
-					if (contain_volatile_functions(rtfunc->funcexpr))
+					if (key_join_contains_volatile_after_planning(
+							rtfunc->funcexpr))
 					{
 						single_row[i] = false;
 						break;
