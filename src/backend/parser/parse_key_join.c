@@ -1702,11 +1702,11 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 					 * demand-driven projection can still resolve the CTE
 					 * from a visible WITH namespace.
 					 */
+					Assert(context->pstate != NULL);
 					for (ParseState *ps = context->pstate;
-						 cte == NULL;
+						 ps != NULL && cte == NULL;
 						 ps = ps->parentParseState)
 					{
-						Assert(ps != NULL);
 						foreach_node(CommonTableExpr, candidate,
 									 ps->p_ctenamespace)
 						{
@@ -1718,6 +1718,12 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 							}
 						}
 					}
+#ifdef USE_ASSERT_CHECKING
+					Assert(cte != NULL);
+#else
+					if (cte == NULL)
+						break;
+#endif
 					cte_owner_stack = NULL;
 				}
 
