@@ -1023,7 +1023,7 @@ select_key_position_parts(List *selected_attnums, List *keyPositions,
  *
  *		Return the key-position index containing an attnum.
  *
- *		Returns -1 if no position contains it.
+ *		Returns -1 if no position contains it or it is a duplicate.
  *
  * Called by:
  *		select_key_position_parts
