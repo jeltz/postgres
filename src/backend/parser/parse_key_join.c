@@ -435,7 +435,7 @@ resolve_columns_on_nsitem(ParseState *pstate,
 {
 	int			ncols = list_length(names);
 	int			surface_ncols = list_length(surface->p_names->colnames);
-	KeyJoinColumn *cols = palloc0(sizeof(KeyJoinColumn) * ncols);
+	KeyJoinColumn *cols = palloc0_array(KeyJoinColumn, ncols);
 	int			i = 0;
 
 	foreach_ptr(Node, namenode, names)
@@ -2450,8 +2450,8 @@ project_key_join_query_facts(KeyJoinFactContext *context, Query *query)
 		return NULL;
 
 	natts = list_length(query->targetList);
-	srcvarno = palloc0((natts + 1) * sizeof(int));
-	srcattno = palloc0((natts + 1) * sizeof(int));
+	srcvarno = palloc0_array(int, natts + 1);
+	srcattno = palloc0_array(int, natts + 1);
 
 	foreach_node(TargetEntry, tle, query->targetList)
 	{
@@ -2520,7 +2520,7 @@ project_key_join_query_facts(KeyJoinFactContext *context, Query *query)
 	if (toprte != NULL && toprte->keyJoinFacts != NULL)
 	{
 		int			ncols = list_length(toprte->eref->colnames);
-		List	  **attrmap = palloc0((ncols + 1) * sizeof(List *));
+		List	  **attrmap = palloc0_array(List *, ncols + 1);
 
 		for (int i = 1; i <= outattno; i++)
 		{
@@ -3826,7 +3826,7 @@ compute_join_output_facts(JoinExpr *j,
 static List **
 build_join_attrmap(RangeTblEntry *joinrte, bool leftside, int nattrs)
 {
-	List	  **attrmap = palloc0((nattrs + 1) * sizeof(List *));
+	List	  **attrmap = palloc0_array(List *, nattrs + 1);
 	List	   *joincols = leftside ? joinrte->joinleftcols :
 		joinrte->joinrightcols;
 
