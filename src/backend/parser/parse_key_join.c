@@ -1306,10 +1306,8 @@ filter_conjunct_matches_key_positions(Node *conjunct, List *keyPositions)
 #endif
 
 	Assert(conjunct != NULL);
-	Assert(IsA(conjunct, OpExpr));
 	op = castNode(OpExpr, conjunct);
 	Assert(list_length(op->args) == 2);
-	Assert(IsA(linitial(op->args), Param));
 	param = castNode(Param, linitial(op->args));
 	Assert(param->paramkind == PARAM_KEYJOIN);
 
@@ -3090,7 +3088,6 @@ map_var_to_jtnode_surface(Query *query, Node *jtnode,
 		return (rtindex == varno) ? list_make1_int(attno) : NIL;
 	}
 
-	Assert(IsA(jtnode, JoinExpr));
 	{
 		JoinExpr   *j = castNode(JoinExpr, jtnode);
 		RangeTblEntry *joinrte = rt_fetch(j->rtindex, query->rtable);
@@ -3472,7 +3469,6 @@ compute_join_output_facts(JoinExpr *j,
 		bool		referencing_unique = false;
 		List	   *referencing_unique_deps = NIL;
 
-		Assert(IsA(j->keyJoin, KeyJoinNode));
 		key_join_node = castNode(KeyJoinNode, j->keyJoin);
 		referencing_left = (key_join_node->referencingVarno == left_rtindex);
 		referenced_left = (key_join_node->referencedVarno == left_rtindex);
@@ -4252,7 +4248,6 @@ revalidate_query_jointree_proofs(Query *query, Node *jtnode,
 			KeyJoinMatch match;
 			KeyJoinFactContext context;
 
-			Assert(IsA(j->keyJoin, KeyJoinNode));
 			key_join = castNode(KeyJoinNode, j->keyJoin);
 			referencing_left = (key_join->referencingVarno == left_rtindex);
 			referencing_rte = referencing_left ? left_rte : right_rte;
@@ -4302,7 +4297,6 @@ revalidate_query_jointree_proofs(Query *query, Node *jtnode,
 				BoolExpr   *andexpr;
 
 				Assert(j->quals != NULL);
-				Assert(IsA(j->quals, BoolExpr));
 				andexpr = castNode(BoolExpr, j->quals);
 				Assert(andexpr->boolop == AND_EXPR);
 				Assert(list_length(andexpr->args) == 2);
@@ -4328,7 +4322,6 @@ revalidate_query_jointree_proofs(Query *query, Node *jtnode,
 			{
 				BoolExpr   *andexpr;
 
-				Assert(IsA(key_quals, BoolExpr));
 				andexpr = castNode(BoolExpr, key_quals);
 				Assert(andexpr->boolop == AND_EXPR);
 				Assert(list_length(andexpr->args) == nkeys);
@@ -4382,7 +4375,6 @@ extract_key_join_qual_arg(Node *qual, List **referenced_args,
 	OpExpr	   *op;
 
 	Assert(qual != NULL);
-	Assert(IsA(qual, OpExpr));
 	op = castNode(OpExpr, qual);
 	Assert(list_length(op->args) == 2);
 
