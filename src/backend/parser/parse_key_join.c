@@ -269,7 +269,7 @@ static bool key_join_equality_operator_is_usable(Oid opno, Oid typeOid,
 												 List **dependencies);
 static Oid	key_join_equality_type(Oid typeOid, int32 typmod,
 								   int32 *eqTypmod);
-static List *make_key_positions_from_attrnums(TupleDesc tupdesc,
+static List *make_key_positions_from_attrnums(const TupleDesc tupdesc,
 											  const AttrNumber *attnums,
 											  int nattnums,
 											  const Oid *eqOperators);
@@ -4538,7 +4538,7 @@ key_join_equality_type(Oid typeOid, int32 typmod, int32 *eqTypmod)
  *		compute_key_join_relation_facts
  */
 static List *
-make_key_positions_from_attrnums(TupleDesc tupdesc, const AttrNumber *attnums,
+make_key_positions_from_attrnums(const TupleDesc tupdesc, const AttrNumber *attnums,
 								 int nattnums, const Oid *eqOperators)
 {
 	List	   *result = NIL;
