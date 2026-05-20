@@ -3610,9 +3610,6 @@ compute_join_output_facts(JoinExpr *j,
 				{
 					ListCell   *lcbase;
 					ListCell   *lcref;
-#ifdef USE_ASSERT_CHECKING
-					bool		found = false;
-#endif
 
 					forboth(lcbase, source->baseAttnums,
 							lcref, source->referencedAttnums)
@@ -3622,14 +3619,12 @@ compute_join_output_facts(JoinExpr *j,
 							target_selected_base =
 								lappend_int(target_selected_base,
 											lfirst_int(lcref));
-#ifdef USE_ASSERT_CHECKING
-							found = true;
-#endif
 							break;
 						}
 					}
-					Assert(found);
 				}
+
+				Assert(list_length(target_selected_base) == list_length(source_selected_base));
 
 				/*
 				 * Match FK and RowCoverage targets to out-facts; the FK case
