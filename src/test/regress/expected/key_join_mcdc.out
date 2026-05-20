@@ -2,8 +2,7 @@
 -- key_join_mcdc
 --
 -- Focused local MC/DC coverage for build_key_join_quals(), its callers, and
--- the equality-operator usability pre-guard.  This test is run by
--- mcdc_parse_key_join.sh, not the normal regression schedule.
+-- the equality-operator usability pre-guard.
 --
 \set VERBOSITY terse
 CREATE SCHEMA key_join_mcdc;

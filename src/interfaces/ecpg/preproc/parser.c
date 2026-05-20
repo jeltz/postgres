@@ -80,7 +80,6 @@ filtered_base_yylex(void)
 	switch (cur_token)
 	{
 		case FORMAT:
-		case KEY:
 		case NOT:
 		case NULLS_P:
 		case WITH:
