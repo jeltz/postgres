@@ -112,7 +112,9 @@ typedef struct KeyJoinQueryStack
  *		Fact computation runs either during live parse analysis or while
  *		revalidating a copied stored Query.  Keep that mode explicit instead
  *		of spreading nullable ParseState/Query arguments through the proof
- *		code.
+ *		code.  revalidating_stored_query is set only for projection contexts
+ *		created after the owner-aware stored proof replay has already visited
+ *		the relevant CTE and FROM-subquery Query trees.
  */
 typedef struct KeyJoinFactContext
 {
@@ -1598,6 +1600,10 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 {
 	Assert(context != NULL);
 	Assert(rte != NULL);
+	Assert(!context->revalidating_stored_query ||
+		   (context->pstate == NULL &&
+			context->query != NULL &&
+			context->query_stack != NULL));
 
 	if (rte->keyJoinFactsComputed)
 		return;
@@ -1664,9 +1670,15 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 					break;
 				}
 
+				/*
+				 * Stored-query replay visits FROM-subqueries before their
+				 * owner's jointree.  This demand path projects facts only.
+				 */
 				if (context->revalidating_stored_query)
-					revalidate_stored_key_join_proofs_in_query(rte->subquery,
-															   context->query_stack);
+				{
+					Assert(context->pstate == NULL);
+					Assert(context->query_stack != NULL);
+				}
 
 				qs.parent = context->query_stack;
 				qs.query = rte->subquery;
@@ -1691,10 +1703,10 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 					int			levelsup = (int) rte->ctelevelsup;
 
 					/*
-					 * Stored revalidation starts from this RTE reference
-					 * site.  Walk rte->ctelevelsup to the Query that owns the
-					 * CTE, and keep that owner frame as the CTE query's
-					 * parent stack.
+					 * Query-backed CTE resolution starts from this RTE
+					 * reference site.  Walk rte->ctelevelsup to the Query
+					 * that owns the CTE, and keep that owner frame as the CTE
+					 * query's parent stack.
 					 */
 					for (KeyJoinQueryStack *qs = context->query_stack;
 						 qs != NULL;
@@ -1730,11 +1742,12 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 				if (cte == NULL)
 				{
 					/*
-					 * Stored revalidation resolves ordinary CTE references
+					 * Stored projection resolves ordinary CTE references
 					 * through the query stack.  If that failed, only live
-					 * demand-driven projection can still resolve the CTE
-					 * from a visible WITH namespace.
+					 * demand-driven projection can still resolve the CTE from a
+					 * visible WITH namespace.
 					 */
+					Assert(!context->revalidating_stored_query);
 					Assert(context->pstate != NULL);
 					for (ParseState *ps = context->pstate;
 						 ps != NULL && cte == NULL;
@@ -1773,8 +1786,15 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 				if (cte->cterecursive)
 					break;
 
-				revalidate_stored_key_join_proofs_in_query((Query *) cte->ctequery,
-														   cte_owner_stack);
+				/*
+				 * Stored-query replay visits CTE queries from their owning
+				 * Query before any RTE_CTE fact projection reaches them.
+				 */
+				if (context->revalidating_stored_query)
+				{
+					Assert(context->pstate == NULL);
+					Assert(cte_owner_stack != NULL);
+				}
 
 				{
 					KeyJoinQueryStack qs;
@@ -2410,6 +2430,9 @@ project_key_join_query_facts(KeyJoinFactContext *context, Query *query)
 
 	Assert(context != NULL);
 	Assert(query != NULL);
+	Assert(context->query == NULL || context->query == query);
+	Assert(!context->revalidating_stored_query ||
+		   context->query_stack != NULL);
 
 	/* These shapes destroy all proof meaning. */
 	if (query->commandType != CMD_SELECT ||
@@ -4110,14 +4133,16 @@ revalidateStoredKeyJoinProofsInQuery(Query *query)
  *
  *		Stored key-join proofs may depend on CTE ownership, outer references,
  *		and facts cached on RTEs.  This routine rebuilds that context for one
- *		Query level, clears stale cached facts, recursively revalidates CTEs
+ *		Query level, clears cached facts, recursively revalidates CTEs
  *		and FROM-subqueries with the current Query as their parent frame, then
  *		revalidates key joins in the jointree.  The final expression walker
  *		handles expression subqueries and intentionally skips FROM/CTE
  *		subqueries already handled in owner-aware passes above.
  *
+ *		Demand-driven RTE projection depends on these owner-aware passes and
+ *		must not call back here for CTE or FROM-subquery bodies.
+ *
  * Called by:
- *		ensure_key_join_surface_facts_internal
  *		revalidate_stored_key_join_node_walker
  *		revalidateStoredKeyJoinProofsInQuery
  */
@@ -4133,9 +4158,15 @@ revalidate_stored_key_join_proofs_in_query(Query *query,
 	qs.parent = parent_stack;
 	qs.query = query;
 
-	/* Clear stale RTE facts before demand-driven revalidation. */
+	/*
+	 * Stored query copies should not arrive with parser scratch facts already
+	 * attached.  Keep release builds robust if a caller accidentally reuses a
+	 * partially projected tree, but assert the one-shot replay contract.
+	 */
 	foreach_node(RangeTblEntry, rte, query->rtable)
 	{
+		Assert(!rte->keyJoinFactsComputed);
+		Assert(rte->keyJoinFacts == NULL);
 		rte->keyJoinFacts = NULL;
 		rte->keyJoinFactsComputed = false;
 	}
@@ -4178,6 +4209,8 @@ revalidate_query_jointree_proofs(Query *query, Node *jtnode,
 {
 	Assert(query != NULL);
 	Assert(jtnode != NULL);
+	Assert(query_stack != NULL);
+	Assert(query_stack->query == query);
 
 	if (IsA(jtnode, FromExpr))
 	{
