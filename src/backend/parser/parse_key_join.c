@@ -1178,10 +1178,8 @@ static Node *
 remap_filter_conjunct(Node *conjunct, List *position_map)
 {
 	FKFilterRemapContext context = {.position_map = position_map};
-	Node	   *result;
 
-	result = remap_filter_param_mutator(conjunct, &context);
-	return result;
+	return remap_filter_param_mutator(conjunct, &context);
 }
 
 /*
