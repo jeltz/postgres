@@ -3060,6 +3060,7 @@ jtnode_surface_rtindex(Node *jtnode)
 {
 	Assert(jtnode != NULL);
 	Assert(IsA(jtnode, RangeTblRef) || IsA(jtnode, JoinExpr));
+
 	if (IsA(jtnode, RangeTblRef))
 		return castNode(RangeTblRef, jtnode)->rtindex;
 	return castNode(JoinExpr, jtnode)->rtindex;
@@ -3347,7 +3348,7 @@ filter_dependency_walker(Node *node, void *context_arg)
 
 	if (IsA(node, OpExpr))
 	{
-		OpExpr	   *expr = (OpExpr *) node;
+		OpExpr	   *expr = castNode(OpExpr, node);
 
 		set_opfuncid(expr);
 		*dependencies = add_op_function_deps(*dependencies, expr->opno,
@@ -3409,6 +3410,7 @@ static List *
 append_filter_dependency(List *dependencies, Oid classId, Oid objectId)
 {
 	Assert(OidIsValid(objectId));
+
 	if (dependency_member(dependencies, classId, objectId, 0))
 		return dependencies;
 	return lappend(dependencies, make_dependency(classId, objectId));
@@ -3483,6 +3485,7 @@ compute_join_output_facts(JoinExpr *j,
 			!join_null_extends_side(j->jointype, referencing_left);
 		preserve_referenced_notnull =
 			!join_null_extends_side(j->jointype, referenced_left);
+
 		Assert(key_join_node->referencingVarno == left_rtindex ||
 			   key_join_node->referencingVarno == right_rtindex);
 		Assert(key_join_node->referencedVarno == left_rtindex ||
