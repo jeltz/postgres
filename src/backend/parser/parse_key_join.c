@@ -1753,16 +1753,8 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 							}
 						}
 					}
-#ifdef USE_ASSERT_CHECKING
-					Assert(cte != NULL);
-#else
-					if (cte == NULL)
-						break;
-#endif
 					cte_owner_stack = NULL;
 				}
-
-				Assert(cte_owner_stack == NULL || cte != NULL);
 
 				/*
 				 * Only ordinary, resolved, non-recursive CTE queries have a
