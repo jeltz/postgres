@@ -2075,8 +2075,7 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 	 */
 	fkeylist = copyObject(RelationGetFKeyList(rel));
 
-	if (fkeylist != NIL)
-		INJECTION_POINT("key-join-after-fkey-list-copy", NULL);
+	INJECTION_POINT("key-join-after-fkey-list-copy", NULL);
 
 	foreach_node(ForeignKeyCacheInfo, fk, fkeylist)
 	{
