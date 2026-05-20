@@ -1178,11 +1178,9 @@ make_filter_position_map(List *src_base_attnums, List *src_selected_base,
 static Node *
 remap_filter_conjunct(Node *conjunct, List *position_map)
 {
-	FKFilterRemapContext context;
+	FKFilterRemapContext context = {.position_map = position_map};
 	Node	   *result;
 
-	memset(&context, 0, sizeof(context));
-	context.position_map = position_map;
 	result = remap_filter_param_mutator(conjunct, &context);
 	return result;
 }
@@ -1200,10 +1198,8 @@ remap_filter_conjunct(Node *conjunct, List *position_map)
 static bool
 filter_conjunct_can_remap(Node *conjunct, List *position_map)
 {
-	FKFilterRemapContext context;
+	FKFilterRemapContext context = {.position_map = position_map};
 
-	memset(&context, 0, sizeof(context));
-	context.position_map = position_map;
 	return !filter_conjunct_unremappable_param_walker(conjunct, &context);
 }
 
@@ -1564,9 +1560,8 @@ make_dependency(Oid classId, Oid objectId)
 static void
 ensure_key_join_surface_facts(ParseState *pstate, RangeTblEntry *rte)
 {
-	KeyJoinFactContext context;
+	KeyJoinFactContext context = {0};
 
-	memset(&context, 0, sizeof(context));
 	context.pstate = pstate;
 	ensure_key_join_surface_facts_internal(&context, rte);
 }
@@ -4248,7 +4243,7 @@ revalidate_query_jointree_proofs(Query *query, Node *jtnode,
 			Node	   *key_quals = NULL;
 			int			nkeys;
 			KeyJoinMatch match;
-			KeyJoinFactContext context;
+			KeyJoinFactContext context = {0};
 
 			key_join = castNode(KeyJoinNode, j->keyJoin);
 			referencing_left = (key_join->referencingVarno == left_rtindex);
@@ -4263,7 +4258,6 @@ revalidate_query_jointree_proofs(Query *query, Node *jtnode,
 				   key_join->referencedVarno == right_rtindex);
 			Assert(key_join->referencingVarno != key_join->referencedVarno);
 
-			memset(&context, 0, sizeof(context));
 			context.query = query;
 			context.query_stack = query_stack;
 			context.revalidating_stored_query = true;
