@@ -4165,15 +4165,15 @@ revalidate_stored_key_join_proofs_in_query(Query *query,
 	{
 		Assert(!rte->keyJoinFactsComputed);
 		Assert(rte->keyJoinFacts == NULL);
+
 		rte->keyJoinFacts = NULL;
 		rte->keyJoinFactsComputed = false;
 	}
 
 	foreach_node(CommonTableExpr, cte, query->cteList)
 	{
-		if (IsA(cte->ctequery, Query))
-			revalidate_stored_key_join_proofs_in_query((Query *) cte->ctequery,
-													   &qs);
+		revalidate_stored_key_join_proofs_in_query(castNode(Query, cte->ctequery),
+												   &qs);
 	}
 
 	foreach_node(RangeTblEntry, rte, query->rtable)
