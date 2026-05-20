@@ -672,7 +672,6 @@ find_key_join_match(RangeTblEntry *referencing_rte,
 	Assert(match != NULL);
 	Assert(referencing_rte != NULL);
 	Assert(referenced_rte != NULL);
-	memset(match, 0, sizeof(*match));
 
 	if (referenced_rte->tablesample != NULL)
 		return false;
