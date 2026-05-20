@@ -6358,6 +6358,54 @@ NOTICE:  drop cascades to 2 other objects
 DETAIL:  drop cascades to table key_join_priv.parent
 drop cascades to table key_join_priv.child
 DROP ROLE key_join_priv_user;
+-- Key-join proof metadata must not affect query identifiers.  The same
+-- executable query should keep its queryId if an equivalent FK proof is
+-- dropped and recreated with new catalog OIDs.
+CREATE FUNCTION pg_temp.key_join_query_id(query_text text) RETURNS bigint
+LANGUAGE plpgsql AS $$
+DECLARE
+    line text;
+BEGIN
+    FOR line IN EXECUTE 'EXPLAIN (VERBOSE, FORMAT TEXT) ' || query_text
+    LOOP
+        IF line ~ 'Query Identifier:' THEN
+            RETURN regexp_replace(line, '.*Query Identifier:\s*(-?\d+).*', '\1')::bigint;
+        END IF;
+    END LOOP;
+    RAISE EXCEPTION 'Query Identifier not found in EXPLAIN output';
+END;
+$$;
+SET compute_query_id = on;
+CREATE TABLE key_join_queryid_parent
+(
+    id int PRIMARY KEY
+);
+CREATE TABLE key_join_queryid_child
+(
+    id int PRIMARY KEY,
+    parent_id int NOT NULL REFERENCES key_join_queryid_parent (id)
+);
+SELECT pg_temp.key_join_query_id($$
+SELECT *
+FROM key_join_queryid_parent p
+JOIN key_join_queryid_child c FOR KEY (parent_id) -> p (id);
+$$) AS qid \gset
+ALTER TABLE key_join_queryid_child DROP CONSTRAINT key_join_queryid_child_parent_id_fkey;
+ALTER TABLE key_join_queryid_child
+    ADD CONSTRAINT key_join_queryid_child_parent_id_fkey
+    FOREIGN KEY (parent_id) REFERENCES key_join_queryid_parent (id);
+SELECT pg_temp.key_join_query_id($$
+SELECT *
+FROM key_join_queryid_parent p
+JOIN key_join_queryid_child c FOR KEY (parent_id) -> p (id);
+$$) = :'qid'::bigint AS same_query_id_after_fk_recreate;
+ same_query_id_after_fk_recreate 
+---------------------------------
+ t
+(1 row)
+
+RESET compute_query_id;
+DROP TABLE key_join_queryid_child, key_join_queryid_parent;
 -- Final cleanup: drop all remaining objects
 DROP VIEW v1, v2;
 DROP TABLE shipments, orders, order_items, packages CASCADE;
