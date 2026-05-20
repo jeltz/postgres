@@ -186,8 +186,7 @@ static void compute_join_output_facts(JoinExpr *j, Index left_rtindex,
 									  RangeTblEntry *left_rte,
 									  Index right_rtindex,
 									  RangeTblEntry *right_rte,
-									  RangeTblEntry *joinrte,
-									  KeyJoinFactContext *context);
+									  RangeTblEntry *joinrte);
 static List *collect_key_join_nodes(Node *node);
 static bool revalidate_stored_key_join_node_walker(Node *node, void *context);
 static void revalidate_stored_key_join_proofs_in_query(Query *query,
@@ -1868,7 +1867,7 @@ ensure_key_join_surface_facts_internal(KeyJoinFactContext *context,
 
 				compute_join_output_facts(j, left_rtindex, left_rte,
 										  right_rtindex, right_rte,
-										  rte, context);
+										  rte);
 				break;
 			}
 		default:
@@ -3426,14 +3425,12 @@ static void
 compute_join_output_facts(JoinExpr *j,
 						  Index left_rtindex, RangeTblEntry *left_rte,
 						  Index right_rtindex, RangeTblEntry *right_rte,
-						  RangeTblEntry *joinrte,
-						  KeyJoinFactContext *context)
+						  RangeTblEntry *joinrte)
 {
 	KeyJoinSurfaceFacts *result;
 	List	  **lmap;
 	List	  **rmap;
 
-	Assert(context != NULL);
 	Assert(left_rte != NULL);
 	Assert(right_rte != NULL);
 	Assert(joinrte->rtekind == RTE_JOIN);
