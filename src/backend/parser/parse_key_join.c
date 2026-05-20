@@ -4461,7 +4461,6 @@ key_join_equality_operator_is_usable(Oid opno, Oid typeOid, List **dependencies)
 	Oid			lefttype;
 	Oid			righttype;
 	Oid			rettype;
-	bool		signature_ok;
 
 	if (!OidIsValid(opno))
 		return false;
@@ -4469,10 +4468,7 @@ key_join_equality_operator_is_usable(Oid opno, Oid typeOid, List **dependencies)
 	op_input_types(opno, &lefttype, &righttype);
 	rettype = get_op_rettype(opno);
 
-	signature_ok = (lefttype == typeOid);
-	signature_ok &= (righttype == typeOid);
-	signature_ok &= (rettype == BOOLOID);
-	if (!signature_ok)
+	if (lefttype != typeOid || righttype != typeOid || rettype != BOOLOID)
 		return false;
 
 	funcid = get_opcode(opno);
