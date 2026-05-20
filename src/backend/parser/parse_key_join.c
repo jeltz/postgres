@@ -3063,7 +3063,8 @@ jtnode_surface_rtindex(Node *jtnode)
 
 	if (IsA(jtnode, RangeTblRef))
 		return castNode(RangeTblRef, jtnode)->rtindex;
-	return castNode(JoinExpr, jtnode)->rtindex;
+	else
+		return castNode(JoinExpr, jtnode)->rtindex;
 }
 
 /*
