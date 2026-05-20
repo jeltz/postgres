@@ -4152,7 +4152,6 @@ revalidate_stored_key_join_proofs_in_query(Query *query,
 	KeyJoinQueryStack qs;
 
 	Assert(query != NULL);
-	Assert(IsA(query, Query));
 
 	qs.parent = parent_stack;
 	qs.query = query;
