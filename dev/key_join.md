@@ -736,13 +736,32 @@ production runtime branch would only duplicate unreachable control flow.
 
 ### Future Work
 
-A future version could mark stored key-join objects whose proof
-dependencies became stale during validation-only replay.  A single
-maintenance process, similar in spirit to catalog bit cleanup performed
-outside foreground DDL, could later refresh marked objects and clear
-their stale dependency edges.  That would improve user friendliness
-without making unrelated foreground DDL rewrite other users' objects or
-introduce lock-order risk between concurrent DDL commands.
+A future version could replace validation-only replay with metadata-only
+dependency replacement during the DDL command that changed a proof
+source.  Revalidation would replay dependent stored key-join objects
+against current catalogs and classify the result as unchanged,
+metadata-only, or unsafe.  Unchanged replay would need no catalog update.
+Metadata-only replay would write the replayed tree back to the owning
+catalog row and rebuild outgoing `pg_depend` edges.  Unsafe replay would
+still reject the DDL.
+
+Only `KeyJoinNode.constraint`, `KeyJoinNode.notNullConstraints`, and
+`KeyJoinNode.proofDependencies` should be refreshable metadata.  The
+classifier would compare executable trees after normalizing those fields
+on a temporary copy, leaving the replayed tree intact for persistence.
+Proof-source replacement, such as a producer view switching from one
+equivalently constrained table to another, would be accepted only when
+executable quals, equality operators, filters, target lists, and
+non-proof tree structure remain unchanged.
+
+The refresh should cover the same stored-object containers that already
+participate in key-join replay: rewrite rules for views and materialized
+views, user-defined rule actions and qualifications, RLS policy `USING`
+and `WITH CHECK` expressions, and new-style SQL function bodies.
+Old-style quoted SQL functions would remain excluded.  After refreshing
+one object, revalidation should make that catalog change visible before
+recursing to downstream objects, so descendants see the refreshed proof
+metadata and dependencies.
 
 ### Alternative Designs Considered
 
