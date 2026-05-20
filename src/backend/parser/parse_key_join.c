@@ -1923,16 +1923,16 @@ compute_key_join_relation_facts(KeyJoinFactContext *context,
 			continue;
 		con = (Form_pg_constraint) GETSTRUCT(contup);
 
-		/*
-		 * NO INHERIT NOT NULL constraints on a partitioned parent do not
-		 * cover child partition rows, so they are not proof facts for an
-		 * inherited partitioned-table scan.
-		 */
 		Assert(con->conenforced);
 		if (con->convalidated)
 		{
 			bool		covers_rows = true;
 
+			/*
+			 * NO INHERIT NOT NULL constraints on a partitioned parent do not
+			 * cover child partition rows, so they are not proof facts for an
+			 * inherited partitioned-table scan.
+			 */
 			if (con->connoinherit)
 			{
 				if (rte->relkind == RELKIND_PARTITIONED_TABLE)
