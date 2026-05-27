@@ -210,7 +210,7 @@ revalidate_dependent_key_join_relation(Oid relationOid)
 		{
 			Node	   *action = (Node *) lfirst(lc);
 
-			if (IsA(action, Query))
+			if (IsA(action, Query)) // XXX: Can it be anything except a query?
 				revalidate_stored_key_join_node(action);
 		}
 
