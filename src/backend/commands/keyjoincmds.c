@@ -146,6 +146,9 @@ revalidate_dependent_key_join_objects_recurse(Oid refclassid, Oid refobjid,
 	List	   *path = list_copy(ancestors);
 	ListCell   *lc;
 
+	/* since this function recurses, it could be driven to stack overflow */
+	check_stack_depth();
+
 	// XXX: Can there still be cycles?
 	Assert(!object_address_list_member(ancestors, refclassid, refobjid));
 	path = lappend(path, make_object_address(refclassid, refobjid));
