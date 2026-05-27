@@ -222,7 +222,7 @@ revalidate_dependent_key_join_relation(Oid relationOid)
 		revalidate_stored_key_join_node(rule->qual);
 	}
 
-	relation_close(rel, AccessShareLock);
+	relation_close(rel, NoLock);
 }
 
 static void
