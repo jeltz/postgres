@@ -31,7 +31,6 @@
 #include "nodes/nodeFuncs.h"
 #include "nodes/parsenodes.h"
 #include "parser/parse_key_join.h"
-#include "storage/lmgr.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/rel.h"
@@ -49,7 +48,6 @@ static void revalidate_dependent_key_join_relation(Oid relationOid);
 static void revalidate_dependent_key_join_function(Oid procOid);
 static void revalidate_dependent_key_join_policy(Oid policy_id);
 static void revalidate_stored_key_join_node(Node *stored);
-static Oid	get_policy_relid(Oid policy_id);
 static Node *policy_string_to_node(HeapTuple policy_tuple,
 								   TupleDesc policy_desc, AttrNumber attnum);
 
@@ -259,16 +257,12 @@ static void
 revalidate_dependent_key_join_policy(Oid policy_id)
 {
 	Relation	pg_policy_rel;
-	Oid			table_id;
 	ScanKeyData skey[1];
 	SysScanDesc sscan;
 	HeapTuple	policy_tuple;
 	TupleDesc	policy_desc;
 	Node	   *qual;
 	Node	   *with_check_qual;
-
-	table_id = get_policy_relid(policy_id);
-	LockRelationOid(table_id, AccessExclusiveLock);
 
 	pg_policy_rel = table_open(PolicyRelationId, AccessShareLock);
 
@@ -375,41 +369,6 @@ make_object_address(Oid classId, Oid objectId)
 
 	ObjectAddressSet(*object, classId, objectId);
 	return object;
-}
-
-static Oid
-get_policy_relid(Oid policy_id)
-{
-	Relation	pg_policy_rel;
-	ScanKeyData skey[1];
-	SysScanDesc sscan;
-	HeapTuple	policy_tuple;
-	Oid			table_id;
-
-	pg_policy_rel = table_open(PolicyRelationId, AccessShareLock);
-
-	ScanKeyInit(&skey[0],
-				Anum_pg_policy_oid,
-				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(policy_id));
-
-	sscan = systable_beginscan(pg_policy_rel, PolicyOidIndexId, true, NULL,
-							   1, skey);
-	policy_tuple = systable_getnext(sscan);
-
-#ifdef USE_ASSERT_CHECKING
-	Assert(HeapTupleIsValid(policy_tuple));
-#else
-	if (!HeapTupleIsValid(policy_tuple))
-		elog(ERROR, "cache lookup failed for policy %u", policy_id);
-#endif
-
-	table_id = ((Form_pg_policy) GETSTRUCT(policy_tuple))->polrelid;
-
-	systable_endscan(sscan);
-	table_close(pg_policy_rel, AccessShareLock);
-
-	return table_id;
 }
 
 static Node *

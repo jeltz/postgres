@@ -119,6 +119,7 @@ test: plpgsql-toast
 test: cluster-conflict
 test: cluster-conflict-partition
 test: key-join-function-race
+test: key-join-policy-function-deadlock
 test: key-join-lazy-facts-lock
 test: cluster-toast-value-reuse
 test: truncate-conflict
