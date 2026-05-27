@@ -4232,10 +4232,8 @@ revalidateStoredKeyJoinProofsInNode(Node *node)
 /*
  * revalidate_stored_key_join_node_walker
  *
- *		Walk an expression tree and revalidate any nested Query nodes with the
- *		supplied owning-query stack, if any.  A top-level Query is handled by
- *		revalidateStoredKeyJoinProofsInQuery(), which performs query-specific
- *		fact rebuilding and recurses into its own subqueries.
+ *		Walk a stored query or expression tree and revalidate any Query nodes
+ *		with the supplied owning-query stack, if any.
  */
 static bool
 revalidate_stored_key_join_node_walker(Node *node, void *context)
@@ -4252,17 +4250,6 @@ revalidate_stored_key_join_node_walker(Node *node, void *context)
 
 	return expression_tree_walker(node, revalidate_stored_key_join_node_walker,
 								  context);
-}
-
-/*
- * revalidateStoredKeyJoinProofsInQuery
- *
- *		Revalidate and rebuild key-join proofs in a copied stored query tree.
- */
-void
-revalidateStoredKeyJoinProofsInQuery(Query *query)
-{
-	revalidate_stored_key_join_proofs_in_query(query, NULL);
 }
 
 /*

@@ -48,7 +48,7 @@ static ObjectAddress *make_object_address(Oid classId, Oid objectId);
 static void revalidate_dependent_key_join_relation(Oid relationOid);
 static void revalidate_dependent_key_join_function(Oid procOid);
 static void revalidate_dependent_key_join_policy(Oid policy_id);
-static void revalidate_stored_key_join_node(Node *stored, bool stored_is_query);
+static void revalidate_stored_key_join_node(Node *stored);
 static Oid	get_policy_relid(Oid policy_id);
 static Node *policy_string_to_node(HeapTuple policy_tuple,
 								   TupleDesc policy_desc, AttrNumber attnum);
@@ -217,10 +217,10 @@ revalidate_dependent_key_join_relation(Oid relationOid)
 			Node	   *action = (Node *) lfirst(lc);
 
 			if (IsA(action, Query))
-				revalidate_stored_key_join_node(action, true);
+				revalidate_stored_key_join_node(action);
 		}
 
-		revalidate_stored_key_join_node(rule->qual, false);
+		revalidate_stored_key_join_node(rule->qual);
 	}
 
 	relation_close(rel, AccessShareLock);
@@ -252,7 +252,7 @@ revalidate_dependent_key_join_function(Oid procOid)
 	body = stringToNode(TextDatumGetCString(datum));
 	ReleaseSysCache(tup);
 
-	revalidate_stored_key_join_node(body, false);
+	revalidate_stored_key_join_node(body);
 }
 
 static void
@@ -294,15 +294,15 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 	with_check_qual = policy_string_to_node(policy_tuple, policy_desc,
 											Anum_pg_policy_polwithcheck);
 
-	revalidate_stored_key_join_node(qual, false);
-	revalidate_stored_key_join_node(with_check_qual, false);
+	revalidate_stored_key_join_node(qual);
+	revalidate_stored_key_join_node(with_check_qual);
 
 	systable_endscan(sscan);
 	table_close(pg_policy_rel, AccessShareLock);
 }
 
 static void
-revalidate_stored_key_join_node(Node *stored, bool stored_is_query)
+revalidate_stored_key_join_node(Node *stored)
 {
 	Node	   *copy;
 
@@ -310,10 +310,7 @@ revalidate_stored_key_join_node(Node *stored, bool stored_is_query)
 		return;
 
 	copy = copyObject(stored);
-	if (stored_is_query)
-		revalidateStoredKeyJoinProofsInQuery(castNode(Query, copy));
-	else
-		revalidateStoredKeyJoinProofsInNode(copy);
+	revalidateStoredKeyJoinProofsInNode(copy);
 
 	if (!revalidatedStoredKeyJoinProofsAreSafe(stored, copy))
 		ereport(ERROR,

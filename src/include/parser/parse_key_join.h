@@ -21,7 +21,6 @@ extern void transformAndValidateKeyJoin(ParseState *pstate, JoinExpr *j,
 										List *l_namespace);
 extern bool storedNodeContainsKeyJoin(Node *node);
 extern void revalidateStoredKeyJoinProofsInNode(Node *node);
-extern void revalidateStoredKeyJoinProofsInQuery(Query *query);
 extern bool revalidatedStoredKeyJoinProofsAreSafe(Node *stored,
 												  Node *revalidated);
 
