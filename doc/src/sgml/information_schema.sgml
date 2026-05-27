@@ -9369,10 +9369,14 @@ ORDER BY c.ordinal_position;
   <para>
    The view <literal>view_constraint_usage</literal> identifies all
    table constraints that are used by the query expression of a view
-   (the <command>SELECT</command> statement that defines the view).
-   This view reports table-constraint dependencies consumed by stored
-   key-join proofs.  A constraint is only included if the table that
-   contains the constraint is owned by a currently enabled role.
+   (the <command>SELECT</command> statement that defines the view).  For
+   views that contain <literal>FOR KEY</literal> joins, this includes
+   table-constraint proof sources such as referential constraints and the
+   primary-key or unique constraints that prove referenced-side uniqueness.
+   These rows identify the table-constraint dependencies whose removal or
+   alteration would invalidate the stored view definition.  A constraint is
+   only included if the table that contains the constraint is owned by a
+   currently enabled role.
   </para>
 
   <table>

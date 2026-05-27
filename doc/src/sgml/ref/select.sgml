@@ -749,10 +749,12 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
       <listitem>
        <para>
         A <literal>FOR KEY</literal> clause requests an equality join that can
-        be proven to follow a usable foreign-key relationship.  The equality
-        comparisons for the join are generated automatically.  If the key
-        relationship cannot be proven during parse analysis, the query is
-        rejected.
+        be proven to follow a usable foreign-key relationship.  It declares a
+        foreign-key traversal from the referencing side to the referenced side,
+        enriching referencing rows with their uniquely matching referenced
+        rows.  The equality comparisons for the join are generated
+        automatically.  If the key relationship cannot be proven during parse
+        analysis, the query is rejected.
        </para>
 
        <para>
@@ -771,16 +773,47 @@ TABLE [ ONLY ] <replaceable class="parameter">table_name</replaceable> [ * ]
        </para>
 
        <para>
-        The referenced columns must be unique and must still represent the
-        referenced rows needed by the foreign key.  The referencing columns
-        must be backed by a matching usable foreign-key constraint, and must
-        be known non-null unless the join type preserves the referencing
-        side.  Base-table proof uses enforced, validated, nondeferrable
-        foreign-key constraints and usable unique keys whose key identities
-        match.  Derived tables, views, common table expressions, and previous
-        key joins can participate when these facts remain visible through
-        their query definitions.  <literal>FOR KEY</literal> does not suppress
-        duplicate output columns; its output column behavior is like
+        PostgreSQL checks the proof at the join point, using facts visible
+        from the two <replaceable class="parameter">from_item</replaceable>
+        inputs.  A valid <literal>FOR KEY</literal> join must satisfy these
+        requirements:
+       </para>
+
+       <itemizedlist>
+        <listitem>
+         <para>
+          The referenced columns must be unique in the referenced input.  This
+          prevents one referencing row from matching more than one referenced
+          row.
+         </para>
+        </listitem>
+
+        <listitem>
+         <para>
+          Every all-non-null referencing key value present in the referencing
+          operand at this join point must have a matching referenced value in
+          the referenced operand.  This requires a matching usable foreign-key
+          constraint and, for derived referenced inputs, enough row coverage to
+          show that needed referenced rows have not been filtered away.
+         </para>
+        </listitem>
+
+        <listitem>
+         <para>
+          The referencing columns must be known non-null, or the join type must
+          preserve the referencing side.  Otherwise an inner join could
+          silently drop referencing rows whose key contains nulls.
+         </para>
+        </listitem>
+       </itemizedlist>
+
+       <para>
+        Base-table proof uses enforced, validated, nondeferrable foreign-key
+        constraints and usable unique keys whose key identities match.  Derived
+        tables, views, common table expressions, and previous key joins can
+        participate when these facts remain visible through their query
+        definitions.  <literal>FOR KEY</literal> does not suppress duplicate
+        output columns; its output column behavior is like
         <literal>JOIN ON</literal>.
        </para>
       </listitem>
