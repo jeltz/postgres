@@ -148,6 +148,7 @@ revalidate_dependent_key_join_objects_recurse(Oid refclassid, Oid refobjid,
 	List	   *path = list_copy(ancestors);
 	ListCell   *lc;
 
+	// XXX: Can there still be cycles?
 	Assert(!object_address_list_member(ancestors, refclassid, refobjid));
 	path = lappend(path, make_object_address(refclassid, refobjid));
 
@@ -170,16 +171,10 @@ revalidate_dependent_key_join_objects_recurse(Oid refclassid, Oid refobjid,
 				break;
 			case ProcedureRelationId:
 				revalidate_dependent_key_join_function(depobj->objectId);
-				revalidate_dependent_key_join_objects_recurse(ProcedureRelationId,
-															  depobj->objectId,
-															  path);
 				break;
 			default:
 				Assert(depobj->classId == PolicyRelationId);
 				revalidate_dependent_key_join_policy(depobj->objectId);
-				revalidate_dependent_key_join_objects_recurse(PolicyRelationId,
-															  depobj->objectId,
-															  path);
 				break;
 		}
 	}
