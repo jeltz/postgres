@@ -48,8 +48,6 @@ static void revalidate_dependent_key_join_relation(Oid relationOid);
 static void revalidate_dependent_key_join_function(Oid procOid);
 static void revalidate_dependent_key_join_policy(Oid policy_id);
 static void revalidate_stored_key_join_node(Node *stored);
-static Node *policy_string_to_node(HeapTuple policy_tuple,
-								   TupleDesc policy_desc, AttrNumber attnum);
 
 static Oid
 get_rule_event_relation(Oid ruleOid)
@@ -214,7 +212,8 @@ revalidate_dependent_key_join_relation(Oid relationOid)
 				revalidate_stored_key_join_node(action);
 		}
 
-		revalidate_stored_key_join_node(rule->qual);
+		if (rule->qual != NULL)
+			revalidate_stored_key_join_node(rule->qual);
 	}
 
 	relation_close(rel, NoLock);
@@ -257,8 +256,8 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 	SysScanDesc sscan;
 	HeapTuple	policy_tuple;
 	TupleDesc	policy_desc;
-	Node	   *qual;
-	Node	   *with_check_qual;
+	Datum		qual_datum;
+	bool		qual_isnull;
 
 	pg_policy_rel = table_open(PolicyRelationId, AccessShareLock);
 
@@ -279,13 +278,16 @@ revalidate_dependent_key_join_policy(Oid policy_id)
 #endif
 
 	policy_desc = RelationGetDescr(pg_policy_rel);
-	qual = policy_string_to_node(policy_tuple, policy_desc,
-								 Anum_pg_policy_polqual);
-	with_check_qual = policy_string_to_node(policy_tuple, policy_desc,
-											Anum_pg_policy_polwithcheck);
 
-	revalidate_stored_key_join_node(qual);
-	revalidate_stored_key_join_node(with_check_qual);
+	qual_datum = heap_getattr(policy_tuple, Anum_pg_policy_polqual,
+							  policy_desc, &qual_isnull);
+	if (!qual_isnull)
+		revalidate_stored_key_join_node(stringToNode(TextDatumGetCString(qual_datum)));
+
+	qual_datum = heap_getattr(policy_tuple, Anum_pg_policy_polwithcheck,
+							  policy_desc, &qual_isnull);
+	if (!qual_isnull)
+		revalidate_stored_key_join_node(stringToNode(TextDatumGetCString(qual_datum)));
 
 	systable_endscan(sscan);
 	table_close(pg_policy_rel, AccessShareLock);
@@ -296,7 +298,9 @@ revalidate_stored_key_join_node(Node *stored)
 {
 	Node	   *copy;
 
-	if (stored == NULL || !storedNodeContainsKeyJoin(stored))
+	Assert(stored != NULL);
+
+	if (!storedNodeContainsKeyJoin(stored))
 		return;
 
 	copy = copyObject(stored);
@@ -364,19 +368,4 @@ make_object_address(Oid classId, Oid objectId)
 
 	ObjectAddressSet(*object, classId, objectId);
 	return object;
-}
-
-static Node *
-policy_string_to_node(HeapTuple policy_tuple, TupleDesc policy_desc,
-					  AttrNumber attnum)
-{
-	Datum		expr_datum;
-	bool		expr_isnull;
-
-	expr_datum = heap_getattr(policy_tuple, attnum, policy_desc,
-							  &expr_isnull);
-	if (expr_isnull)
-		return NULL;
-
-	return stringToNode(TextDatumGetCString(expr_datum));
 }
