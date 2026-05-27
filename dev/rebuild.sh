@@ -11,6 +11,7 @@ COVERAGE_BUILD=/Users/joel/build-postgresql-coverage
 COVERAGE_INSTALL=/Users/joel/install-postgresql-coverage
 DATA=/Users/joel/pg-data
 OPENLDAP_PKGCONFIG=/opt/homebrew/opt/openldap/lib/pkgconfig
+HOMEBREW_XML_CATALOGS=(/opt/homebrew/etc/xml/catalog /usr/local/etc/xml/catalog)
 ICU_PREFIX=$(brew --prefix icu4c 2>/dev/null || true)
 
 PKG_CONFIG_PATHS=()
@@ -18,6 +19,15 @@ PKG_CONFIG_PATHS=()
 [[ -n "$ICU_PREFIX" && -d "$ICU_PREFIX/lib/pkgconfig" ]] && PKG_CONFIG_PATHS+=("$ICU_PREFIX/lib/pkgconfig")
 [[ -n "$PKG_CONFIG_PATH" ]] && PKG_CONFIG_PATHS+=("$PKG_CONFIG_PATH")
 export PKG_CONFIG_PATH=$(IFS=:; echo "${PKG_CONFIG_PATHS[*]}")
+
+XML_CATALOG_FILE_PATHS=()
+[[ -n "$XML_CATALOG_FILES" ]] && XML_CATALOG_FILE_PATHS+=("$XML_CATALOG_FILES")
+for xml_catalog in "${HOMEBREW_XML_CATALOGS[@]}"; do
+    [[ -f "$xml_catalog" ]] && XML_CATALOG_FILE_PATHS+=("$xml_catalog")
+done
+if (( ${#XML_CATALOG_FILE_PATHS[@]} )); then
+    export XML_CATALOG_FILES=$(IFS=" "; echo "${XML_CATALOG_FILE_PATHS[*]}")
+fi
 
 CMD=${1:-}
 
@@ -29,13 +39,37 @@ usage() {
     echo "  reinit    Also reinitialize the data directory"
     echo "  reconfig  Also reconfigure the build (implies reinit)"
     echo "  test      Also run tests"
+    echo "  html      Build documentation in multi-page HTML format"
     echo "  coverage-html  Build with normal coverage and generate HTML report"
     exit 1
 }
 
-if [[ "$CMD" != "" && "$CMD" != "reinit" && "$CMD" != "reconfig" && "$CMD" != "test" && "$CMD" != "coverage-html" ]]; then
+if [[ "$CMD" != "" && "$CMD" != "reinit" && "$CMD" != "reconfig" && "$CMD" != "test" && "$CMD" != "html" && "$CMD" != "coverage-html" ]]; then
     usage
 fi
+
+run_docs_html() {
+    local docs_index=$BUILD/doc/src/sgml/html/index.html
+
+    if [[ ! -f "$BUILD/build.ninja" ]]; then
+        echo "Configuring build with meson..."
+        meson setup "$BUILD" "$SRC" \
+            --prefix="$INSTALL" \
+            --buildtype=debug \
+            -Dcassert=true \
+            -Dicu=enabled \
+            -Dinjection_points=true \
+            -Ddocs=enabled
+    else
+        echo "Ensuring docs build options..."
+        meson configure "$BUILD" -Ddocs=enabled
+    fi
+
+    echo "Building HTML documentation..."
+    ninja -C "$BUILD" html
+
+    echo "HTML documentation: $docs_index"
+}
 
 run_coverage_html() {
     local python_user_base
@@ -101,6 +135,11 @@ run_coverage_html() {
     echo "Coverage report: $coverage_report"
     echo "Test output: $COVERAGE_BUILD/coverage-test-output.log"
 }
+
+if [[ "$CMD" == "html" ]]; then
+    run_docs_html
+    exit 0
+fi
 
 if [[ "$CMD" == "coverage-html" ]]; then
     run_coverage_html
