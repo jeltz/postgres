@@ -106,13 +106,13 @@ find_dependent_key_join_objects(Oid refclassid, Oid refobjid)
 	while (HeapTupleIsValid((tup = systable_getnext(scan))))
 	{
 		Form_pg_depend dep = (Form_pg_depend) GETSTRUCT(tup);
-		Oid			classid = InvalidOid;
-		Oid			objectid = InvalidOid;
+		Oid			classid;
+		Oid			objectid;
 
 		if (dep->classid == RewriteRelationId)
 		{
-			objectid = get_rule_event_relation(dep->objid);
 			classid = RelationRelationId;
+			objectid = get_rule_event_relation(dep->objid);
 		}
 		else if (dep->classid == ProcedureRelationId)
 		{
@@ -129,6 +129,7 @@ find_dependent_key_join_objects(Oid refclassid, Oid refobjid)
 
 		if (classid == refclassid && objectid == refobjid)
 			continue;
+
 		if (!object_address_list_member(result, classid, objectid))
 			result = lappend(result, make_object_address(classid, objectid));
 	}
@@ -355,8 +356,7 @@ object_address_list_member(List *objects, Oid classId, Oid objectId)
 	{
 		Assert(object->objectSubId == 0);
 
-		if (object->classId == classId &&
-			object->objectId == objectId)
+		if (object->classId == classId && object->objectId == objectId)
 			return true;
 	}
 	return false;
@@ -365,7 +365,7 @@ object_address_list_member(List *objects, Oid classId, Oid objectId)
 static ObjectAddress *
 make_object_address(Oid classId, Oid objectId)
 {
-	ObjectAddress *object = palloc(sizeof(ObjectAddress));
+	ObjectAddress *object = palloc_object(ObjectAddress);
 
 	ObjectAddressSet(*object, classId, objectId);
 	return object;
