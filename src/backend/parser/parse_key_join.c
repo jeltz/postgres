@@ -187,7 +187,6 @@ typedef struct KeyJoinRowCollapse
 	List	   *positions;			/* of KeyJoinKeyPosition */
 } KeyJoinRowCollapse;
 
-/* local function prototypes */
 static bool find_key_join_match(RangeTblEntry *referencing_rte,
 								RangeTblEntry *referenced_rte,
 								List *referencing_attnums,
@@ -249,7 +248,6 @@ static void add_inactive_projected(KeyJoinSurfaceFacts *dst, KeyJoinFact *old,
 								   List **attrmap,
 								   KeyJoinInactiveReason reason);
 
-/* local leaf functions */
 static KeyJoinColumn *resolve_columns_on_nsitem(ParseState *pstate,
 												ParseNamespaceItem *lookup,
 												ParseNamespaceItem *surface,
@@ -1229,13 +1227,6 @@ rowcollapse_preserves_rowcoverage(List *rowcoverage_key_positions,
 	return true;
 }
 
-/*
- * key_position_index_for_attnum
- *
- *		Return the key-position index containing an attnum.
- *
- *		Returns -1 if no position contains it or it is a duplicate.
- */
 static int
 key_position_index_for_attnum(List *keyPositions, int attno)
 {
@@ -1295,11 +1286,6 @@ key_position_identity_equal(KeyJoinKeyPosition *left, KeyJoinKeyPosition *right)
 	return left->eqOperator == right->eqOperator;
 }
 
-/*
- * int_lists_same_members
- *
- *		Return true if two integer lists contain the same members.
- */
 static bool
 int_lists_same_members(List *a, List *b)
 {
@@ -1743,11 +1729,6 @@ key_join_nested_query_walker(Node *node, void *context)
 	return expression_tree_walker(node, key_join_nested_query_walker, context);
 }
 
-/*
- * list_contains_equal_node
- *
- *		Return true if a list already contains an equal expression node.
- */
 static bool
 list_contains_equal_node(List *list, Node *node)
 {
@@ -1775,11 +1756,6 @@ append_dependencies_unique(List *dst, List *src)
 	return dst;
 }
 
-/*
- * dependency_member
- *
- *		Return true if a dependency list contains the given object.
- */
 static bool
 dependency_member(List *deps, Oid classId, Oid objectId)
 {
@@ -2763,7 +2739,10 @@ project_key_join_query_facts(KeyJoinFactContext *context, Query *query)
 	Assert(!context->revalidating_stored_query ||
 		   context->query_stack != NULL);
 
-	/* These shapes destroy all proof meaning. */
+	/*
+	 * Non-SELECT query trees, set operations, SRFs, and grouping sets do not
+	 * expose a simple targetlist projection surface for facts to pass through.
+	 */
 	if (query->commandType != CMD_SELECT ||
 		query->setOperations != NULL ||
 		query->hasTargetSRFs ||
@@ -3502,10 +3481,6 @@ join_output_attno_for_input(RangeTblEntry *joinrte, bool leftside, int input_col
 	if (leftside)
 		return input_colno;
 
-	/*
-	 * compute_join_output_facts() handles accepted key joins and plain inner
-	 * cross joins only.  Neither form can merge JOIN USING columns.
-	 */
 	Assert(joinrte->joinmergedcols == 0);
 	return list_length(joinrte->joinleftcols) +
 		input_colno;
@@ -4554,11 +4529,6 @@ extract_key_join_qual_arg(Node *qual, List **referenced_args,
 	*locations = lappend_int(*locations, op->location);
 }
 
-/*
- * add_fact
- *
- *		Append a fresh surface fact of the given kind to a fact set.
- */
 static KeyJoinFact *
 add_fact(KeyJoinSurfaceFacts *set, KeyJoinFactKind kind)
 {
@@ -4775,11 +4745,6 @@ make_key_position(List *attnums, Oid typeOid, int32 typmod,
 	return pos;
 }
 
-/*
- * list_make_attrnums
- *
- *		Build an integer list from an AttrNumber array.
- */
 static List *
 list_make_attrnums(const AttrNumber *attnums, int nattnums)
 {
