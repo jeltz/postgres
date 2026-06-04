@@ -142,6 +142,7 @@
 #include "storage/shmem_internal.h"
 #include "storage/spin.h"
 #include "utils/builtins.h"
+#include "utils/memdebug.h"
 #include "utils/tuplestore.h"
 
 /*
@@ -405,6 +406,12 @@ ShmemGetRequestedSize(void)
 		/* pad the start address for alignment like ShmemAllocRaw() does */
 		if (alignment < PG_CACHE_LINE_SIZE)
 			alignment = PG_CACHE_LINE_SIZE;
+
+#if USE_VALGRIND
+		/* ensure there is at least one byte for a sentinel */
+		size = add_size(size, 1);
+#endif
+
 		size = TYPEALIGN(alignment, size);
 
 		size = add_size(size, request->options->size);
@@ -663,6 +670,9 @@ InitShmemAllocator(PGShmemHeader *seghdr)
 	Assert(seghdr == (void *) MAXALIGN(seghdr));
 	Assert(seghdr->content_offset == MAXALIGN(seghdr->content_offset));
 
+	VALGRIND_CREATE_BLOCK(seghdr + seghdr->content_offset, seghdr->totalsize - seghdr->content_offset, "ShmemAllocator");
+	VALGRIND_MAKE_MEM_NOACCESS(seghdr + seghdr->content_offset, seghdr->totalsize - seghdr->content_offset);
+
 	/*
 	 * Allocations after this point should go through ShmemAlloc, which
 	 * expects to allocate everything on cache line boundaries.  Make sure the
@@ -674,6 +684,8 @@ InitShmemAllocator(PGShmemHeader *seghdr)
 				(errcode(ERRCODE_OUT_OF_MEMORY),
 				 errmsg("out of shared memory (%zu bytes requested)",
 						offset)));
+
+	VALGRIND_MAKE_MEM_DEFINED(seghdr + seghdr->content_offset, sizeof(ShmemAllocatorData));
 
 	/*
 	 * In postmaster or stand-alone backend, initialize the shared memory
@@ -820,6 +832,9 @@ ShmemAllocRaw(Size size, Size alignment, Size *allocated_size)
 	SpinLockAcquire(&ShmemAllocator->shmem_lock);
 
 	rawStart = ShmemAllocator->free_offset;
+#if USE_VALGRIND
+	rawStart += 1; /* ensure there is at least one byte for a sentinel */
+#endif
 	newStart = TYPEALIGN(alignment, rawStart);
 
 	newFree = newStart + size;
@@ -827,6 +842,8 @@ ShmemAllocRaw(Size size, Size alignment, Size *allocated_size)
 	{
 		newSpace = (char *) ShmemBase + newStart;
 		ShmemAllocator->free_offset = newFree;
+
+		VALGRIND_MAKE_MEM_DEFINED(newSpace, size);
 	}
 	else
 		newSpace = NULL;
