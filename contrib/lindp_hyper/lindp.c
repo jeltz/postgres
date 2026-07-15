@@ -450,7 +450,7 @@ lindp_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
 		top = lindp_run_dp(root, hg, order, n, true);
 
 		/* we use the cost of the cheapest total path as cost of the seed */
-		if (top->cheapest_total_path != NULL)
+		if (top && top->cheapest_total_path != NULL)
 			fitness = top->cheapest_total_path->total_cost;
 		else
 			fitness = DBL_MAX;
